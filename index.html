@@ -108,6 +108,65 @@
     background: rgba(0,0,0,0.55); padding: 6px 10px; border-radius: 8px; white-space: pre;
   }
   #debug.show { display: block; }
+  .screen {
+    position: fixed; inset: 0; display: none; z-index: 15; padding: 24px;
+    background: rgba(27, 20, 16, 0.72); align-items: center; justify-content: center; text-align: center;
+  }
+  .screen.show { display: flex; }
+  .screen .card {
+    max-width: 520px; width: 100%; padding: 28px 28px 24px;
+    background: var(--panel); border: 3px solid var(--gold); border-radius: 22px;
+    box-shadow: 0 6px 0 rgba(0,0,0,0.4);
+  }
+  .screen .eyebrow { font-size: 14px; letter-spacing: 2px; text-transform: uppercase; color: var(--moss); font-weight: 700; }
+  .screen h1 { margin: 6px 0 12px; font-size: clamp(34px, 6vw, 52px); color: var(--gold); line-height: 1.05; }
+  .screen h1 .amp { color: var(--cream); font-weight: 400; }
+  .screen .stakes { margin: 0 auto 18px; max-width: 420px; font-size: 18px; line-height: 1.45; }
+  .howto { list-style: none; margin: 0 auto 22px; padding: 0; max-width: 400px; text-align: left; font-size: 16px; line-height: 1.4; }
+  .howto li { display: flex; gap: 10px; align-items: flex-start; margin: 8px 0; }
+  .howto .ico { font-size: 20px; line-height: 1.1; width: 26px; flex: none; text-align: center; }
+  .screen button {
+    min-height: 56px; padding: 0 30px; background: var(--gold); color: var(--ink);
+    border: 3px solid var(--ink); border-radius: 28px; font: inherit; font-size: 20px; font-weight: 800;
+    cursor: pointer; box-shadow: 0 5px 0 var(--ink); transition: transform 0.08s ease, box-shadow 0.08s ease;
+  }
+  .screen button:active { transform: translateY(4px); box-shadow: 0 1px 0 var(--ink); }
+  @media (max-height: 460px) {
+    .screen .card { padding: 14px 18px 12px; }
+    .screen h1 { margin: 2px 0 6px; }
+    .screen .stakes { margin-bottom: 8px; font-size: 15px; }
+    .howto { margin-bottom: 10px; font-size: 14px; }
+    .howto li { margin: 4px 0; }
+    .screen button { min-height: 46px; font-size: 17px; }
+  }
+  #tip {
+    position: absolute; display: none; pointer-events: none; transform: translate(-50%, 0);
+    align-items: center; flex-direction: column; gap: 2px;
+  }
+  #tip.show { display: flex; }
+  .tip-text {
+    background: var(--gold); color: var(--ink); border: 2px solid var(--ink); border-radius: 12px;
+    padding: 8px 14px; font-size: 16px; font-weight: 800; white-space: nowrap; box-shadow: 0 3px 0 var(--ink);
+  }
+  .tip-arrow {
+    width: 0; height: 0; border-left: 12px solid transparent; border-right: 12px solid transparent;
+    border-top: 16px solid var(--gold); order: 2; animation: bob 0.9s ease-in-out infinite;
+    filter: drop-shadow(0 2px 0 var(--ink));
+  }
+  #tip.up .tip-arrow { order: 0; border-top: none; border-bottom: 16px solid var(--gold); }
+  @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(6px); } }
+  #floaters { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+  .floater {
+    position: absolute; transform: translate(-50%, -50%); font-weight: 900; font-size: 18px;
+    color: var(--cream); text-shadow: 0 2px 0 var(--ink), 0 0 6px rgba(0,0,0,0.6);
+    animation: floatup 0.9s ease-out forwards;
+  }
+  .floater.gold { color: var(--gold); font-size: 20px; animation-duration: 1.1s; }
+  @keyframes floatup {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(0.6); }
+    15% { opacity: 1; transform: translate(-50%, -70%) scale(1.15); }
+    100% { opacity: 0; transform: translate(-50%, -160%) scale(1); }
+  }
   #rotate {
     position: fixed; inset: 0; display: none; z-index: 20;
     background: #2f4a33; color: var(--cream);
@@ -145,9 +204,33 @@
   </div>
   <button id="wave-btn" type="button">Send the first wave</button>
   <div id="panel"></div>
+  <div id="tip"><div class="tip-arrow"></div><div class="tip-text"></div></div>
+  <div id="floaters"></div>
   <div id="toast"></div>
   <div id="flash"></div>
   <div id="debug"></div>
+</div>
+
+<div id="title" class="screen">
+  <div class="card">
+    <div class="eyebrow">A woodland tower defense</div>
+    <h1>Briar <span class="amp">&amp;</span> Bastion</h1>
+    <p class="stakes">The Shadow Hollow has cracked open. Goblins are on the road, and the Bastion must hold.</p>
+    <ul class="howto">
+      <li><span class="ico">&#127793;</span>Tap a bright tile beside the road to plant a tower.</li>
+      <li><span class="ico">&#127792;</span>Towers shoot on their own. Every goblin they drop pays gold.</li>
+      <li><span class="ico">&#9873;</span>Send the next wave when you're ready. Twelve waves. Twenty lives.</li>
+    </ul>
+    <button id="start-btn" type="button">Hold the Bastion</button>
+  </div>
+</div>
+
+<div id="end" class="screen">
+  <div class="card">
+    <h1 id="end-title">The Bastion holds!</h1>
+    <p id="end-text" class="stakes"></p>
+    <button id="restart-btn" type="button">Play again</button>
+  </div>
 </div>
 
 <div id="rotate">
@@ -253,7 +336,7 @@ const GameState = (() => {
   // Every tower is a character with a job. Only the Slinger exists yet,
   // the other four arrive in M4 and slot into this same table.
   const TOWER_TYPES = {
-    slinger: { id: 'slinger', name: 'Sprout Slinger', cost: 70, range: 2.6, hitsFlying: false, blurb: 'Quick acorn shots. Ground only.' },
+    slinger: { id: 'slinger', name: 'Sprout Slinger', cost: 70, range: 2.6, damage: 8, cooldown: 0.62, windup: 0.16, projectileSpeed: 7.5, hitsFlying: false, blurb: 'Quick acorn shots. Ground only.' },
   };
   const ENEMY_TYPES = {
     grunt: { id: 'grunt', name: 'Goblin Grunt', hp: 30, speed: 1.25, bounty: 8, flying: false },
@@ -350,8 +433,19 @@ const GameState = (() => {
     waveActive: false,
     waveQueue: [],    // enemy type ids still to spawn this wave
     spawnTimer: 0,
+    spawnGap: 1.5,
+    hpScale: 1,
+    projectiles: [],
+    phase: 'title',   // title | playing | won | lost
+    kills: 0,
   };
   let nextId = 1;
+
+  function startGame() {
+    if (state.phase !== 'title') return;
+    state.phase = 'playing';
+    emit('gameStarted');
+  }
 
   function towerAt(c, r) { return state.towers.find((t) => t.c === c && t.r === r) || null; }
 
@@ -405,6 +499,7 @@ const GameState = (() => {
     const tower = {
       id: nextId++, type: typeId, c: sel.c, r: sel.r, tier: 1,
       x: worldX(sel.c), z: worldZ(sel.r), range: type.range, facing: 0,
+      cooldown: 0, windup: 0, targetId: null,
     };
     state.towers.push(tower);
     state.selected = { kind: 'tower', id: tower.id, c: sel.c, r: sel.r };
@@ -416,8 +511,9 @@ const GameState = (() => {
   // -------- enemies --------
   function spawnEnemy(typeId) {
     const t = ENEMY_TYPES[typeId];
+    const hp = Math.round(t.hp * state.hpScale);
     const e = {
-      id: nextId++, type: typeId, name: t.name, hp: t.hp, maxHp: t.hp, speed: t.speed,
+      id: nextId++, type: typeId, name: t.name, hp, maxHp: hp, speed: t.speed,
       flying: t.flying, bounty: t.bounty,
       dist: 0, lane: (Math.random() - 0.5) * 0.44,   // lateral offset so a crowd doesn't walk single file
       x: pathPoints[0].x, z: pathPoints[0].z, dirX: 1, dirZ: 0, age: 0,
@@ -448,26 +544,115 @@ const GameState = (() => {
     state.lives = Math.max(0, state.lives - 1);
     emit('enemyLeaked', e);
     emit('livesChanged', state.lives);
+    if (state.lives <= 0 && state.phase === 'playing') {
+      state.phase = 'lost';
+      emit('gameLost');
+    }
+  }
+
+  // -------- combat --------
+  function enemyById(id) { return state.enemies.find((e) => e.id === id) || null; }
+
+  // Towers shoot whichever reachable enemy is furthest down the road.
+  function pickTarget(tower, type) {
+    let best = null;
+    for (const e of state.enemies) {
+      if (e.flying && !type.hitsFlying) continue;
+      const d = Math.hypot(e.x - tower.x, e.z - tower.z);
+      if (d > tower.range) continue;
+      if (!best || e.dist > best.dist) best = e;
+    }
+    return best;
+  }
+
+  function updateTower(tower, dt) {
+    const type = TOWER_TYPES[tower.type];
+    tower.cooldown = Math.max(0, tower.cooldown - dt);
+    let target = tower.targetId ? enemyById(tower.targetId) : null;
+    if (target && Math.hypot(target.x - tower.x, target.z - tower.z) > tower.range + 0.2) target = null;
+    if (!target) { target = pickTarget(tower, type); tower.targetId = target ? target.id : null; }
+    if (target) tower.facing = Math.atan2(target.x - tower.x, target.z - tower.z);
+    if (tower.windup > 0) {
+      // anticipation: the wind-up beat before the shot
+      tower.windup -= dt;
+      if (tower.windup <= 0) {
+        if (target) fire(tower, type, target);
+        tower.cooldown = type.cooldown;
+      }
+      return;
+    }
+    if (target && tower.cooldown <= 0) {
+      tower.windup = type.windup;
+      emit('towerWindup', tower);
+    }
+  }
+
+  function fire(tower, type, target) {
+    const p = {
+      id: nextId++, towerId: tower.id, targetId: target.id, damage: type.damage,
+      x: tower.x, z: tower.z, sx: tower.x, sz: tower.z, speed: type.projectileSpeed, t: 0, total: 1,
+    };
+    p.total = Math.max(0.2, Math.hypot(target.x - tower.x, target.z - tower.z));
+    state.projectiles.push(p);
+    emit('towerFired', { tower, projectile: p });
+  }
+
+  function updateProjectiles(dt) {
+    for (let i = state.projectiles.length - 1; i >= 0; i--) {
+      const p = state.projectiles[i];
+      const target = enemyById(p.targetId);
+      if (!target) { state.projectiles.splice(i, 1); emit('projectileFizzled', p); continue; }
+      const dx = target.x - p.x, dz = target.z - p.z;
+      const dist = Math.hypot(dx, dz);
+      const step = p.speed * dt;
+      p.total = Math.max(p.total, dist + step);
+      if (dist <= step + 0.12) {
+        state.projectiles.splice(i, 1);
+        damage(target, p.damage, p);
+        continue;
+      }
+      p.x += (dx / dist) * step;
+      p.z += (dz / dist) * step;
+      p.t = Math.min(1, 1 - dist / Math.max(0.001, Math.hypot(target.x - p.sx, target.z - p.sz)));
+    }
+  }
+
+  function damage(e, amount, source) {
+    e.hp -= amount;
+    emit('enemyHit', { enemy: e, amount, x: e.x, z: e.z });
+    if (e.hp <= 0) {
+      const i = state.enemies.indexOf(e);
+      if (i >= 0) state.enemies.splice(i, 1);
+      state.gold += e.bounty;
+      state.kills += 1;
+      emit('enemyKilled', e);
+      emit('goldChanged', state.gold);
+    }
   }
 
   // -------- waves (scaffold; M7 replaces this with the 12-wave table) --------
   function startWave() {
-    if (state.waveActive) return false;
+    if (state.waveActive || state.phase !== 'playing') return false;
     state.wave += 1;
     state.waveQueue = new Array(5 + state.wave).fill('grunt');
     state.spawnTimer = 0.6;
+    state.spawnGap = Math.max(0.9, 1.5 - (state.wave - 1) * 0.08);
+    state.hpScale = 1 + (state.wave - 1) * 0.25;   // goblins toughen each wave
     state.waveActive = true;
     emit('waveStarted', state.wave);
     return true;
   }
 
   function update(dt) {
+    if (state.phase !== 'playing') return;
     state.time += dt;
+    for (const t of state.towers) updateTower(t, dt);
+    updateProjectiles(dt);
     if (state.waveActive) {
       state.spawnTimer -= dt;
       if (state.spawnTimer <= 0 && state.waveQueue.length) {
         spawnEnemy(state.waveQueue.shift());
-        state.spawnTimer = 1.5;
+        state.spawnTimer = state.spawnGap;
       }
     }
     for (let i = state.enemies.length - 1; i >= 0; i--) {
@@ -481,6 +666,10 @@ const GameState = (() => {
     if (state.waveActive && !state.waveQueue.length && !state.enemies.length) {
       state.waveActive = false;
       emit('waveEnded', state.wave);
+      if (state.wave >= CONFIG.totalWaves && state.phase === 'playing') {
+        state.phase = 'won';
+        emit('gameWon');
+      }
     }
   }
 
@@ -488,7 +677,7 @@ const GameState = (() => {
     cols, rows, SPAWN, STREAM_COL, BRIDGE_CELL, BASTION_CELLS, BASTION_GATE_CELL,
     TOWER_TYPES, ENEMY_TYPES,
     pathCells, pathWaypoints: PATH_WAYPOINTS, pathPoints, pathLength, pathPosAt, gate,
-    state, on, emit, update, worldX, worldZ,
+    state, on, emit, update, worldX, worldZ, startGame,
     selectTile, clearSelection, placeTower, canAfford, towerAt, startWave, spawnEnemy,
     inGrid, isPath, isStream, isBridge, isBastion, isSpawn, isBuildable, isCobble,
     cellKind, hollowness, pathIndexOf,
@@ -1370,6 +1559,42 @@ const Renderer = (() => {
     }
   }
 
+  // -------- projectile views: pooled acorns flying in a small arc --------
+  const acornPool = [];
+  const acornViews = new Map();
+  function makeAcorn() {
+    const g = new THREE.Group();
+    const body = new THREE.Mesh(GEO.sphereLo, toon(PALETTE.acorn));
+    body.scale.set(0.07, 0.09, 0.07);
+    addOutline(body);
+    const cap = new THREE.Mesh(GEO.dome, toon(PALETTE.acornCap));
+    cap.scale.set(0.08, 0.05, 0.08); cap.position.y = 0.04;
+    g.add(body, cap);
+    g.visible = false;
+    scene.add(g);
+    return g;
+  }
+  function updateProjectileViews() {
+    const live = new Set();
+    for (const p of GameState.state.projectiles) {
+      live.add(p.id);
+      let g = acornViews.get(p.id);
+      if (!g) {
+        g = acornPool.pop() || makeAcorn();
+        g.visible = true;
+        acornViews.set(p.id, g);
+      }
+      g.position.set(p.x, 0.75 + Math.sin(p.t * Math.PI) * 0.45, p.z);
+      g.rotation.x += 0.4; g.rotation.z += 0.25;
+    }
+    for (const [id, g] of acornViews) {
+      if (live.has(id)) continue;
+      g.visible = false;
+      acornViews.delete(id);
+      acornPool.push(g);
+    }
+  }
+
   // -------- camera shake --------
   const shake = { amp: 0, decay: 0, x: 0, y: 0 };
   function shakeCamera(amp, dur = 0.3) {
@@ -1383,16 +1608,19 @@ const Renderer = (() => {
     const g = liveProp(slingerParts(), tower.x, 0, tower.z);
     g.name = `tower-${tower.id}`;
     decal(0, 0, 0.36, g);
+    const sling = ['slingHandle', 'prongL', 'prongR', 'band'].map((n) => g.getObjectByName(n));
     const v = {
       group: g, tower, born: GameState.state.time,
       hat: g.getObjectByName('hat'), sprout: g.getObjectByName('sprout'),
       hatRz: g.getObjectByName('hat').rotation.z,
+      sling, slingBase: sling.map((m) => m.position.clone()),
+      windup: 0, recoil: 0,
     };
     towerViews.set(tower.id, v);
     puff(tower.x, 0.1, tower.z, { count: 12, color: PALETTE.path, speed: 1.6, size: 0.12, up: 1.0 });
     return v;
   }
-  function updateTowerViews(t) {
+  function updateTowerViews(t, dt) {
     for (const v of towerViews.values()) {
       const age = t - v.born;
       // placement pop: sprout up from nothing with an overshoot, then settle
@@ -1406,9 +1634,21 @@ const Renderer = (() => {
         const bob = Math.sin(t * 2.2 + v.tower.id);
         v.group.scale.set(1 - 0.015 * bob, 1 + 0.03 * bob, 1 - 0.015 * bob);
       }
-      v.group.rotation.y = v.tower.facing + Math.sin(t * 0.8 + v.tower.id * 1.7) * 0.2;
+      const idleLook = v.tower.targetId ? 0 : Math.sin(t * 0.8 + v.tower.id * 1.7) * 0.2;
+      v.group.rotation.y = v.tower.facing + idleLook;
       v.hat.rotation.z = v.hatRz + Math.sin(t * 2.2 + v.tower.id + 0.5) * 0.05;
       v.sprout.rotation.z = -0.5 + Math.sin(t * 3 + v.tower.id) * 0.25;
+      // anticipation: the sling is drawn back and the body leans in; then it snaps forward
+      const type = GameState.TOWER_TYPES[v.tower.type];
+      const pull = v.tower.windup > 0 ? 1 - v.tower.windup / type.windup : 0;
+      v.recoil = Math.max(0, v.recoil - dt * 6);
+      const back = pull * 0.16 - v.recoil * 0.1;
+      v.sling.forEach((m, i) => { m.position.z = v.slingBase[i].z - back; m.position.y = v.slingBase[i].y - pull * 0.05; });
+      v.group.rotation.x = -pull * 0.12 + v.recoil * 0.18;
+      if (age >= 0.5) {
+        const sq = 1 + v.recoil * 0.12;
+        v.group.scale.x *= sq; v.group.scale.z *= sq; v.group.scale.y /= sq;
+      }
     }
   }
 
@@ -1422,7 +1662,7 @@ const Renderer = (() => {
       group: g, e, decal: decal(0, 0, 0.3, g),
       earL: g.getObjectByName('earL'), earR: g.getObjectByName('earR'),
       footL: g.getObjectByName('footL'), footR: g.getObjectByName('footR'),
-      earM: new THREE.Matrix4(), footLz: 0.02, footRz: 0.02,
+      earM: new THREE.Matrix4(), footLz: 0.02, footRz: 0.02, pop: 0,
     };
     v.earL.matrixAutoUpdate = false; v.earR.matrixAutoUpdate = false;
     enemyViews.set(e.id, v);
@@ -1440,8 +1680,10 @@ const Renderer = (() => {
       g.rotation.x = 0.1;
       g.rotation.z = Math.sin(cycle) * 0.08;
       const stretch = 0.9 + 0.22 * bounce;
+      v.pop = Math.max(0, v.pop - dt * 5);
+      const popK = Math.sin(Math.min(1, v.pop) * Math.PI) * 0.35;   // scale-pop when hit
       const s = born * (1 - (1 - born) * 0.5);
-      g.scale.set(s * (1.06 - 0.1 * bounce), s * stretch, s * (1.06 - 0.1 * bounce));
+      g.scale.set(s * (1.06 - 0.1 * bounce + popK), s * (stretch - popK * 0.6), s * (1.06 - 0.1 * bounce + popK));
       const flap = 0.35 + 0.45 * bounce;
       pivotMatrix(0.2, 0.56, 0, 0, 0, -1.2 + flap, 0, 0.13, 0, 0.07, 0.26, 0.05, v.earL.matrix);
       pivotMatrix(-0.2, 0.56, 0, 0, 0, 1.2 - flap, 0, 0.13, 0, 0.07, 0.26, 0.05, v.earR.matrix);
@@ -1466,6 +1708,29 @@ const Renderer = (() => {
     enemyViews.delete(e.id);
     exit(v);
   }
+  // Silly death: a surprised hop, a fast spin, a stretch, then a puff of smoke.
+  function deathExit(v) {
+    const g = v.group;
+    const y0 = g.position.y, s0 = g.scale.clone();
+    let puffed = false;
+    dying.push({
+      group: g, t: 0, dur: 0.55,
+      update(k) {
+        const hop = Math.sin(Math.min(1, k * 1.6) * Math.PI);
+        g.position.y = y0 + hop * 0.5;
+        g.rotation.y += 0.7;
+        g.rotation.x = 0.1 + k * 0.4;
+        const shrink = k < 0.7 ? 1 : 1 - (k - 0.7) / 0.3;
+        g.scale.set(s0.x * (1 - k * 0.35) * shrink, s0.y * (1 + hop * 0.6) * shrink, s0.z * (1 - k * 0.35) * shrink);
+        if (k > 0.62 && !puffed) {
+          puffed = true;
+          puff(g.position.x, 0.45, g.position.z, { count: 12, color: PALETTE.cream, speed: 1.6, size: 0.13, up: 1.2, ttl: 0.7 });
+          puff(g.position.x, 0.4, g.position.z, { count: 6, color: PALETTE.goblin, speed: 2.2, size: 0.08, up: 2.2, ttl: 0.6 });
+        }
+      },
+    });
+  }
+
   // Leak: the goblin squeezes through the gate with a spin and a puff.
   function leakExit(v) {
     const g = v.group;
@@ -1550,6 +1815,13 @@ const Renderer = (() => {
     GameState.on('towerPlaced', addTowerView);
     GameState.on('enemySpawned', addEnemyView);
     GameState.on('enemyLeaked', (e) => removeEnemyView(e, leakExit));
+    GameState.on('enemyKilled', (e) => removeEnemyView(e, deathExit));
+    GameState.on('enemyHit', ({ enemy, x, z }) => {
+      const v = enemyViews.get(enemy.id);
+      if (v) v.pop = 1;
+      puff(x, 0.45, z, { count: 3, color: PALETTE.cream, speed: 1.0, size: 0.06, up: 1.0, ttl: 0.35 });
+    });
+    GameState.on('towerFired', ({ tower }) => { const v = towerViews.get(tower.id); if (v) v.recoil = 1; });
   }
 
   // -------- camera --------
@@ -1609,6 +1881,11 @@ const Renderer = (() => {
     return { c: Math.floor(hit.x + cols / 2), r: Math.floor(hit.z + rows / 2) };
   }
 
+  function worldToScreen(x, y, z) {
+    const v = new THREE.Vector3(x, y, z).project(camera);
+    return { x: (v.x + 1) / 2 * cssW, y: (1 - v.y) / 2 * cssH };
+  }
+
   // -------- init / frame --------
   function init(canvasEl) {
     canvas = canvasEl;
@@ -1648,8 +1925,9 @@ const Renderer = (() => {
 
   function render(t, dt) {
     for (const a of animated) a.update(t, dt);
-    updateTowerViews(t);
+    updateTowerViews(t, dt);
     updateEnemyViews(t, dt);
+    updateProjectileViews();
     if (shake.amp > 0) {
       shake.amp = Math.max(0, shake.amp - shake.decay * dt);
       shake.x = (Math.random() - 0.5) * 2 * shake.amp;
@@ -1664,7 +1942,7 @@ const Renderer = (() => {
     return { calls: r.calls, triangles: r.triangles };
   }
 
-  return { init, render, resize, screenToCell, stats, shakeCamera, puff, debugScene: () => scene, debugViews: () => ({ enemyViews: enemyViews.size, dying: dying.map((d) => [+d.t.toFixed(3), d.dur]), towerViews: towerViews.size }) };
+  return { init, render, resize, screenToCell, worldToScreen, stats, shakeCamera, puff, debugScene: () => scene, debugViews: () => ({ enemyViews: enemyViews.size, dying: dying.map((d) => [+d.t.toFixed(3), d.dur]), towerViews: towerViews.size }) };
 })();
 
 // ===================================================================
@@ -1766,6 +2044,70 @@ const UI = (() => {
     }
   }
 
+  // Floating numbers: damage in cream, gold in gold, anchored to a world point.
+  function floater(x, y, z, text, cls) {
+    const p = Renderer.worldToScreen(x, y, z);
+    const el = document.createElement('div');
+    el.className = 'floater' + (cls ? ' ' + cls : '');
+    el.textContent = text;
+    el.style.left = p.x + 'px';
+    el.style.top = p.y + 'px';
+    const host = $('floaters');
+    host.appendChild(el);
+    if (host.childElementCount > 40) host.removeChild(host.firstElementChild);
+    el.addEventListener('animationend', () => el.remove());
+  }
+
+  // Onboarding: one tip at a time, anchored to the thing to tap next.
+  const TIP_TILE = [7, 5];
+  function tipState() {
+    const s = GameState.state;
+    if (s.phase !== 'playing') return null;
+    if (s.towers.length === 0) return 'build';
+    if (s.wave === 0) return 'wave';
+    return null;
+  }
+  function updateTip() {
+    const st = tipState();
+    const tip = $('tip');
+    if (!st) { tip.classList.remove('show'); return; }
+    tip.classList.add('show');
+    if (st === 'build') {
+      const sel = GameState.state.selected;
+      const p = Renderer.worldToScreen(GameState.worldX(TIP_TILE[0]), 0, GameState.worldZ(TIP_TILE[1]));
+      const text = sel && sel.kind === 'tile' ? 'Now tap the Sprout Slinger button' : 'Tap here to plant a tower';
+      if (sel && sel.kind === 'tile') {
+        const bb = $('panel').getBoundingClientRect();
+        tip.classList.add('up');
+        tip.style.left = (bb.left + bb.width / 2) + 'px';
+        tip.style.top = (bb.top - 52) + 'px';
+        tip.style.transform = 'translate(-50%, -100%)';
+      } else {
+        tip.classList.remove('up');
+        tip.style.left = p.x + 'px';
+        tip.style.top = (p.y - 60) + 'px';
+        tip.style.transform = 'translate(-50%, -100%)';
+      }
+      $('tip').querySelector('.tip-text').textContent = text;
+    } else {
+      const bb = $('wave-btn').getBoundingClientRect();
+      tip.classList.add('up');
+      tip.style.left = (bb.left + bb.width / 2) + 'px';
+      tip.style.top = (bb.bottom + 8) + 'px';
+      tip.style.transform = 'translate(-50%, 0)';
+      $('tip').querySelector('.tip-text').textContent = 'Send the first wave';
+    }
+  }
+
+  function showEnd(won) {
+    const s = GameState.state;
+    $('end-title').textContent = won ? 'The Bastion holds!' : 'The Bastion has fallen';
+    $('end-text').textContent = won
+      ? `Twelve waves turned back with ${s.lives} of 20 lives to spare. The valley sleeps easy tonight.`
+      : `The goblins got through on wave ${s.wave}. Plant towers where the road bends and keep gold moving.`;
+    $('end').classList.add('show');
+  }
+
   function updateOrientation() {
     const portrait = window.innerHeight > window.innerWidth;
     const mobile = (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) || window.innerWidth < 720;
@@ -1789,6 +2131,13 @@ const UI = (() => {
       if (!res.ok && res.reason) toast(res.reason, true);
     });
     $('wave-btn').addEventListener('click', () => { Audio.unlock(); GameState.startWave(); });
+    $('title').classList.add('show');
+    $('start-btn').addEventListener('click', () => { Audio.unlock(); $('title').classList.remove('show'); GameState.startGame(); });
+    $('restart-btn').addEventListener('click', () => location.reload());
+    GameState.on('enemyHit', ({ enemy, amount, x, z }) => floater(x, 0.7, z, amount));
+    GameState.on('enemyKilled', (e) => floater(e.x, 0.9, e.z, `+${e.bounty}`, 'gold'));
+    GameState.on('gameWon', () => setTimeout(() => showEnd(true), 900));
+    GameState.on('gameLost', () => setTimeout(() => showEnd(false), 900));
 
     GameState.on('tileSelected', renderPanel);
     GameState.on('towerSelected', renderPanel);
@@ -1804,6 +2153,7 @@ const UI = (() => {
 
   function frame(dt) {
     updateHud();
+    updateTip();
     if (!debugOn) return;
     fpsAcc += dt; fpsFrames++;
     if (fpsAcc >= 0.5) {
@@ -1885,6 +2235,28 @@ const Audio = (() => {
       voice({ type: 'sawtooth', freq: 262, to: 262, dur: 0.18, vol: 0.2, cutoff: 1600, delay: 0.24 });
       voice({ type: 'sawtooth', freq: 392, to: 392, dur: 0.45, vol: 0.24, cutoff: 1800, delay: 0.44 });
     },
+    shoot() {    // a quick elastic "thwip"
+      voice({ type: 'triangle', freq: 900, to: 380, dur: 0.07, vol: 0.2, cutoff: 3200 });
+      voice({ type: 'sine', freq: 240, to: 520, dur: 0.06, vol: 0.12, cutoff: 1800 });
+    },
+    hit() {      // a woody "tok"
+      voice({ type: 'square', freq: 620, to: 300, dur: 0.05, vol: 0.14, cutoff: 1800 });
+      voice({ type: 'triangle', freq: 180, to: 120, dur: 0.07, vol: 0.2, cutoff: 900 });
+    },
+    death() {    // a surprised "bwoop" sliding down, then a soft pop
+      voice({ type: 'square', freq: 520, to: 160, dur: 0.28, vol: 0.16, cutoff: 1500 });
+      voice({ type: 'triangle', freq: 90, to: 60, dur: 0.12, vol: 0.32, cutoff: 700, delay: 0.24 });
+    },
+    gold() {     // two bright coin notes
+      voice({ type: 'sine', freq: 1318, to: 1318, dur: 0.09, vol: 0.18, cutoff: 5000, delay: 0.28 });
+      voice({ type: 'sine', freq: 1760, to: 1760, dur: 0.16, vol: 0.18, cutoff: 5000, delay: 0.36 });
+    },
+    win() {
+      [523, 659, 784, 1047].forEach((f, i) => voice({ type: 'triangle', freq: f, to: f, dur: i === 3 ? 0.7 : 0.2, vol: 0.26, cutoff: 3000, delay: i * 0.16 }));
+    },
+    lose() {
+      [330, 311, 294, 220].forEach((f, i) => voice({ type: 'sawtooth', freq: f, to: f * 0.97, dur: i === 3 ? 0.9 : 0.3, vol: 0.18, cutoff: 1100, delay: i * 0.28 }));
+    },
     waveEnd() {     // bright rising triad
       voice({ type: 'sine', freq: 523, to: 523, dur: 0.14, vol: 0.25, cutoff: 3000 });
       voice({ type: 'sine', freq: 659, to: 659, dur: 0.14, vol: 0.25, cutoff: 3000, delay: 0.12 });
@@ -1902,6 +2274,11 @@ const Audio = (() => {
     GameState.on('enemyLeaked', () => sfx.leak());
     GameState.on('waveStarted', () => sfx.waveStart());
     GameState.on('waveEnded', () => sfx.waveEnd());
+    GameState.on('towerFired', () => sfx.shoot());
+    GameState.on('enemyHit', () => sfx.hit());
+    GameState.on('enemyKilled', () => { sfx.death(); sfx.gold(); });
+    GameState.on('gameWon', () => sfx.win());
+    GameState.on('gameLost', () => sfx.lose());
   }
 
   return { init, unlock, sfx };

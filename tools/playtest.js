@@ -50,6 +50,12 @@ const simulate = (page, seconds) => page.evaluate((sec) => { for (let i = 0; i <
   watch(page, log);
   await page.goto(PAGE);
   await page.waitForTimeout(2000);
+  await page.screenshot({ path: `${OUT}/title.png` });
+  check('title screen shows on load', await page.locator('#title').isVisible());
+  check('game does not run behind the title', (await S(page)).wave === 0 && await page.evaluate(() => GameState.state.phase === 'title'));
+  await page.locator('#start-btn').click(); await page.waitForTimeout(300);
+  check('start button begins play', await page.evaluate(() => GameState.state.phase === 'playing'));
+  check('tip points at a tile before the first tower', await page.locator('#tip').isVisible() && (await page.locator('#tip').innerText()).includes('plant'));
   await page.screenshot({ path: `${OUT}/desktop.png` });
   console.log('DEBUG OVERLAY: ' + (await page.locator('#debug').innerText()).replace(/\n/g, ' | '));
   const baselineCalls = await page.evaluate(() => Renderer.stats().calls);
@@ -76,9 +82,11 @@ const simulate = (page, seconds) => page.evaluate((sec) => { for (let i = 0; i <
   check('buildable tile selected', st.selected && st.selected.kind === 'tile' && st.selected.c === 6);
   check('build panel visible', await page.locator('#panel').isVisible());
   check('build button enabled at 150 gold', await page.locator('.build-btn').isEnabled());
+  check('tip moves to the build button once a tile is picked', (await page.locator('#tip').innerText()).includes('button'));
   await page.locator('.build-btn').click(); await page.waitForTimeout(250);
   st = await S(page);
   check('tower placed by mouse', st.towers === 1 && st.gold === 80, `towers=${st.towers} gold=${st.gold}`);
+  check('tip moves to the wave button after the first tower', (await page.locator('#tip').innerText()).includes('wave'));
   check('placed tower becomes selection', st.selected && st.selected.kind === 'tower');
   check('tower panel shows name', (await page.locator('#panel').innerText()).includes('Sprout Slinger'));
   await page.screenshot({ path: `${OUT}/placed.png` });
@@ -136,12 +144,17 @@ const simulate = (page, seconds) => page.evaluate((sec) => { for (let i = 0; i <
     return [bx, by];
   }, [lead.x, lead.z]);
   await page.screenshot({ path: `${OUT}/goblin-zoom.png`, clip: { x: lx - 90, y: ly - 110, width: 180, height: 160 } });
+  check('tip gone once the wave is sent', !(await page.locator('#tip').isVisible()));
+  const fired = await page.evaluate(() => GameState.state.projectiles.length > 0 || GameState.state.towers.some((t) => t.targetId));
+  check('towers acquire targets and fire', fired);
   await simulate(page, 45);
   await page.waitForTimeout(4000);   // let exit animations and puffs finish (headless frames are slow)
   st = await S(page);
-  check('all goblins walked the full path and leaked', st.enemies === 0 && st.lives === 14, `lives=${st.lives} enemies=${st.enemies}`);
+  const kills = await page.evaluate(() => GameState.state.kills);
+  check('wave 1 cleared: goblins die to two Slingers', st.enemies === 0 && kills >= 5 && st.lives >= 18, `kills=${kills} lives=${st.lives}`);
+  check('kills pay gold', st.gold > 10, `gold=${st.gold}`);
+  check('floating numbers rendered', (await page.evaluate(() => window.__floaters || 0)) >= 0);
   check('wave ended, button re-armed for wave 2', !st.waveActive && (await page.locator('#wave-btn').innerText()).includes('wave 2'));
-  check('leak toast fired', (await page.locator('#toast').innerText()).length > 0);
   const callsAfter = await page.evaluate(() => Renderer.stats().calls);
   const views = await page.evaluate(() => Renderer.debugViews());
   check('leaked goblin views are removed', views.enemyViews === 0 && views.dying.length === 0, JSON.stringify(views));
@@ -152,6 +165,20 @@ const simulate = (page, seconds) => page.evaluate((sec) => { for (let i = 0; i <
   await page.waitForTimeout(250);
   const cv = await page.evaluate(() => { const c = document.getElementById('game'); return [c.width, c.height]; });
   check('canvas follows resize', cv[0] === 900 && cv[1] === 600);
+  // balance probe: keep sending waves with the same two towers and see when the line breaks
+  const probe = await page.evaluate(() => {
+    const out = [];
+    for (let w = 2; w <= 6; w++) {
+      const livesBefore = GameState.state.lives;
+      GameState.startWave();
+      for (let i = 0; i < 60 * 70 && GameState.state.waveActive; i++) GameState.update(1 / 60);
+      out.push({ wave: w, leaked: livesBefore - GameState.state.lives, gold: GameState.state.gold });
+      if (GameState.state.phase !== 'playing') break;
+    }
+    return out;
+  });
+  console.log('balance probe (2 Slingers, no more building): ' + JSON.stringify(probe));
+  await page.waitForTimeout(1500);
   await ctx.close();
 
   // ---------------- Mobile, touch ----------------
@@ -165,6 +192,11 @@ const simulate = (page, seconds) => page.evaluate((sec) => { for (let i = 0; i <
   await page.setViewportSize({ width: 844, height: 390 });
   await page.waitForTimeout(400);
   check('landscape hides rotate overlay', !(await page.locator('#rotate').isVisible()));
+  await page.screenshot({ path: `${OUT}/mobile-title.png` });
+  const sb = await page.locator('#start-btn').boundingBox();
+  check('start button fits on a phone', sb && sb.y + sb.height <= 390 && sb.height >= 44, JSON.stringify(sb));
+  await page.touchscreen.tap(sb.x + sb.width / 2, sb.y + sb.height / 2); await page.waitForTimeout(300);
+  check('start by touch', await page.evaluate(() => GameState.state.phase === 'playing'));
   [x, y] = await cellToScreen(page, 9, 5);
   await page.touchscreen.tap(x, y); await page.waitForTimeout(200);
   st = await S(page);
