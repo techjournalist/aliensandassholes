@@ -55,8 +55,55 @@
   }
   #toast.show { opacity: 1; transform: translate(-50%, 0); }
   #toast.bad { border-color: #ff8fa3; color: #ffd0d8; }
+  #wave-btn {
+    position: absolute; top: max(10px, env(safe-area-inset-top));
+    right: max(10px, env(safe-area-inset-right));
+    pointer-events: auto; min-height: 48px; padding: 0 20px;
+    background: var(--gold); color: var(--ink); border: 3px solid var(--ink);
+    border-radius: 24px; font: inherit; font-size: 18px; font-weight: 800;
+    cursor: pointer; box-shadow: 0 4px 0 var(--ink);
+    transition: transform 0.08s ease, box-shadow 0.08s ease;
+  }
+  #wave-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
+  #wave-btn:disabled {
+    background: var(--panel); color: #bfe6ff; border-color: #bfe6ff;
+    box-shadow: 0 3px 0 rgba(0,0,0,0.35); cursor: default; transform: none;
+  }
+  #panel {
+    position: absolute; left: max(10px, env(safe-area-inset-left)); bottom: max(10px, env(safe-area-inset-bottom));
+    transform: translate(0, 12px); opacity: 0; pointer-events: none; visibility: hidden;
+    background: var(--panel); border: 2px solid var(--gold); border-radius: 16px;
+    padding: 10px 12px; min-width: 240px; max-width: 320px;
+    transition: opacity 0.15s ease, transform 0.15s ease, visibility 0s linear 0.15s;
+    box-shadow: 0 3px 0 rgba(0,0,0,0.35);
+  }
+  #panel.show { opacity: 1; transform: translate(0, 0); pointer-events: auto; visibility: visible; transition-delay: 0s; }
+  .panel-title { font-size: 15px; font-weight: 800; color: var(--gold); margin: 0 4px 8px; letter-spacing: 0.4px; }
+  .panel-title .tier { color: var(--cream); font-weight: 600; opacity: 0.8; margin-left: 6px; }
+  .panel-blurb { font-size: 15px; margin: 0 4px 2px; opacity: 0.9; }
+  .build-btn {
+    display: flex; align-items: center; gap: 12px; width: 100%; min-height: 56px;
+    padding: 6px 12px; background: #2f4a33; color: var(--cream);
+    border: 2px solid var(--moss); border-radius: 12px; font: inherit; text-align: left;
+    cursor: pointer; transition: transform 0.08s ease, background 0.1s ease;
+  }
+  .build-btn:active { transform: scale(0.97); background: #3a5a3f; }
+  .build-btn:disabled { opacity: 0.55; cursor: default; border-color: #6d6e66; }
+  .build-icon { font-size: 26px; line-height: 1; }
+  .build-text { display: flex; flex-direction: column; flex: 1; }
+  .build-name { font-size: 17px; font-weight: 800; }
+  .build-blurb { font-size: 13px; opacity: 0.8; }
+  .build-cost { font-size: 17px; font-weight: 800; color: var(--gold); white-space: nowrap; }
+  .build-cost.poor { color: #ff8fa3; }
+  #flash { position: absolute; inset: 0; pointer-events: none; opacity: 0; }
+  #flash.leak { animation: leakflash 0.5s ease-out; }
+  @keyframes leakflash {
+    0% { opacity: 0; }
+    15% { opacity: 1; box-shadow: inset 0 0 120px 40px rgba(255, 70, 90, 0.55); }
+    100% { opacity: 0; box-shadow: inset 0 0 160px 60px rgba(255, 70, 90, 0); }
+  }
   #debug {
-    position: absolute; right: 10px; top: 10px; display: none;
+    position: absolute; right: 10px; top: 70px; display: none;
     font: 12px/1.5 ui-monospace, Menlo, Consolas, monospace;
     background: rgba(0,0,0,0.55); padding: 6px 10px; border-radius: 8px; white-space: pre;
   }
@@ -96,7 +143,10 @@
     <div class="pill lives"><span class="icon">&#9829;</span><span id="hud-lives">0</span></div>
     <div class="pill wave"><span class="icon">&#9873;</span><span id="hud-wave">Wave</span></div>
   </div>
+  <button id="wave-btn" type="button">Send the first wave</button>
+  <div id="panel"></div>
   <div id="toast"></div>
+  <div id="flash"></div>
   <div id="debug"></div>
 </div>
 
@@ -166,6 +216,8 @@ const PALETTE = {
   hollowWood:   0x4a3f44,
   hollowRock:   0x8c8894,
   spore:        0x8a5fc4,
+  goblin:       0x9ac04b,
+  goblinDark:   0x5f7d2a,
   outline:      0x1b1410,
   windowWarm:   0xffd36b,
   shadow:       0x000000,
@@ -198,9 +250,21 @@ const GameState = (() => {
   const BASTION_GATE_CELL = [16, 8];
   const COBBLE_CELLS = 3;    // last N path cells are cobbled
 
+  // Every tower is a character with a job. Only the Slinger exists yet,
+  // the other four arrive in M4 and slot into this same table.
+  const TOWER_TYPES = {
+    slinger: { id: 'slinger', name: 'Sprout Slinger', cost: 70, range: 2.6, hitsFlying: false, blurb: 'Quick acorn shots. Ground only.' },
+  };
+  const ENEMY_TYPES = {
+    grunt: { id: 'grunt', name: 'Goblin Grunt', hp: 30, speed: 1.25, bounty: 8, flying: false },
+  };
+
   const listeners = {};
   function on(event, fn) { (listeners[event] = listeners[event] || []).push(fn); }
   function emit(event, payload) { (listeners[event] || []).forEach((fn) => fn(payload)); }
+
+  const worldX = (c) => c - cols / 2 + 0.5;
+  const worldZ = (r) => r - rows / 2 + 0.5;
 
   // Expand the waypoint list into an ordered list of path cells.
   const pathCells = [];
@@ -213,6 +277,30 @@ const GameState = (() => {
     while (x !== bx || z !== bz) { x += dx; z += dz; pathCells.push([x, z]); }
   }
   const pathIndex = new Map(pathCells.map(([c, r], i) => [`${c},${r}`, i]));
+
+  // World-space polyline the enemies walk: waypoint centers, plus a final
+  // step north into the keep's gate so leaks visibly go through the door.
+  const pathPoints = PATH_WAYPOINTS.map(([c, r]) => ({ x: worldX(c), z: worldZ(r) }));
+  const gate = { x: worldX(BASTION_GATE_CELL[0]), z: worldZ(BASTION_GATE_CELL[1] + 1) - 0.72 };
+  pathPoints.push(gate);
+  const pathLens = [0];
+  for (let i = 1; i < pathPoints.length; i++) {
+    const a = pathPoints[i - 1], b = pathPoints[i];
+    pathLens.push(pathLens[i - 1] + Math.hypot(b.x - a.x, b.z - a.z));
+  }
+  const pathLength = pathLens[pathLens.length - 1];
+  function pathPosAt(d, out) {
+    out = out || { x: 0, z: 0 };
+    if (d <= 0) { out.x = pathPoints[0].x; out.z = pathPoints[0].z; return out; }
+    if (d >= pathLength) { out.x = gate.x; out.z = gate.z; return out; }
+    let i = 1;
+    while (pathLens[i] < d) i++;
+    const a = pathPoints[i - 1], b = pathPoints[i];
+    const t = (d - pathLens[i - 1]) / (pathLens[i] - pathLens[i - 1]);
+    out.x = a.x + (b.x - a.x) * t;
+    out.z = a.z + (b.z - a.z) * t;
+    return out;
+  }
 
   function key(c, r) { return `${c},${r}`; }
   function inGrid(c, r) { return c >= 0 && r >= 0 && c < cols && r < rows; }
@@ -256,15 +344,33 @@ const GameState = (() => {
     lives: CONFIG.startLives,
     wave: 0,
     time: 0,
-    selected: null,   // {c, r} of a buildable tile the player tapped
+    selected: null,   // {kind:'tile', c, r} or {kind:'tower', id, c, r}
     towers: [],
     enemies: [],
+    waveActive: false,
+    waveQueue: [],    // enemy type ids still to spawn this wave
+    spawnTimer: 0,
   };
+  let nextId = 1;
 
-  // The one interaction M1 supports: pick a tile. Rejections carry an
-  // in-world reason so the UI can teach the placement rule by feedback.
+  function towerAt(c, r) { return state.towers.find((t) => t.c === c && t.r === r) || null; }
+
+  function clearSelection() {
+    if (!state.selected) return;
+    state.selected = null;
+    emit('selectionCleared');
+  }
+
+  // Tap on a tile: select a tower, select an empty buildable tile, or
+  // explain in-world why nothing can go there.
   function selectTile(c, r) {
-    if (!inGrid(c, r)) return { ok: false, c, r, reason: 'Beyond the valley.' };
+    if (!inGrid(c, r)) { clearSelection(); return { ok: false, c, r, reason: null }; }
+    const tower = towerAt(c, r);
+    if (tower) {
+      state.selected = { kind: 'tower', id: tower.id, c, r };
+      emit('towerSelected', tower);
+      return { ok: true, c, r, tower };
+    }
     let reason = null;
     if (isPath(c, r)) reason = "Can't build on the road, the goblins walk there.";
     else if (isStream(c, r)) reason = "Can't build in the stream.";
@@ -272,23 +378,118 @@ const GameState = (() => {
     else if (isSpawn(c, r)) reason = 'Nothing grows on the Hollow stump.';
     else if (!isBuildable(c, r)) reason = 'Too far from the road. A tower needs a road to watch.';
     if (reason) {
-      state.selected = null;
+      clearSelection();
       const res = { ok: false, c, r, reason };
       emit('tileRejected', res);
       return res;
     }
-    state.selected = { c, r };
+    state.selected = { kind: 'tile', c, r };
     const res = { ok: true, c, r };
     emit('tileSelected', res);
     return res;
   }
 
-  function update(dt) { state.time += dt; }
+  function canAfford(typeId) { return state.gold >= TOWER_TYPES[typeId].cost; }
+
+  // Place a tower of the given type on the currently selected tile.
+  function placeTower(typeId) {
+    const sel = state.selected, type = TOWER_TYPES[typeId];
+    if (!sel || sel.kind !== 'tile' || !type) return { ok: false, reason: 'Pick a spot by the road first.' };
+    if (towerAt(sel.c, sel.r)) return { ok: false, reason: 'Something already stands there.' };
+    if (state.gold < type.cost) {
+      const res = { ok: false, reason: `Not enough gold. A ${type.name} costs ${type.cost}.` };
+      emit('placeRejected', res);
+      return res;
+    }
+    state.gold -= type.cost;
+    const tower = {
+      id: nextId++, type: typeId, c: sel.c, r: sel.r, tier: 1,
+      x: worldX(sel.c), z: worldZ(sel.r), range: type.range, facing: 0,
+    };
+    state.towers.push(tower);
+    state.selected = { kind: 'tower', id: tower.id, c: sel.c, r: sel.r };
+    emit('towerPlaced', tower);
+    emit('goldChanged', state.gold);
+    return { ok: true, tower };
+  }
+
+  // -------- enemies --------
+  function spawnEnemy(typeId) {
+    const t = ENEMY_TYPES[typeId];
+    const e = {
+      id: nextId++, type: typeId, name: t.name, hp: t.hp, maxHp: t.hp, speed: t.speed,
+      flying: t.flying, bounty: t.bounty,
+      dist: 0, lane: (Math.random() - 0.5) * 0.44,   // lateral offset so a crowd doesn't walk single file
+      x: pathPoints[0].x, z: pathPoints[0].z, dirX: 1, dirZ: 0, age: 0,
+    };
+    state.enemies.push(e);
+    emit('enemySpawned', e);
+    return e;
+  }
+
+  const _a = { x: 0, z: 0 }, _b = { x: 0, z: 0 };
+  function moveEnemy(e, dt) {
+    e.age += dt;
+    e.dist += e.speed * dt;
+    pathPosAt(e.dist - 0.3, _a);
+    pathPosAt(e.dist + 0.3, _b);
+    let dx = _b.x - _a.x, dz = _b.z - _a.z;
+    const l = Math.hypot(dx, dz) || 1;
+    dx /= l; dz /= l;
+    e.dirX = dx; e.dirZ = dz;
+    pathPosAt(e.dist, _a);
+    // lane offset fades out over the last stretch so everyone funnels into the gate
+    const funnel = Math.min(1, Math.max(0, (pathLength - e.dist) / 1.2));
+    e.x = _a.x + -dz * e.lane * funnel;
+    e.z = _a.z + dx * e.lane * funnel;
+  }
+
+  function leak(e) {
+    state.lives = Math.max(0, state.lives - 1);
+    emit('enemyLeaked', e);
+    emit('livesChanged', state.lives);
+  }
+
+  // -------- waves (scaffold; M7 replaces this with the 12-wave table) --------
+  function startWave() {
+    if (state.waveActive) return false;
+    state.wave += 1;
+    state.waveQueue = new Array(5 + state.wave).fill('grunt');
+    state.spawnTimer = 0.6;
+    state.waveActive = true;
+    emit('waveStarted', state.wave);
+    return true;
+  }
+
+  function update(dt) {
+    state.time += dt;
+    if (state.waveActive) {
+      state.spawnTimer -= dt;
+      if (state.spawnTimer <= 0 && state.waveQueue.length) {
+        spawnEnemy(state.waveQueue.shift());
+        state.spawnTimer = 1.5;
+      }
+    }
+    for (let i = state.enemies.length - 1; i >= 0; i--) {
+      const e = state.enemies[i];
+      moveEnemy(e, dt);
+      if (e.dist >= pathLength) {
+        state.enemies.splice(i, 1);
+        leak(e);
+      }
+    }
+    if (state.waveActive && !state.waveQueue.length && !state.enemies.length) {
+      state.waveActive = false;
+      emit('waveEnded', state.wave);
+    }
+  }
 
   return {
     cols, rows, SPAWN, STREAM_COL, BRIDGE_CELL, BASTION_CELLS, BASTION_GATE_CELL,
-    pathCells, pathWaypoints: PATH_WAYPOINTS,
-    state, on, emit, update, selectTile,
+    TOWER_TYPES, ENEMY_TYPES,
+    pathCells, pathWaypoints: PATH_WAYPOINTS, pathPoints, pathLength, pathPosAt, gate,
+    state, on, emit, update, worldX, worldZ,
+    selectTile, clearSelection, placeTower, canAfford, towerAt, startWave, spawnEnemy,
     inGrid, isPath, isStream, isBridge, isBastion, isSpawn, isBuildable, isCobble,
     cellKind, hollowness, pathIndexOf,
   };
@@ -318,8 +519,7 @@ const Renderer = (() => {
       return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
     };
   }
-  const worldX = (c) => c - cols / 2 + 0.5;
-  const worldZ = (r) => r - rows / 2 + 0.5;
+  const { worldX, worldZ } = GameState;
   const lerpColor = (a, b, t) => new THREE.Color(a).lerp(new THREE.Color(b), t);
 
   function toon(color, opts = {}) {
@@ -483,21 +683,42 @@ const Renderer = (() => {
     }
   }
 
-  // Live props: a Group of real meshes we can animate (squash, sway, bob).
+  // Live props: a Group we can animate (squash, sway, bob). Parts flagged
+  // `live` stay separate meshes so they can move on their own; the rest are
+  // merged into one vertex-colored mesh plus one outline mesh, which keeps a
+  // character at roughly 4 draw calls plus 2 per live part.
+  function colored(geo, color) {
+    const c = new THREE.Color(color), n = geo.attributes.position.count;
+    const arr = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) { arr[i * 3] = c.r; arr[i * 3 + 1] = c.g; arr[i * 3 + 2] = c.b; }
+    geo.setAttribute('color', new THREE.BufferAttribute(arr, 3));
+    return geo;
+  }
   function liveProp(parts, x, y, z) {
     const g = new THREE.Group();
     g.position.set(x, y, z);
+    const toonGeos = [], unlitGeos = [], outlineGeos = [];
     for (const p of parts) {
-      const mat = p.unlit ? unlit(p.color) : toon(p.color, p.matOpts);
-      const mesh = new THREE.Mesh(p.geo, mat);
-      mesh.applyMatrix4(p.m);
-      if (p.name) mesh.name = p.name;
-      if (p.outline) addOutline(mesh);
-      g.add(mesh);
+      if (p.live) {
+        const mat = p.unlit ? unlit(p.color) : toon(p.color, p.matOpts);
+        const mesh = new THREE.Mesh(p.geo, mat);
+        mesh.applyMatrix4(p.m);
+        if (p.name) mesh.name = p.name;
+        if (p.outline) addOutline(mesh);
+        g.add(mesh);
+        continue;
+      }
+      (p.unlit ? unlitGeos : toonGeos).push(colored(p.geo.clone().applyMatrix4(p.m), p.color));
+      if (p.outline) outlineGeos.push(smoothedForOutline(p.geo).clone().applyMatrix4(p.m));
     }
+    if (toonGeos.length) { const m = new THREE.Mesh(mergeGeoms(toonGeos), toon(0xffffff, { vc: true })); m.name = 'merged'; g.add(m); }
+    if (unlitGeos.length) { const m = new THREE.Mesh(mergeGeoms(unlitGeos), unlitVC()); m.name = 'mergedUnlit'; g.add(m); }
+    if (outlineGeos.length) { const m = new THREE.Mesh(mergeGeoms(outlineGeos), outlineMat); m.name = 'mergedOutline'; g.add(m); }
     scene.add(g);
     return g;
   }
+  let _unlitVC = null;
+  function unlitVC() { return _unlitVC || (_unlitVC = new THREE.MeshBasicMaterial({ vertexColors: true })); }
   function decal(x, z, radius, parent) {
     const d = new THREE.Mesh(GEO.circle, unlit(PALETTE.shadow, { opacity: 0.22, depthWrite: false }));
     d.position.set(x, 0.012, z);
@@ -964,7 +1185,8 @@ const Renderer = (() => {
         }
         return;
       }
-      if (roll < 0.22) {
+      const hidesTower = GameState.isBuildable(c, r - 1) || GameState.isBuildable(c - 1, r - 1);
+      if (roll < 0.22 && !hidesTower) {
         const { parts, radius } = treeParts(rng);
         if (swayTrees.length < 8) {
           const g = liveProp(parts, x, 0, z);
@@ -1044,38 +1266,228 @@ const Renderer = (() => {
     });
   }
 
-  // The M1 outline test shape: a gnome-knight standing on a buildable tile.
-  function buildTestGnome() {
-    const cell = [6, 5];
-    const parts = [
-      P(GEO.sphereLo, PALETTE.tunic, M(0, 0.3, 0, { sx: 0.27, sy: 0.24, sz: 0.25 }), true, { name: 'body' }),
-      P(GEO.sphereLo, PALETTE.woodLight, M(0, 0.06, 0.1, { sx: 0.1, sy: 0.06, sz: 0.12 }), true, { name: 'footL' }),
-      P(GEO.sphereLo, PALETTE.woodLight, M(-0.15, 0.06, 0.06, { sx: 0.1, sy: 0.06, sz: 0.12 }), true, { name: 'footR' }),
-      P(GEO.sphere, PALETTE.skin, M(0, 0.62, 0, { s: 0.23 }), true, { name: 'head' }),
-      P(GEO.sphereLo, PALETTE.cream, M(0, 0.5, 0.15, { sx: 0.18, sy: 0.16, sz: 0.12 }), true, { name: 'beard' }),
-      P(GEO.sphereLo, 0xf0a98a, M(0, 0.62, 0.22, { s: 0.06 }), false, { name: 'nose' }),
-      P(GEO.cone, PALETTE.capRed, M(0.02, 1.02, -0.02, { sx: 0.24, sy: 0.55, sz: 0.24, rz: -0.12 }), true, { name: 'hat' }),
-      P(GEO.cyl, PALETTE.capRed, M(0, 0.78, 0, { sx: 0.27, sy: 0.05, sz: 0.27 }), true, { name: 'brim' }),
-      P(GEO.sphereLo, PALETTE.stone, M(0.3, 0.3, 0.05, { sx: 0.12, sy: 0.16, sz: 0.05 }), true, { name: 'shield' }),
-    ];
-    const x = worldX(cell[0]), z = worldZ(cell[1]);
-    const g = liveProp(parts, x, 0, z);
-    g.name = 'testGnome';
-    decal(0, 0, 0.32, g).position.y = 0.012;
-    const hat = g.getObjectByName('hat');
-    const hatBaseRz = hat.rotation.z;
-    animated.push({
-      update(t) {
-        const bob = Math.sin(t * 2.4);
-        g.scale.set(1 - 0.022 * bob, 1 + 0.045 * bob, 1 - 0.022 * bob);
-        g.position.y = 0.03 * Math.max(0, bob);
-        g.rotation.y = Math.sin(t * 0.7) * 0.25;
-        hat.rotation.z = hatBaseRz + Math.sin(t * 2.4 + 0.6) * 0.06;
-      },
-    });
-    return g;
+  // -------- characters --------
+  // A part whose matrix pivots at (px,py,pz), rotates, then offsets by
+  // (ox,oy,oz) before scaling: used for ears and arms that swing from a joint.
+  function pivotMatrix(px, py, pz, rx, ry, rz, ox, oy, oz, sx, sy, sz, out) {
+    out = out || new THREE.Matrix4();
+    _e.set(rx, ry, rz);
+    out.makeTranslation(px, py, pz)
+      .multiply(new THREE.Matrix4().makeRotationFromEuler(_e))
+      .multiply(new THREE.Matrix4().makeTranslation(ox, oy, oz))
+      .multiply(new THREE.Matrix4().makeScale(sx, sy, sz));
+    return out;
   }
 
+  // Sprout Slinger: a small gnome-knight on a mossy stone pad, holding a
+  // forked slingshot up and ready. Faces +z. Silhouette: the raised fork.
+  function slingerParts() {
+    return [
+      P(GEO.cyl, PALETTE.stoneDark, M(0, 0.06, 0, { sx: 0.38, sy: 0.12, sz: 0.38 }), true, { name: 'pad' }),
+      P(GEO.cyl, PALETTE.moss, M(0, 0.13, 0, { sx: 0.34, sy: 0.04, sz: 0.34 }), false, { name: 'padMoss' }),
+      P(GEO.cone, PALETTE.meadowLight, M(0.3, 0.2, 0.18, { sx: 0.05, sy: 0.12, sz: 0.05, rz: -0.3 }), false),
+      P(GEO.cone, PALETTE.meadowLight, M(-0.28, 0.2, -0.2, { sx: 0.05, sy: 0.1, sz: 0.05, rz: 0.3 }), false),
+      P(GEO.sphereLo, PALETTE.tunic, M(0, 0.42, 0, { sx: 0.25, sy: 0.22, sz: 0.23 }), true, { name: 'body' }),
+      P(GEO.sphereLo, PALETTE.woodLight, M(0.1, 0.18, 0.08, { sx: 0.09, sy: 0.05, sz: 0.11 }), true),
+      P(GEO.sphereLo, PALETTE.woodLight, M(-0.1, 0.18, 0.08, { sx: 0.09, sy: 0.05, sz: 0.11 }), true),
+      P(GEO.sphere, PALETTE.skin, M(0, 0.72, 0, { s: 0.22 }), true, { name: 'head' }),
+      P(GEO.sphereLo, PALETTE.cream, M(0, 0.6, 0.14, { sx: 0.17, sy: 0.15, sz: 0.11 }), true, { name: 'beard' }),
+      P(GEO.sphereLo, 0xf0a98a, M(0, 0.72, 0.21, { s: 0.055 }), false),
+      P(GEO.cyl, PALETTE.capRed, M(0, 0.86, 0, { sx: 0.26, sy: 0.05, sz: 0.26 }), true, { name: 'brim' }),
+      P(GEO.cone, PALETTE.capRed, M(0.02, 1.1, -0.02, { sx: 0.22, sy: 0.52, sz: 0.22, rz: -0.14 }), true, { name: 'hat', live: true }),
+      P(GEO.sphereLo, PALETTE.meadowLight, M(0.09, 1.38, -0.02, { sx: 0.07, sy: 0.04, sz: 0.1, rz: -0.5 }), true, { name: 'sprout', live: true }),
+      // the slingshot: a wooden Y with a dark band, held out to the right
+      P(GEO.cyl, PALETTE.wood, M(0.34, 0.66, 0.12, { sx: 0.045, sy: 0.42, sz: 0.045, rz: -0.12 }), true, { name: 'slingHandle', live: true }),
+      P(GEO.cyl, PALETTE.wood, M(0.24, 1.0, 0.12, { sx: 0.035, sy: 0.34, sz: 0.035, rz: 0.6 }), true, { name: 'prongL', live: true }),
+      P(GEO.cyl, PALETTE.wood, M(0.48, 1.0, 0.12, { sx: 0.035, sy: 0.34, sz: 0.035, rz: -0.6 }), true, { name: 'prongR', live: true }),
+      P(GEO.box, PALETTE.outline, M(0.36, 1.13, 0.12, { sx: 0.3, sy: 0.025, sz: 0.025 }), false, { name: 'band', live: true, unlit: true }),
+      P(GEO.sphereLo, PALETTE.acorn, M(-0.2, 0.36, 0.14, { s: 0.07 }), true, { name: 'pouch' }),
+    ];
+  }
+
+  // Goblin Grunt: mostly head, huge ears, a carrot nose, a stubby club.
+  // Faces +z. Silhouette: the ears.
+  function gruntParts() {
+    const g = PALETTE.goblin, gd = PALETTE.goblinDark;
+    return [
+      P(GEO.sphereLo, g, M(0, 0.2, 0, { sx: 0.2, sy: 0.17, sz: 0.18 }), true, { name: 'body' }),
+      P(GEO.box, PALETTE.acornCap, M(0, 0.16, 0, { sx: 0.42, sy: 0.06, sz: 0.38 }), false, { name: 'belt' }),
+      P(GEO.sphereLo, gd, M(0.1, 0.05, 0.02, { sx: 0.09, sy: 0.05, sz: 0.11 }), true, { name: 'footL', live: true }),
+      P(GEO.sphereLo, gd, M(-0.1, 0.05, 0.02, { sx: 0.09, sy: 0.05, sz: 0.11 }), true, { name: 'footR', live: true }),
+      P(GEO.sphere, g, M(0, 0.5, 0, { sx: 0.25, sy: 0.23, sz: 0.24 }), true, { name: 'head' }),
+      P(GEO.cone, g, pivotMatrix(0.2, 0.56, 0, 0, 0, -1.2, 0, 0.13, 0, 0.07, 0.26, 0.05), true, { name: 'earL', live: true }),
+      P(GEO.cone, g, pivotMatrix(-0.2, 0.56, 0, 0, 0, 1.2, 0, 0.13, 0, 0.07, 0.26, 0.05), true, { name: 'earR', live: true }),
+      P(GEO.sphereLo, PALETTE.cream, M(0.09, 0.54, 0.2, { s: 0.055 }), false, { unlit: true }),
+      P(GEO.sphereLo, PALETTE.cream, M(-0.09, 0.54, 0.2, { s: 0.055 }), false, { unlit: true }),
+      P(GEO.sphereLo, PALETTE.outline, M(0.1, 0.54, 0.245, { s: 0.025 }), false, { unlit: true }),
+      P(GEO.sphereLo, PALETTE.outline, M(-0.08, 0.54, 0.245, { s: 0.025 }), false, { unlit: true }),
+      P(GEO.cone, gd, M(0, 0.47, 0.3, { sx: 0.05, sy: 0.18, sz: 0.05, rx: Math.PI / 2 }), true, { name: 'nose' }),
+      P(GEO.box, PALETTE.cream, M(0.05, 0.4, 0.21, { sx: 0.04, sy: 0.05, sz: 0.02 }), false, { unlit: true }),
+      P(GEO.sphereLo, g, M(0.2, 0.26, 0.06, { s: 0.06 }), true, { name: 'armL' }),
+      P(GEO.sphereLo, g, M(-0.2, 0.26, 0.06, { s: 0.06 }), true, { name: 'armR' }),
+      P(GEO.cyl, PALETTE.wood, pivotMatrix(-0.22, 0.26, 0.06, 0.5, 0, 0.35, 0, 0.14, 0, 0.03, 0.3, 0.03), true, { name: 'club' }),
+      P(GEO.sphereLo, PALETTE.woodLight, pivotMatrix(-0.22, 0.26, 0.06, 0.5, 0, 0.35, 0, 0.3, 0, 0.06, 0.06, 0.06), true, { name: 'clubHead' }),
+    ];
+  }
+
+  // -------- particles: a pooled dust puff --------
+  const particles = [];
+  function buildParticles() {
+    for (let i = 0; i < 48; i++) {
+      const m = new THREE.Mesh(GEO.sphereLo, new THREE.MeshBasicMaterial({ color: PALETTE.cream, transparent: true, opacity: 0 }));
+      m.visible = false;
+      m.userData = { life: 0, ttl: 1, vx: 0, vy: 0, vz: 0, size: 0.1 };
+      scene.add(m);
+      particles.push(m);
+    }
+    animated.push({
+      update(t, dt) {
+        for (const p of particles) {
+          const u = p.userData;
+          if (!p.visible) continue;
+          u.life += dt;
+          if (u.life >= u.ttl) { p.visible = false; continue; }
+          const k = u.life / u.ttl;
+          u.vy -= 1.6 * dt;
+          p.position.x += u.vx * dt; p.position.y += u.vy * dt; p.position.z += u.vz * dt;
+          if (p.position.y < 0.03) { p.position.y = 0.03; u.vy = Math.abs(u.vy) * 0.3; }
+          p.scale.setScalar(u.size * (1 - k * 0.6));
+          p.material.opacity = 0.85 * (1 - k);
+        }
+      },
+    });
+  }
+  function puff(x, y, z, { count = 8, color = PALETTE.cream, speed = 1.2, size = 0.1, up = 1.4, ttl = 0.6 } = {}) {
+    let n = 0;
+    for (const p of particles) {
+      if (p.visible) continue;
+      const a = Math.random() * Math.PI * 2, s = speed * (0.5 + Math.random() * 0.5);
+      p.position.set(x, y, z);
+      p.userData = { life: 0, ttl: ttl * (0.7 + Math.random() * 0.5), vx: Math.cos(a) * s, vy: up * (0.4 + Math.random() * 0.6), vz: Math.sin(a) * s, size: size * (0.6 + Math.random() * 0.8) };
+      p.material.color.setHex(color);
+      p.visible = true;
+      if (++n >= count) break;
+    }
+  }
+
+  // -------- camera shake --------
+  const shake = { amp: 0, decay: 0, x: 0, y: 0 };
+  function shakeCamera(amp, dur = 0.3) {
+    shake.amp = Math.max(shake.amp, amp);
+    shake.decay = amp / dur;
+  }
+
+  // -------- tower views --------
+  const towerViews = new Map();
+  function addTowerView(tower) {
+    const g = liveProp(slingerParts(), tower.x, 0, tower.z);
+    g.name = `tower-${tower.id}`;
+    decal(0, 0, 0.36, g);
+    const v = {
+      group: g, tower, born: GameState.state.time,
+      hat: g.getObjectByName('hat'), sprout: g.getObjectByName('sprout'),
+      hatRz: g.getObjectByName('hat').rotation.z,
+    };
+    towerViews.set(tower.id, v);
+    puff(tower.x, 0.1, tower.z, { count: 12, color: PALETTE.path, speed: 1.6, size: 0.12, up: 1.0 });
+    return v;
+  }
+  function updateTowerViews(t) {
+    for (const v of towerViews.values()) {
+      const age = t - v.born;
+      // placement pop: sprout up from nothing with an overshoot, then settle
+      let pop = 1;
+      if (age < 0.5) {
+        const k = age / 0.5;
+        pop = 1 + Math.sin(k * Math.PI) * 0.35 * (1 - k) ;
+        const grow = Math.min(1, age / 0.22);
+        v.group.scale.set(grow * (2 - pop), grow * pop, grow * (2 - pop));
+      } else {
+        const bob = Math.sin(t * 2.2 + v.tower.id);
+        v.group.scale.set(1 - 0.015 * bob, 1 + 0.03 * bob, 1 - 0.015 * bob);
+      }
+      v.group.rotation.y = v.tower.facing + Math.sin(t * 0.8 + v.tower.id * 1.7) * 0.2;
+      v.hat.rotation.z = v.hatRz + Math.sin(t * 2.2 + v.tower.id + 0.5) * 0.05;
+      v.sprout.rotation.z = -0.5 + Math.sin(t * 3 + v.tower.id) * 0.25;
+    }
+  }
+
+  // -------- enemy views --------
+  const enemyViews = new Map();
+  const dying = [];   // views playing an exit animation before removal
+  function addEnemyView(e) {
+    const g = liveProp(gruntParts(), e.x, 0, e.z);
+    g.name = `enemy-${e.id}`;
+    const v = {
+      group: g, e, decal: decal(0, 0, 0.3, g),
+      earL: g.getObjectByName('earL'), earR: g.getObjectByName('earR'),
+      footL: g.getObjectByName('footL'), footR: g.getObjectByName('footR'),
+      earM: new THREE.Matrix4(), footLz: 0.02, footRz: 0.02,
+    };
+    v.earL.matrixAutoUpdate = false; v.earR.matrixAutoUpdate = false;
+    enemyViews.set(e.id, v);
+    puff(e.x, 0.3, e.z, { count: 7, color: PALETTE.spore, speed: 0.8, size: 0.09, up: 1.2 });
+    return v;
+  }
+  function updateEnemyViews(t, dt) {
+    for (const v of enemyViews.values()) {
+      const e = v.e, g = v.group;
+      const cycle = e.dist * 7.5;
+      const bounce = Math.abs(Math.sin(cycle));
+      const born = Math.min(1, e.age / 0.35);   // pop out of the crack
+      g.position.set(e.x, 0.09 * bounce, e.z);
+      g.rotation.y = Math.atan2(e.dirX, e.dirZ);
+      g.rotation.x = 0.1;
+      g.rotation.z = Math.sin(cycle) * 0.08;
+      const stretch = 0.9 + 0.22 * bounce;
+      const s = born * (1 - (1 - born) * 0.5);
+      g.scale.set(s * (1.06 - 0.1 * bounce), s * stretch, s * (1.06 - 0.1 * bounce));
+      const flap = 0.35 + 0.45 * bounce;
+      pivotMatrix(0.2, 0.56, 0, 0, 0, -1.2 + flap, 0, 0.13, 0, 0.07, 0.26, 0.05, v.earL.matrix);
+      pivotMatrix(-0.2, 0.56, 0, 0, 0, 1.2 - flap, 0, 0.13, 0, 0.07, 0.26, 0.05, v.earR.matrix);
+      v.footL.position.z = 0.02 + Math.sin(cycle) * 0.12;
+      v.footR.position.z = 0.02 - Math.sin(cycle) * 0.12;
+      v.footL.position.y = 0.05 + Math.max(0, Math.sin(cycle)) * 0.06 - 0.09 * bounce;
+      v.footR.position.y = 0.05 + Math.max(0, -Math.sin(cycle)) * 0.06 - 0.09 * bounce;
+      v.decal.scale.setScalar(0.3 * (1 - 0.3 * bounce));
+      v.decal.position.y = 0.012 - 0.09 * bounce;   // keep the shadow flat on the ground while the body hops
+    }
+    for (let i = dying.length - 1; i >= 0; i--) {
+      const d = dying[i];
+      d.t += dt;
+      const k = d.t / d.dur;
+      if (k >= 1) { scene.remove(d.group); dying.splice(i, 1); continue; }
+      d.update(k);
+    }
+  }
+  function removeEnemyView(e, exit) {
+    const v = enemyViews.get(e.id);
+    if (!v) return;
+    enemyViews.delete(e.id);
+    exit(v);
+  }
+  // Leak: the goblin squeezes through the gate with a spin and a puff.
+  function leakExit(v) {
+    const g = v.group;
+    const x0 = g.position.x, z0 = g.position.z;
+    const gate = GameState.gate;
+    dying.push({
+      group: g, t: 0, dur: 0.38,
+      update(k) {
+        g.position.x = x0 + (gate.x - x0) * k;
+        g.position.z = z0 + (gate.z - 0.25 - z0) * k;
+        g.position.y = 0.15 * Math.sin(k * Math.PI);
+        g.rotation.y += 0.6;
+        const s = (1 - k) * (1 + 0.3 * Math.sin(k * Math.PI));
+        g.scale.set(s * 1.1, s * 0.8, s * 1.1);
+      },
+    });
+    puff(gate.x, 0.3, gate.z + 0.1, { count: 10, color: PALETTE.stone, speed: 1.4, size: 0.11 });
+    shakeCamera(0.09, 0.35);
+  }
+
+  // -------- selection, range preview --------
+  let rangeRing, rangeDisc;
   function buildSelection() {
     const ringGeo = new THREE.RingGeometry(0.34, 0.44, 24);
     ringGeo.rotateX(-Math.PI / 2);
@@ -1087,16 +1499,37 @@ const Renderer = (() => {
     rejectRing.position.y = 0.02;
     rejectRing.visible = false;
     scene.add(rejectRing);
+    // range preview: a thin ring plus a faint disc, sized per tower type
+    const rg = new THREE.RingGeometry(0.96, 1, 64);
+    rg.rotateX(-Math.PI / 2);
+    rangeRing = new THREE.Mesh(rg, new THREE.MeshBasicMaterial({ color: PALETTE.cream, transparent: true, opacity: 0.7, depthWrite: false }));
+    rangeRing.position.y = 0.016;
+    rangeRing.visible = false;
+    scene.add(rangeRing);
+    rangeDisc = new THREE.Mesh(GEO.circle, new THREE.MeshBasicMaterial({ color: PALETTE.cream, transparent: true, opacity: 0.1, depthWrite: false }));
+    rangeDisc.position.y = 0.014;
+    rangeDisc.visible = false;
+    scene.add(rangeDisc);
+
     animated.push({
       update(t, dt) {
         const sel = GameState.state.selected;
         selectionRing.visible = !!sel;
+        rangeRing.visible = rangeDisc.visible = !!sel;
         if (sel) {
-          selectionRing.position.x = worldX(sel.c);
-          selectionRing.position.z = worldZ(sel.r);
+          const x = worldX(sel.c), z = worldZ(sel.r);
+          selectionRing.position.x = x; selectionRing.position.z = z;
           const s = 1 + 0.06 * Math.sin(t * 5);
           selectionRing.scale.set(s, 1, s);
           selectionRing.rotation.y = t * 0.6;
+          const range = sel.kind === 'tower'
+            ? (GameState.state.towers.find((tw) => tw.id === sel.id) || { range: 0 }).range
+            : GameState.TOWER_TYPES.slinger.range;
+          rangeRing.position.x = rangeDisc.position.x = x;
+          rangeRing.position.z = rangeDisc.position.z = z;
+          rangeRing.scale.set(range, 1, range);
+          rangeDisc.scale.set(range, 1, range);
+          rangeRing.material.opacity = sel.kind === 'tower' ? 0.75 : 0.45 + 0.15 * Math.sin(t * 4);
         }
         if (rejectTimer > 0) {
           rejectTimer -= dt;
@@ -1114,9 +1547,13 @@ const Renderer = (() => {
       rejectTimer = 0.4;
       rejectCell = res;
     });
+    GameState.on('towerPlaced', addTowerView);
+    GameState.on('enemySpawned', addEnemyView);
+    GameState.on('enemyLeaked', (e) => removeEnemyView(e, leakExit));
   }
 
   // -------- camera --------
+  const camBase = new THREE.Vector3(), camRight = new THREE.Vector3(), camUp = new THREE.Vector3();
   function placeCamera() {
     const el = THREE.MathUtils.degToRad(CONFIG.cameraElevation);
     const yaw = THREE.MathUtils.degToRad(CONFIG.cameraYaw);
@@ -1124,6 +1561,9 @@ const Renderer = (() => {
     camera.position.copy(dir.multiplyScalar(40));
     camera.lookAt(0, 0, 0);
     camera.updateMatrixWorld(true);
+    camBase.copy(camera.position);
+    camRight.setFromMatrixColumn(camera.matrixWorld, 0);
+    camUp.setFromMatrixColumn(camera.matrixWorld, 1);
   }
   function fitCamera() {
     const aspect = cssW / cssH;
@@ -1197,7 +1637,7 @@ const Renderer = (() => {
     buildHollow();
     buildBastion();
     buildCountryside();
-    buildTestGnome();
+    buildParticles();
     buildSelection();
     flushBatch();
 
@@ -1208,6 +1648,14 @@ const Renderer = (() => {
 
   function render(t, dt) {
     for (const a of animated) a.update(t, dt);
+    updateTowerViews(t);
+    updateEnemyViews(t, dt);
+    if (shake.amp > 0) {
+      shake.amp = Math.max(0, shake.amp - shake.decay * dt);
+      shake.x = (Math.random() - 0.5) * 2 * shake.amp;
+      shake.y = (Math.random() - 0.5) * 2 * shake.amp;
+    } else { shake.x = shake.y = 0; }
+    camera.position.copy(camBase).addScaledVector(camRight, shake.x).addScaledVector(camUp, shake.y);
     renderer.render(scene, camera);
   }
 
@@ -1216,7 +1664,7 @@ const Renderer = (() => {
     return { calls: r.calls, triangles: r.triangles };
   }
 
-  return { init, render, resize, screenToCell, stats };
+  return { init, render, resize, screenToCell, stats, shakeCamera, puff, debugScene: () => scene, debugViews: () => ({ enemyViews: enemyViews.size, dying: dying.map((d) => [+d.t.toFixed(3), d.dur]), towerViews: towerViews.size }) };
 })();
 
 // ===================================================================
@@ -1258,12 +1706,23 @@ const UI = (() => {
   const $ = (id) => document.getElementById(id);
   let toastTimer = 0;
   let debugOn = false, fpsAcc = 0, fpsFrames = 0, fpsShown = 0;
+  const shown = { gold: null, lives: null, wave: null, waveBtn: null };
 
   function updateHud() {
     const s = GameState.state;
-    $('hud-gold').textContent = s.gold;
-    $('hud-lives').textContent = s.lives;
-    $('hud-wave').textContent = s.wave > 0 ? `Wave ${s.wave}/${CONFIG.totalWaves}` : 'Prep';
+    if (shown.gold !== s.gold) { $('hud-gold').textContent = s.gold; shown.gold = s.gold; }
+    if (shown.lives !== s.lives) { $('hud-lives').textContent = s.lives; shown.lives = s.lives; }
+    const wave = s.wave > 0 ? `Wave ${s.wave}/${CONFIG.totalWaves}` : 'Prep';
+    if (shown.wave !== wave) { $('hud-wave').textContent = wave; shown.wave = wave; }
+    const btn = $('wave-btn');
+    const label = s.waveActive
+      ? `${s.waveQueue.length + s.enemies.length} goblins coming`
+      : (s.wave === 0 ? 'Send the first wave' : `Send wave ${s.wave + 1}`);
+    if (shown.waveBtn !== label) {
+      btn.textContent = label;
+      btn.disabled = s.waveActive;
+      shown.waveBtn = label;
+    }
   }
 
   function toast(text, bad) {
@@ -1273,6 +1732,38 @@ const UI = (() => {
     el.classList.add('show');
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+  }
+
+  function flash(cls) {
+    const el = $('flash');
+    el.classList.remove('leak');
+    void el.offsetWidth;   // restart the CSS animation
+    el.classList.add(cls);
+  }
+
+  // The panel under the map: what you can do with the selected thing.
+  function renderPanel() {
+    const sel = GameState.state.selected;
+    const panel = $('panel');
+    if (!sel) { panel.classList.remove('show'); panel.innerHTML = ''; return; }
+    panel.classList.add('show');
+    if (sel.kind === 'tile') {
+      const t = GameState.TOWER_TYPES.slinger;
+      const afford = GameState.canAfford('slinger');
+      panel.innerHTML = `
+        <div class="panel-title">Build here</div>
+        <button class="build-btn" data-tower="${t.id}" ${afford ? '' : 'disabled'}>
+          <span class="build-icon">&#127793;</span>
+          <span class="build-text"><span class="build-name">${t.name}</span><span class="build-blurb">${t.blurb}</span></span>
+          <span class="build-cost ${afford ? '' : 'poor'}">&#9679; ${t.cost}</span>
+        </button>`;
+    } else {
+      const tower = GameState.state.towers.find((tw) => tw.id === sel.id);
+      const t = GameState.TOWER_TYPES[tower.type];
+      panel.innerHTML = `
+        <div class="panel-title">${t.name} <span class="tier">Tier ${tower.tier}</span></div>
+        <div class="panel-blurb">${t.blurb}</div>`;
+    }
   }
 
   function updateOrientation() {
@@ -1286,13 +1777,33 @@ const UI = (() => {
     $('debug').classList.toggle('show', debugOn);
     updateHud();
     updateOrientation();
+    renderPanel();
     window.addEventListener('resize', updateOrientation);
     window.addEventListener('orientationchange', () => setTimeout(updateOrientation, 60));
-    GameState.on('tileSelected', () => toast('A fine spot for a tower.'));
-    GameState.on('tileRejected', (res) => toast(res.reason, true));
+
+    $('panel').addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-tower]');
+      if (!btn) return;
+      Audio.unlock();
+      const res = GameState.placeTower(btn.dataset.tower);
+      if (!res.ok && res.reason) toast(res.reason, true);
+    });
+    $('wave-btn').addEventListener('click', () => { Audio.unlock(); GameState.startWave(); });
+
+    GameState.on('tileSelected', renderPanel);
+    GameState.on('towerSelected', renderPanel);
+    GameState.on('selectionCleared', renderPanel);
+    GameState.on('towerPlaced', renderPanel);
+    GameState.on('goldChanged', renderPanel);
+    GameState.on('tileRejected', (res) => { renderPanel(); toast(res.reason, true); });
+    GameState.on('placeRejected', (res) => toast(res.reason, true));
+    GameState.on('enemyLeaked', (e) => { flash('leak'); toast(`A ${e.name} slipped into the Bastion!`, true); });
+    GameState.on('waveStarted', (w) => { updateHud(); toast(w === 1 ? 'The Hollow stirs. Goblins on the road!' : `Wave ${w}. Here they come!`); });
+    GameState.on('waveEnded', () => { updateHud(); toast('The road is quiet, for now.'); });
   }
 
   function frame(dt) {
+    updateHud();
     if (!debugOn) return;
     fpsAcc += dt; fpsFrames++;
     if (fpsAcc >= 0.5) {
@@ -1303,7 +1814,7 @@ const UI = (() => {
     }
   }
 
-  return { init, frame, updateHud, toast };
+  return { init, frame, updateHud, toast, renderPanel };
 })();
 
 // ===================================================================
@@ -1355,11 +1866,42 @@ const Audio = (() => {
       voice({ type: 'triangle', freq: 190, to: 120, dur: 0.16, vol: 0.4, cutoff: 900 });
       voice({ type: 'square', freq: 140, to: 95, dur: 0.12, vol: 0.12, cutoff: 500, delay: 0.09 });
     },
+    place() {    // a soft thump into the soil, then a springy "boing" as it sprouts
+      voice({ type: 'triangle', freq: 150, to: 80, dur: 0.14, vol: 0.5, cutoff: 700 });
+      voice({ type: 'sine', freq: 280, to: 760, dur: 0.24, vol: 0.32, cutoff: 2600, delay: 0.07 });
+      voice({ type: 'sine', freq: 1040, to: 1180, dur: 0.12, vol: 0.14, cutoff: 3600, delay: 0.24 });
+    },
+    spawn() {    // a wet little goblin "blib-blub"
+      voice({ type: 'square', freq: 210, to: 320, dur: 0.09, vol: 0.1, cutoff: 1100 });
+      voice({ type: 'square', freq: 330, to: 240, dur: 0.12, vol: 0.09, cutoff: 1100, delay: 0.1 });
+    },
+    leak() {     // a bonk on the gate and a sad two-note slide
+      voice({ type: 'triangle', freq: 120, to: 55, dur: 0.28, vol: 0.55, cutoff: 600 });
+      voice({ type: 'sawtooth', freq: 392, to: 370, dur: 0.16, vol: 0.14, cutoff: 1200, delay: 0.05 });
+      voice({ type: 'sawtooth', freq: 311, to: 250, dur: 0.3, vol: 0.14, cutoff: 1000, delay: 0.22 });
+    },
+    waveStart() {   // a little horn call from the Bastion walls
+      voice({ type: 'sawtooth', freq: 262, to: 262, dur: 0.22, vol: 0.22, cutoff: 1600 });
+      voice({ type: 'sawtooth', freq: 262, to: 262, dur: 0.18, vol: 0.2, cutoff: 1600, delay: 0.24 });
+      voice({ type: 'sawtooth', freq: 392, to: 392, dur: 0.45, vol: 0.24, cutoff: 1800, delay: 0.44 });
+    },
+    waveEnd() {     // bright rising triad
+      voice({ type: 'sine', freq: 523, to: 523, dur: 0.14, vol: 0.25, cutoff: 3000 });
+      voice({ type: 'sine', freq: 659, to: 659, dur: 0.14, vol: 0.25, cutoff: 3000, delay: 0.12 });
+      voice({ type: 'sine', freq: 784, to: 784, dur: 0.3, vol: 0.28, cutoff: 3200, delay: 0.24 });
+    },
   };
 
   function init() {
     GameState.on('tileSelected', () => sfx.select());
+    GameState.on('towerSelected', () => sfx.select());
     GameState.on('tileRejected', () => sfx.reject());
+    GameState.on('placeRejected', () => sfx.reject());
+    GameState.on('towerPlaced', () => sfx.place());
+    GameState.on('enemySpawned', () => sfx.spawn());
+    GameState.on('enemyLeaked', () => sfx.leak());
+    GameState.on('waveStarted', () => sfx.waveStart());
+    GameState.on('waveEnded', () => sfx.waveEnd());
   }
 
   return { init, unlock, sfx };
