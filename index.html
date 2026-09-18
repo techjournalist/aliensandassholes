@@ -1,0 +1,1395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Briar &amp; Bastion</title>
+<style>
+  :root {
+    --ink: #1b1410;
+    --cream: #f6ecd4;
+    --gold: #f2c14e;
+    --moss: #6fae4a;
+    --bark: #8b5a2b;
+    --magic: #c861e0;
+    --panel: rgba(27, 20, 16, 0.82);
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%;
+    overflow: hidden; background: #2f4a33;
+    font-family: "Trebuchet MS", "Segoe UI", system-ui, -apple-system, sans-serif;
+    color: var(--cream);
+    -webkit-user-select: none; user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior: none;
+  }
+  #game {
+    position: fixed; inset: 0; width: 100%; height: 100%;
+    display: block; touch-action: none; outline: none;
+  }
+  #ui { position: fixed; inset: 0; pointer-events: none; }
+  #hud {
+    position: absolute; top: max(10px, env(safe-area-inset-top));
+    left: max(10px, env(safe-area-inset-left));
+    display: flex; gap: 8px; flex-wrap: wrap;
+  }
+  .pill {
+    min-height: 44px; padding: 0 14px; display: flex; align-items: center; gap: 8px;
+    background: var(--panel); border: 2px solid var(--gold); border-radius: 22px;
+    font-size: 18px; font-weight: 700; letter-spacing: 0.3px;
+    box-shadow: 0 3px 0 rgba(0,0,0,0.35);
+  }
+  .pill .icon { font-size: 20px; line-height: 1; }
+  .pill.gold { color: var(--gold); }
+  .pill.lives { color: #ff8fa3; border-color: #ff8fa3; }
+  .pill.wave { color: #bfe6ff; border-color: #bfe6ff; }
+  #toast {
+    position: absolute; left: 50%; bottom: max(24px, env(safe-area-inset-bottom));
+    transform: translate(-50%, 10px); opacity: 0;
+    background: var(--panel); border: 2px solid var(--cream); border-radius: 14px;
+    padding: 10px 18px; font-size: 17px; font-weight: 700; white-space: nowrap;
+    transition: opacity 0.18s ease, transform 0.18s ease;
+    box-shadow: 0 3px 0 rgba(0,0,0,0.35);
+  }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); }
+  #toast.bad { border-color: #ff8fa3; color: #ffd0d8; }
+  #debug {
+    position: absolute; right: 10px; top: 10px; display: none;
+    font: 12px/1.5 ui-monospace, Menlo, Consolas, monospace;
+    background: rgba(0,0,0,0.55); padding: 6px 10px; border-radius: 8px; white-space: pre;
+  }
+  #debug.show { display: block; }
+  #rotate {
+    position: fixed; inset: 0; display: none; z-index: 20;
+    background: #2f4a33; color: var(--cream);
+    align-items: center; justify-content: center; text-align: center; padding: 24px;
+  }
+  #rotate.show { display: flex; }
+  #rotate .card { max-width: 320px; }
+  #rotate .phone {
+    width: 46px; height: 80px; margin: 0 auto 18px; border: 4px solid var(--gold);
+    border-radius: 10px; animation: turn 1.6s ease-in-out infinite;
+  }
+  @keyframes turn {
+    0%, 20% { transform: rotate(0deg); }
+    60%, 100% { transform: rotate(-90deg); }
+  }
+  #rotate h1 { margin: 0 0 8px; font-size: 24px; color: var(--gold); }
+  #rotate p { margin: 0; font-size: 17px; line-height: 1.4; }
+  #load-error {
+    position: fixed; inset: 0; display: none; z-index: 30; padding: 24px;
+    background: #2f4a33; align-items: center; justify-content: center; text-align: center;
+  }
+  #load-error.show { display: flex; }
+  #load-error .card { max-width: 420px; font-size: 17px; line-height: 1.45; }
+  #load-error h1 { color: var(--gold); margin: 0 0 10px; }
+</style>
+</head>
+<body>
+<canvas id="game" aria-label="Briar and Bastion game view"></canvas>
+
+<div id="ui">
+  <div id="hud">
+    <div class="pill gold"><span class="icon">&#9679;</span><span id="hud-gold">0</span></div>
+    <div class="pill lives"><span class="icon">&#9829;</span><span id="hud-lives">0</span></div>
+    <div class="pill wave"><span class="icon">&#9873;</span><span id="hud-wave">Wave</span></div>
+  </div>
+  <div id="toast"></div>
+  <div id="debug"></div>
+</div>
+
+<div id="rotate">
+  <div class="card">
+    <div class="phone"></div>
+    <h1>Turn your device sideways</h1>
+    <p>The valley is wide. Briar &amp; Bastion is played in landscape.</p>
+  </div>
+</div>
+
+<div id="load-error">
+  <div class="card">
+    <h1>The valley didn't load</h1>
+    <p>Briar &amp; Bastion needs to fetch one library (three.js) from the web the first time it opens. Check your connection and reload the page.</p>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+'use strict';
+/* =====================================================================
+ * Briar & Bastion
+ * Sections, in order: PALETTE/CONFIG, GameState, Renderer, Input, UI,
+ * Audio, Boot. GameState is pure logic. Renderer/UI/Audio only read
+ * from GameState or react to its events. Input funnels everything
+ * through handleTap(x, y).
+ * ===================================================================== */
+
+// ===================================================================
+// PALETTE / CONFIG  (fix colors here, never invent new ones in assets)
+// ===================================================================
+const PALETTE = {
+  backdrop:     0x2f4a33,
+  meadow:       0x6fae4a,
+  meadowDark:   0x5c9a3d,
+  meadowLight:  0x86c25c,
+  earth:        0x6b4a2b,
+  path:         0xc9a46a,
+  pathEdge:     0xb08a52,
+  cobble:       0x9d9a90,
+  cobbleDark:   0x7e7b72,
+  stone:        0x8e8f86,
+  stoneDark:    0x6d6e66,
+  moss:         0x7fb35a,
+  wood:         0x8b5a2b,
+  woodLight:    0xb07a3e,
+  water:        0x4fa3c9,
+  waterDeep:    0x3b86ad,
+  waterFoam:    0xd8f3fb,
+  streamBed:    0x4a6f7a,
+  gold:         0xf2c14e,
+  cream:        0xf6ecd4,
+  skin:         0xf5cfa8,
+  tunic:        0x4f8a3a,
+  capRed:       0xd9503f,
+  capBrown:     0xb8473a,
+  acorn:        0x9c6b3c,
+  acornCap:     0x6b4423,
+  flowerPink:   0xf07ac2,
+  flowerYellow: 0xffd66b,
+  magic:        0xc861e0,
+  magicGlow:    0xa66ef0,
+  hollowGround: 0x5a5062,
+  hollowEarth:  0x3f3848,
+  hollowPath:   0x6d6260,
+  hollowWood:   0x4a3f44,
+  hollowRock:   0x8c8894,
+  spore:        0x8a5fc4,
+  outline:      0x1b1410,
+  windowWarm:   0xffd36b,
+  shadow:       0x000000,
+};
+
+const CONFIG = {
+  cols: 18,
+  rows: 11,
+  border: 2,                 // decorative ring of tiles outside the grid
+  tileHeight: 0.3,
+  outlinePx: 2.2,            // outline thickness in CSS pixels
+  maxPixelRatio: 2,
+  cameraElevation: 50,       // degrees above the ground plane
+  cameraYaw: 12,             // degrees, small so the grid stays readable
+  startGold: 150,
+  startLives: 20,
+  totalWaves: 12,
+};
+
+// ===================================================================
+// GameState  (pure logic: no THREE, no DOM, no audio in here)
+// ===================================================================
+const GameState = (() => {
+  const { cols, rows } = CONFIG;
+  const SPAWN = [0, 2];
+  const PATH_WAYPOINTS = [[0, 2], [4, 2], [4, 6], [8, 6], [11, 6], [11, 3], [14, 3], [14, 9], [16, 9]];
+  const STREAM_COL = 8;
+  const BRIDGE_CELL = [8, 6];
+  const BASTION_CELLS = [[16, 6], [17, 6], [16, 7], [17, 7], [16, 8], [17, 8]];
+  const BASTION_GATE_CELL = [16, 8];
+  const COBBLE_CELLS = 3;    // last N path cells are cobbled
+
+  const listeners = {};
+  function on(event, fn) { (listeners[event] = listeners[event] || []).push(fn); }
+  function emit(event, payload) { (listeners[event] || []).forEach((fn) => fn(payload)); }
+
+  // Expand the waypoint list into an ordered list of path cells.
+  const pathCells = [];
+  for (let i = 0; i < PATH_WAYPOINTS.length - 1; i++) {
+    const [ax, az] = PATH_WAYPOINTS[i];
+    const [bx, bz] = PATH_WAYPOINTS[i + 1];
+    const dx = Math.sign(bx - ax), dz = Math.sign(bz - az);
+    let x = ax, z = az;
+    if (i === 0) pathCells.push([x, z]);
+    while (x !== bx || z !== bz) { x += dx; z += dz; pathCells.push([x, z]); }
+  }
+  const pathIndex = new Map(pathCells.map(([c, r], i) => [`${c},${r}`, i]));
+
+  function key(c, r) { return `${c},${r}`; }
+  function inGrid(c, r) { return c >= 0 && r >= 0 && c < cols && r < rows; }
+  function isPath(c, r) { return pathIndex.has(key(c, r)); }
+  function isStream(c, r) { return c === STREAM_COL && !(c === BRIDGE_CELL[0] && r === BRIDGE_CELL[1]); }
+  function isBridge(c, r) { return c === BRIDGE_CELL[0] && r === BRIDGE_CELL[1]; }
+  function isBastion(c, r) { return BASTION_CELLS.some(([bc, br]) => bc === c && br === r); }
+  function isSpawn(c, r) { return c === SPAWN[0] && r === SPAWN[1]; }
+
+  // 0 = pleasant countryside, 1 = deep in the Shadow Hollow. Defined for
+  // any cell, including the decorative border, so the blight bleeds off
+  // the edge of the map instead of stopping at a hard line.
+  function hollowness(c, r) {
+    const dx = (c - 0.6) / 4.1, dz = (r - 2.1) / 3.4;
+    const d = Math.sqrt(dx * dx + dz * dz);
+    return Math.max(0, Math.min(1, (1.18 - d) / 0.42));
+  }
+
+  // Buildable = inside the grid, on plain ground, and touching the road.
+  function isBuildable(c, r) {
+    if (!inGrid(c, r) || isPath(c, r) || isStream(c, r) || isBastion(c, r) || isSpawn(c, r)) return false;
+    for (let dc = -1; dc <= 1; dc++) for (let dr = -1; dr <= 1; dr++) {
+      if ((dc || dr) && isPath(c + dc, r + dr)) return true;
+    }
+    return false;
+  }
+
+  function cellKind(c, r) {
+    if (isBastion(c, r)) return 'bastion';
+    if (isBridge(c, r)) return 'bridge';
+    if (isStream(c, r)) return 'stream';
+    if (isPath(c, r)) return 'path';
+    return 'ground';
+  }
+
+  function pathIndexOf(c, r) { const i = pathIndex.get(key(c, r)); return i === undefined ? -1 : i; }
+  function isCobble(c, r) { const i = pathIndexOf(c, r); return i >= 0 && i >= pathCells.length - COBBLE_CELLS; }
+
+  const state = {
+    gold: CONFIG.startGold,
+    lives: CONFIG.startLives,
+    wave: 0,
+    time: 0,
+    selected: null,   // {c, r} of a buildable tile the player tapped
+    towers: [],
+    enemies: [],
+  };
+
+  // The one interaction M1 supports: pick a tile. Rejections carry an
+  // in-world reason so the UI can teach the placement rule by feedback.
+  function selectTile(c, r) {
+    if (!inGrid(c, r)) return { ok: false, c, r, reason: 'Beyond the valley.' };
+    let reason = null;
+    if (isPath(c, r)) reason = "Can't build on the road, the goblins walk there.";
+    else if (isStream(c, r)) reason = "Can't build in the stream.";
+    else if (isBastion(c, r)) reason = "That's the Bastion. Build around it.";
+    else if (isSpawn(c, r)) reason = 'Nothing grows on the Hollow stump.';
+    else if (!isBuildable(c, r)) reason = 'Too far from the road. A tower needs a road to watch.';
+    if (reason) {
+      state.selected = null;
+      const res = { ok: false, c, r, reason };
+      emit('tileRejected', res);
+      return res;
+    }
+    state.selected = { c, r };
+    const res = { ok: true, c, r };
+    emit('tileSelected', res);
+    return res;
+  }
+
+  function update(dt) { state.time += dt; }
+
+  return {
+    cols, rows, SPAWN, STREAM_COL, BRIDGE_CELL, BASTION_CELLS, BASTION_GATE_CELL,
+    pathCells, pathWaypoints: PATH_WAYPOINTS,
+    state, on, emit, update, selectTile,
+    inGrid, isPath, isStream, isBridge, isBastion, isSpawn, isBuildable, isCobble,
+    cellKind, hollowness, pathIndexOf,
+  };
+})();
+
+// ===================================================================
+// Renderer  (all three.js; reads GameState, never writes it)
+// ===================================================================
+const Renderer = (() => {
+  const { cols, rows, border, tileHeight } = CONFIG;
+  let renderer, scene, camera, canvas, cssW = 1, cssH = 1;
+  const animated = [];          // { update(t, dt) }
+  const materialCache = new Map();
+  let gradientMap, outlineMat;
+  let selectionRing, rejectRing;
+  let rejectTimer = 0, rejectCell = null;
+  let unitsPerPixel = 0.02;
+
+  // -------- small helpers --------
+  function srand(seed) {   // mulberry32, deterministic set dressing
+    let a = seed >>> 0;
+    return () => {
+      a = (a + 0x6D2B79F5) >>> 0;
+      let t = a;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  const worldX = (c) => c - cols / 2 + 0.5;
+  const worldZ = (r) => r - rows / 2 + 0.5;
+  const lerpColor = (a, b, t) => new THREE.Color(a).lerp(new THREE.Color(b), t);
+
+  function toon(color, opts = {}) {
+    const k = `t${color}${opts.side || ''}${opts.vc ? 'v' : ''}${opts.emissive || ''}`;
+    if (materialCache.has(k)) return materialCache.get(k);
+    const m = new THREE.MeshToonMaterial({
+      color, gradientMap,
+      vertexColors: !!opts.vc,
+      side: opts.side || THREE.FrontSide,
+      emissive: opts.emissive || 0x000000,
+    });
+    materialCache.set(k, m);
+    return m;
+  }
+  function unlit(color, opts = {}) {
+    const k = `u${color}${opts.opacity ?? 1}${opts.side || ''}`;
+    if (materialCache.has(k)) return materialCache.get(k);
+    const m = new THREE.MeshBasicMaterial({
+      color, transparent: opts.opacity !== undefined && opts.opacity < 1,
+      opacity: opts.opacity ?? 1, side: opts.side || THREE.FrontSide,
+      depthWrite: opts.depthWrite ?? true,
+    });
+    materialCache.set(k, m);
+    return m;
+  }
+
+  // Unit primitives; every prop is one of these scaled by a matrix.
+  const GEO = {};
+  function buildPrimitives() {
+    GEO.sphere = new THREE.SphereGeometry(1, 12, 9);
+    GEO.sphereLo = new THREE.SphereGeometry(1, 8, 6);
+    GEO.sphereMid = new THREE.SphereGeometry(1, 10, 7);
+    GEO.dome = new THREE.SphereGeometry(1, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2);
+    GEO.box = new THREE.BoxGeometry(1, 1, 1);
+    GEO.cone = new THREE.ConeGeometry(1, 1, 10);
+    GEO.cyl = new THREE.CylinderGeometry(1, 1, 1, 10);
+    GEO.cylTaper = new THREE.CylinderGeometry(0.6, 1, 1, 9);
+    GEO.rock = new THREE.DodecahedronGeometry(1, 0);
+    GEO.circle = new THREE.CircleGeometry(1, 18);
+    for (const k in GEO) { if (GEO[k].index) GEO[k] = GEO[k].toNonIndexed(); }
+    // circle should lie flat on the ground
+    GEO.circle.rotateX(-Math.PI / 2);
+  }
+
+  // Outline geometry: same shape, but with normals averaged across every
+  // vertex that shares a position, so the inverted hull has no gaps at
+  // hard edges (boxes, cone rims, cylinder caps).
+  const smoothCache = new Map();
+  function smoothedForOutline(geo) {
+    if (smoothCache.has(geo.uuid)) return smoothCache.get(geo.uuid);
+    const g = geo.index ? geo.toNonIndexed() : geo.clone();
+    const pos = g.attributes.position, nor = g.attributes.normal;
+    const sums = new Map();
+    const keyOf = (i) => `${Math.round(pos.getX(i) * 1e4)},${Math.round(pos.getY(i) * 1e4)},${Math.round(pos.getZ(i) * 1e4)}`;
+    for (let i = 0; i < pos.count; i++) {
+      const k = keyOf(i);
+      let s = sums.get(k);
+      if (!s) { s = [0, 0, 0]; sums.set(k, s); }
+      s[0] += nor.getX(i); s[1] += nor.getY(i); s[2] += nor.getZ(i);
+    }
+    for (let i = 0; i < pos.count; i++) {
+      const s = sums.get(keyOf(i));
+      const l = Math.hypot(s[0], s[1], s[2]) || 1;
+      nor.setXYZ(i, s[0] / l, s[1] / l, s[2] / l);
+    }
+    nor.needsUpdate = true;
+    smoothCache.set(geo.uuid, g);
+    return g;
+  }
+
+  function makeOutlineMaterial() {
+    return new THREE.ShaderMaterial({
+      uniforms: {
+        thickness: { value: 0.04 },
+        color: { value: new THREE.Color(PALETTE.outline) },
+      },
+      vertexShader: `
+        uniform float thickness;
+        void main() {
+          vec3 n = normalize(normalMatrix * normal);
+          vec4 mv = modelViewMatrix * vec4(position, 1.0);
+          mv.xyz += n * thickness;   // view-space push: constant width under an ortho camera
+          gl_Position = projectionMatrix * mv;
+        }`,
+      fragmentShader: `
+        uniform vec3 color;
+        void main() { gl_FragColor = vec4(color, 1.0); }`,
+      side: THREE.BackSide,
+    });
+  }
+
+  function addOutline(mesh) {
+    const o = new THREE.Mesh(smoothedForOutline(mesh.geometry), outlineMat);
+    o.name = 'outline';
+    mesh.add(o);
+    return o;
+  }
+
+  // Merge non-indexed geometries (position + normal, optional color).
+  function mergeGeoms(geos) {
+    let count = 0;
+    geos.forEach((g) => { count += g.attributes.position.count; });
+    const withColor = geos.length > 0 && geos.every((g) => g.attributes.color);
+    const pos = new Float32Array(count * 3), nor = new Float32Array(count * 3);
+    const col = withColor ? new Float32Array(count * 3) : null;
+    let off = 0;
+    for (const g of geos) {
+      pos.set(g.attributes.position.array, off * 3);
+      nor.set(g.attributes.normal.array, off * 3);
+      if (col) col.set(g.attributes.color.array, off * 3);
+      off += g.attributes.position.count;
+    }
+    const out = new THREE.BufferGeometry();
+    out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    out.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+    if (col) out.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    return out;
+  }
+
+  // Matrix builder: M(x, y, z, {rx, ry, rz, sx, sy, sz, s})
+  const _e = new THREE.Euler(), _q = new THREE.Quaternion(), _p = new THREE.Vector3(), _s = new THREE.Vector3();
+  function M(x, y, z, o = {}) {
+    _e.set(o.rx || 0, o.ry || 0, o.rz || 0);
+    _q.setFromEuler(_e);
+    _p.set(x, y, z);
+    const s = o.s ?? 1;
+    _s.set(o.sx ?? s, o.sy ?? s, o.sz ?? s);
+    return new THREE.Matrix4().compose(_p, _q, _s);
+  }
+
+  // Static batcher: props that never move are merged per material into a
+  // handful of draw calls (one per color, one for every outline).
+  const batch = { groups: new Map(), outlines: [], decals: [] };
+  function batchPart(part, worldMatrix) {
+    const m = worldMatrix ? worldMatrix.clone().multiply(part.m) : part.m;
+    const g = part.geo.clone().applyMatrix4(m);
+    const matKey = (part.unlit ? 'u' : 't') + part.color;
+    let grp = batch.groups.get(matKey);
+    if (!grp) { grp = { mat: part.unlit ? unlit(part.color) : toon(part.color), geos: [] }; batch.groups.set(matKey, grp); }
+    grp.geos.push(g);
+    if (part.outline) batch.outlines.push(smoothedForOutline(part.geo).clone().applyMatrix4(m));
+  }
+  function batchDecal(x, z, radius) {
+    batch.decals.push(GEO.circle.clone().applyMatrix4(M(x, 0.012, z, { s: radius })));
+  }
+  function flushBatch() {
+    for (const grp of batch.groups.values()) {
+      const mesh = new THREE.Mesh(mergeGeoms(grp.geos), grp.mat);
+      mesh.matrixAutoUpdate = false;
+      scene.add(mesh);
+    }
+    if (batch.outlines.length) {
+      const mesh = new THREE.Mesh(mergeGeoms(batch.outlines), outlineMat);
+      mesh.matrixAutoUpdate = false;
+      scene.add(mesh);
+    }
+    if (batch.decals.length) {
+      const mesh = new THREE.Mesh(mergeGeoms(batch.decals), unlit(PALETTE.shadow, { opacity: 0.22, depthWrite: false }));
+      mesh.matrixAutoUpdate = false;
+      scene.add(mesh);
+    }
+  }
+
+  // Live props: a Group of real meshes we can animate (squash, sway, bob).
+  function liveProp(parts, x, y, z) {
+    const g = new THREE.Group();
+    g.position.set(x, y, z);
+    for (const p of parts) {
+      const mat = p.unlit ? unlit(p.color) : toon(p.color, p.matOpts);
+      const mesh = new THREE.Mesh(p.geo, mat);
+      mesh.applyMatrix4(p.m);
+      if (p.name) mesh.name = p.name;
+      if (p.outline) addOutline(mesh);
+      g.add(mesh);
+    }
+    scene.add(g);
+    return g;
+  }
+  function decal(x, z, radius, parent) {
+    const d = new THREE.Mesh(GEO.circle, unlit(PALETTE.shadow, { opacity: 0.22, depthWrite: false }));
+    d.position.set(x, 0.012, z);
+    d.scale.setScalar(radius);
+    (parent || scene).add(d);
+    return d;
+  }
+
+  // -------- prop recipes (each returns a parts list in local space) --------
+  const P = (geo, color, m, outline = true, extra = {}) => ({ geo, color, m, outline, ...extra });
+
+  function treeParts(rng) {
+    const h = 0.7 + rng() * 0.5, r = 0.42 + rng() * 0.28;
+    const parts = [
+      P(GEO.cyl, PALETTE.wood, M(0, h * 0.35, 0, { sx: 0.13, sy: h * 0.7, sz: 0.13 })),
+      P(GEO.sphereMid, PALETTE.meadowDark, M(0, h * 0.62 + r * 0.7, 0, { sx: r, sy: r * 0.9, sz: r })),
+      P(GEO.sphereMid, PALETTE.meadow, M(r * 0.45, h * 0.62 + r * 1.15, r * 0.2, { s: r * 0.72 })),
+      P(GEO.sphereMid, PALETTE.meadowLight, M(-r * 0.4, h * 0.62 + r * 1.25, -r * 0.1, { s: r * 0.6 })),
+    ];
+    return { parts, radius: r * 0.9 };
+  }
+  function deadTreeParts(rng) {
+    const h = 0.9 + rng() * 0.7, lean = (rng() - 0.5) * 0.5;
+    const parts = [
+      P(GEO.cylTaper, PALETTE.hollowWood, M(0, h / 2, 0, { sx: 0.12, sy: h, sz: 0.12, rz: lean })),
+    ];
+    const n = 2 + Math.floor(rng() * 2);
+    for (let i = 0; i < n; i++) {
+      const y = h * (0.45 + rng() * 0.45), a = rng() * Math.PI * 2, len = 0.3 + rng() * 0.35;
+      const tilt = 0.9 + rng() * 0.6;
+      const m = new THREE.Matrix4().makeTranslation(Math.sin(lean) * -y * 0.5, y, 0)
+        .multiply(new THREE.Matrix4().makeRotationY(a))
+        .multiply(new THREE.Matrix4().makeRotationZ(tilt))
+        .multiply(new THREE.Matrix4().makeTranslation(0, len / 2, 0))
+        .multiply(new THREE.Matrix4().makeScale(0.05, len, 0.05));
+      parts.push(P(GEO.cylTaper, PALETTE.hollowWood, m));
+    }
+    return { parts, radius: 0.25 };
+  }
+  function mushroomParts(rng, big) {
+    const s = big ? 0.55 + rng() * 0.25 : 0.22 + rng() * 0.12;
+    const tilt = (rng() - 0.5) * 0.25;
+    const parts = [
+      P(GEO.cyl, PALETTE.cream, M(0, s * 0.45, 0, { sx: s * 0.3, sy: s * 0.9, sz: s * 0.3, rz: tilt })),
+      P(GEO.dome, PALETTE.capRed, M(0, s * 0.8, 0, { sx: s * 0.75, sy: s * 0.55, sz: s * 0.75, rz: tilt })),
+    ];
+    const spots = 2 + Math.floor(rng() * 2);
+    for (let i = 0; i < spots; i++) {
+      const a = rng() * Math.PI * 2, d = s * (0.25 + rng() * 0.3);
+      parts.push(P(GEO.sphereLo, PALETTE.cream, M(Math.cos(a) * d, s * 0.8 + s * 0.42, Math.sin(a) * d, { s: s * 0.11 }), false));
+    }
+    return { parts, radius: s * 0.75 };
+  }
+  function tuftParts(rng) {
+    const s = 0.12 + rng() * 0.12;
+    return { parts: [P(GEO.sphereLo, PALETTE.meadowLight, M(0, s * 0.35, 0, { sx: s * 1.4, sy: s * 0.6, sz: s * 1.2 }), false)], radius: 0 };
+  }
+  function rockParts(rng, hollow) {
+    const s = 0.16 + rng() * 0.22;
+    const color = hollow ? PALETTE.hollowRock : PALETTE.stone;
+    return {
+      parts: [P(GEO.rock, color, M(0, s * 0.55, 0, { sx: s * 1.3, sy: s * 0.8, sz: s, ry: rng() * 3 }))],
+      radius: s * 1.2,
+    };
+  }
+  function flowerParts(rng) {
+    const h = 0.18 + rng() * 0.12;
+    const color = rng() < 0.5 ? PALETTE.flowerPink : PALETTE.flowerYellow;
+    return {
+      parts: [
+        P(GEO.cyl, PALETTE.meadowDark, M(0, h / 2, 0, { sx: 0.02, sy: h, sz: 0.02 }), false),
+        P(GEO.sphereLo, color, M(0, h + 0.04, 0, { s: 0.07 })),
+      ], radius: 0,
+    };
+  }
+  function acornParts(rng) {
+    const s = 0.14 + rng() * 0.1, tilt = (rng() - 0.5) * 0.6;
+    return {
+      parts: [
+        P(GEO.sphere, PALETTE.acorn, M(0, s * 0.9, 0, { sx: s * 0.75, sy: s, sz: s * 0.75, rz: tilt })),
+        P(GEO.dome, PALETTE.acornCap, M(Math.sin(tilt) * -s * 0.4, s * 1.25, 0, { sx: s * 0.85, sy: s * 0.5, sz: s * 0.85, rz: tilt })),
+        P(GEO.cyl, PALETTE.acornCap, M(Math.sin(tilt) * -s * 0.7, s * 1.75, 0, { sx: s * 0.1, sy: s * 0.35, sz: s * 0.1, rz: tilt }), false),
+      ], radius: s * 0.8,
+    };
+  }
+
+  // -------- scene construction --------
+  function buildGround() {
+    const geos = [];
+    const rng = srand(7);
+    const topColor = new THREE.Color(), sideColor = new THREE.Color();
+    const rowsMin = -border, rowsMax = rows + border, colsMin = -border, colsMax = cols + border;
+    for (let r = rowsMin; r < rowsMax; r++) {
+      for (let c = colsMin; c < colsMax; c++) {
+        const inGrid = GameState.inGrid(c, r);
+        const kind = inGrid ? GameState.cellKind(c, r) : (c === GameState.STREAM_COL ? 'stream' : 'ground');
+        const h = GameState.hollowness(c, r);
+        let top, side, height = tileHeight, yTop = 0;
+        if (kind === 'stream') {
+          height = 0.12; yTop = -0.2;
+          topColor.set(PALETTE.streamBed); sideColor.set(PALETTE.streamBed);
+        } else if (kind === 'path' || kind === 'bridge') {
+          const cob = GameState.isCobble(c, r);
+          topColor.copy(cob ? lerpColor(PALETTE.cobble, PALETTE.cobbleDark, rng() * 0.5) : lerpColor(PALETTE.path, PALETTE.hollowPath, h));
+          topColor.offsetHSL(0, 0, (rng() - 0.5) * 0.04);
+          sideColor.copy(lerpColor(PALETTE.earth, PALETTE.hollowEarth, h));
+          if (kind === 'bridge') { height = 0.12; yTop = -0.2; topColor.set(PALETTE.streamBed); sideColor.set(PALETTE.streamBed); }
+        } else if (kind === 'bastion') {
+          topColor.copy(lerpColor(PALETTE.cobble, PALETTE.moss, 0.35));
+          sideColor.set(PALETTE.earth);
+        } else {
+          const base = rng() < 0.5 ? PALETTE.meadow : PALETTE.meadowDark;
+          topColor.copy(lerpColor(base, PALETTE.hollowGround, h));
+          topColor.offsetHSL(0, 0, (rng() - 0.5) * 0.05 - (inGrid ? 0 : 0.03));
+          sideColor.copy(lerpColor(PALETTE.earth, PALETTE.hollowEarth, h));
+        }
+        top = topColor; side = sideColor;
+        const g = GEO.box.clone().applyMatrix4(M(worldX(c), yTop - height / 2, worldZ(r), { sx: 1, sy: height, sz: 1 }));
+        const n = g.attributes.normal, colors = new Float32Array(n.count * 3);
+        for (let i = 0; i < n.count; i++) {
+          const col = n.getY(i) > 0.5 ? top : side;
+          colors[i * 3] = col.r; colors[i * 3 + 1] = col.g; colors[i * 3 + 2] = col.b;
+        }
+        g.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        geos.push(g);
+      }
+    }
+    const ground = new THREE.Mesh(mergeGeoms(geos), toon(0xffffff, { vc: true }));
+    ground.name = 'ground';
+    ground.matrixAutoUpdate = false;
+    scene.add(ground);
+
+    // A wide dark-green floor so the world never shows the void.
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(cols + border * 2 + 40, rows + border * 2 + 40), unlit(0x27402b));
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.y = -tileHeight - 0.02;
+    scene.add(floor);
+
+    // Buildable tile markers: a soft lighter inset square on every cell
+    // that touches the road. One merged mesh, one draw call.
+    const markers = [];
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+      if (!GameState.isBuildable(c, r)) continue;
+      const h = GameState.hollowness(c, r);
+      const g = new THREE.PlaneGeometry(0.8, 0.8).toNonIndexed();
+      g.rotateX(-Math.PI / 2);
+      g.applyMatrix4(M(worldX(c), 0.006, worldZ(r)));
+      const col = lerpColor(PALETTE.meadowLight, 0x8f86a3, h).offsetHSL(0, 0, 0.08);
+      const colors = new Float32Array(g.attributes.position.count * 3);
+      for (let i = 0; i < g.attributes.position.count; i++) { colors[i * 3] = col.r; colors[i * 3 + 1] = col.g; colors[i * 3 + 2] = col.b; }
+      g.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+      markers.push(g);
+    }
+    const markerMesh = new THREE.Mesh(mergeGeoms(markers), new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.5, depthWrite: false }));
+    markerMesh.name = 'buildableMarkers';
+    markerMesh.matrixAutoUpdate = false;
+    scene.add(markerMesh);
+    animated.push({ update(t) { markerMesh.material.opacity = 0.42 + Math.sin(t * 1.6) * 0.1; } });
+  }
+
+  function buildStream() {
+    const x = worldX(GameState.STREAM_COL);
+    const length = rows + border * 2;
+    const water = new THREE.Mesh(new THREE.PlaneGeometry(0.98, length), unlit(PALETTE.water));
+    water.rotation.x = -Math.PI / 2;
+    water.position.set(x, -0.12, 0);
+    scene.add(water);
+    const waterColor = new THREE.Color(PALETTE.water), deep = new THREE.Color(PALETTE.waterDeep);
+    // Foam streaks drifting downstream (+z), looping.
+    const streaks = [];
+    const rng = srand(21);
+    for (let i = 0; i < 14; i++) {
+      const s = new THREE.Mesh(GEO.box, unlit(PALETTE.waterFoam, { opacity: 0.55, depthWrite: false }));
+      s.scale.set(0.05 + rng() * 0.04, 0.01, 0.25 + rng() * 0.3);
+      s.position.set(x + (rng() - 0.5) * 0.7, -0.11, -length / 2 + rng() * length);
+      s.userData.speed = 0.5 + rng() * 0.5;
+      scene.add(s);
+      streaks.push(s);
+    }
+    // Bank stones along the water's edge.
+    for (let i = 0; i < 16; i++) {
+      const side = rng() < 0.5 ? -1 : 1;
+      const z = -length / 2 + 0.3 + rng() * (length - 0.6);
+      if (Math.abs(z - worldZ(GameState.BRIDGE_CELL[1])) < 0.9) continue;
+      const s = 0.06 + rng() * 0.07;
+      batchPart(P(GEO.rock, PALETTE.stone, M(x + side * (0.5 + s * 0.6), -0.02, z, { sx: s * 1.4, sy: s, sz: s, ry: rng() * 3 }), false));
+    }
+    animated.push({
+      update(t, dt) {
+        water.material.color.copy(waterColor).lerp(deep, 0.5 + Math.sin(t * 1.3) * 0.5);
+        for (const s of streaks) {
+          s.position.z += s.userData.speed * dt;
+          if (s.position.z > length / 2) s.position.z -= length;
+        }
+      },
+    });
+  }
+
+  function buildBridge() {
+    const [bc, br] = GameState.BRIDGE_CELL;
+    const x = worldX(bc), z = worldZ(br);
+    const rng = srand(33);
+    const wm = M(x, 0, z);
+    // support beams
+    batchPart(P(GEO.box, PALETTE.wood, M(0, -0.02, -0.34, { sx: 1.3, sy: 0.08, sz: 0.09 })), wm);
+    batchPart(P(GEO.box, PALETTE.wood, M(0, -0.02, 0.34, { sx: 1.3, sy: 0.08, sz: 0.09 })), wm);
+    // planks laid across the walking direction, a little uneven
+    for (let i = 0; i < 7; i++) {
+      const px = -0.54 + i * 0.18;
+      batchPart(P(GEO.box, i % 2 ? PALETTE.woodLight : PALETTE.wood,
+        M(px, 0.03 + (rng() - 0.5) * 0.015, (rng() - 0.5) * 0.04, { sx: 0.16, sy: 0.05, sz: 0.94, ry: (rng() - 0.5) * 0.08 })), wm);
+    }
+    // railings, one post leaning because it's rickety
+    for (const side of [-1, 1]) {
+      for (let i = 0; i < 3; i++) {
+        const px = -0.5 + i * 0.5, lean = (i === 1 && side === 1) ? 0.25 : (rng() - 0.5) * 0.08;
+        batchPart(P(GEO.box, PALETTE.woodLight, M(px, 0.25, side * 0.46, { sx: 0.07, sy: 0.42, sz: 0.07, rx: lean * side })), wm);
+      }
+      batchPart(P(GEO.box, PALETTE.wood, M(0, 0.44, side * 0.46, { sx: 1.15, sy: 0.05, sz: 0.06, rz: (rng() - 0.5) * 0.05 })), wm);
+    }
+    // stone footings on each bank
+    for (const side of [-1, 1]) {
+      batchPart(P(GEO.box, PALETTE.stoneDark, M(side * 0.62, -0.05, 0, { sx: 0.16, sy: 0.14, sz: 1.0 })), wm);
+    }
+  }
+
+  function buildHollow() {
+    const [sc, sr] = GameState.SPAWN;
+    const x = worldX(sc), z = worldZ(sr);
+    const rng = srand(99);
+    const wm = M(x, 0, z);
+    // the cracked stump itself
+    batchPart(P(GEO.cyl, PALETTE.hollowWood, M(0, 0.36, 0, { sx: 0.58, sy: 0.72, sz: 0.62 })), wm);
+    batchPart(P(GEO.cyl, 0x5a4d52, M(0, 0.72, 0, { sx: 0.5, sy: 0.02, sz: 0.54 }), false), wm);   // pale cut face
+    for (let i = 0; i < 6; i++) {   // jagged splinters around the rim
+      const a = (i / 6) * Math.PI * 2 + rng() * 0.4;
+      if (Math.abs(a - Math.PI / 4) < 0.7) continue;   // leave the crack side open
+      const h = 0.25 + rng() * 0.45;
+      batchPart(P(GEO.cone, PALETTE.hollowWood, M(Math.cos(a) * 0.5, 0.72 + h / 2, Math.sin(a) * 0.54, { sx: 0.12, sy: h, sz: 0.12, rz: -Math.cos(a) * 0.3, rx: Math.sin(a) * 0.3 })), wm);
+    }
+    // a dark crack facing the road and the camera, where the horde will come from
+    const ca = Math.PI / 4, cx0 = Math.cos(ca) * 0.5, cz0 = Math.sin(ca) * 0.52;
+    batchPart(P(GEO.box, 0x120c14, M(cx0, 0.3, cz0, { sx: 0.26, sy: 0.58, sz: 0.36, ry: -ca }), false), wm);
+    batchPart(P(GEO.cyl, 0x120c14, M(cx0, 0.58, cz0, { sx: 0.18, sy: 0.26, sz: 0.18, rz: Math.PI / 2, ry: -ca }), false), wm);
+    // gnarled roots reaching out over the ground
+    for (let i = 0; i < 4; i++) {
+      const a = 1.3 + i * 1.05 + rng() * 0.3, len = 0.45 + rng() * 0.4;
+      const m = new THREE.Matrix4().makeRotationY(-a)
+        .multiply(new THREE.Matrix4().makeTranslation(0.45 + len / 2, 0.06, 0))
+        .multiply(new THREE.Matrix4().makeRotationZ(Math.PI / 2))
+        .multiply(new THREE.Matrix4().makeScale(0.08, len, 0.1));
+      batchPart(P(GEO.cylTaper, PALETTE.hollowWood, m), wm);
+    }
+    // corruption cracks seeping across the blighted ground, pulsing
+    const cracks = [];
+    for (let i = 0; i < 12; i++) {
+      const a = rng() * Math.PI * 2, d = 0.9 + rng() * 2.4, len = 0.35 + rng() * 0.5;
+      const cx = x + Math.cos(a) * d, cz = z + Math.sin(a) * d;
+      if (GameState.hollowness(Math.round(cx + cols / 2 - 0.5), Math.round(cz + rows / 2 - 0.5)) < 0.3) continue;
+      const crack = new THREE.Mesh(GEO.box, new THREE.MeshBasicMaterial({ color: PALETTE.magicGlow, transparent: true, opacity: 0.8, depthWrite: false }));
+      crack.scale.set(len, 0.01, 0.08);
+      crack.position.set(cx, 0.008, cz);
+      crack.rotation.y = rng() * Math.PI;
+      crack.userData.phase = rng() * 6.28;
+      scene.add(crack);
+      cracks.push(crack);
+    }
+    // the glow inside the crack
+    const glow = new THREE.Mesh(GEO.sphereLo, new THREE.MeshBasicMaterial({ color: PALETTE.magicGlow, transparent: true, opacity: 0.85 }));
+    glow.position.set(x + Math.cos(Math.PI / 4) * 0.58, 0.34, z + Math.sin(Math.PI / 4) * 0.6);
+    scene.add(glow);
+    // spores drifting up out of the stump
+    const spores = [];
+    for (let i = 0; i < 9; i++) {
+      const s = new THREE.Mesh(GEO.sphereLo, new THREE.MeshBasicMaterial({ color: PALETTE.spore, transparent: true, opacity: 0.8 }));
+      s.userData = { a: rng() * 6.28, r: 0.3 + rng() * 0.6, speed: 0.25 + rng() * 0.25, y: rng() * 1.6, size: 0.035 + rng() * 0.03 };
+      scene.add(s);
+      spores.push(s);
+    }
+    animated.push({
+      update(t, dt) {
+        for (const c of cracks) c.material.opacity = 0.45 + 0.4 * (0.5 + 0.5 * Math.sin(t * 2.1 + c.userData.phase));
+        const pulse = 0.9 + 0.15 * Math.sin(t * 3.2);
+        glow.scale.setScalar(0.2 * pulse);
+        glow.material.opacity = 0.6 + 0.3 * Math.sin(t * 3.2);
+        for (const s of spores) {
+          const u = s.userData;
+          u.y += u.speed * dt; u.a += dt * 0.8;
+          if (u.y > 1.8) u.y = 0;
+          s.position.set(x + Math.cos(u.a) * u.r, 0.55 + u.y, z + Math.sin(u.a) * u.r * 0.7);
+          const fade = Math.min(1, u.y * 3) * Math.max(0, 1 - u.y / 1.8);
+          s.material.opacity = 0.75 * fade;
+          s.scale.setScalar(u.size * (0.7 + 0.6 * fade));
+        }
+      },
+    });
+  }
+
+  function buildBastion() {
+    const cells = GameState.BASTION_CELLS;
+    const cx = worldX((cells[0][0] + cells[cells.length - 1][0]) / 2);
+    const cz = worldZ((cells[0][1] + cells[cells.length - 1][1]) / 2);
+    const wm = M(cx, 0, cz);
+    const stone = PALETTE.stone, dark = PALETTE.stoneDark;
+    const H = 1.9;   // keep wall height: tall enough that the walls read from the camera angle
+    // main keep body, a moss line along the top and a darker stone footing
+    batchPart(P(GEO.box, stone, M(0, H / 2, -0.1, { sx: 1.9, sy: H, sz: 2.5 })), wm);
+    batchPart(P(GEO.box, dark, M(0, 0.12, -0.1, { sx: 1.98, sy: 0.24, sz: 2.58 })), wm);
+    batchPart(P(GEO.box, PALETTE.moss, M(0, H + 0.03, -0.1, { sx: 1.82, sy: 0.07, sz: 2.42 }), false), wm);
+    // moss creeping up the walls, so it reads as an old mossy keep and not a fresh one
+    batchPart(P(GEO.box, PALETTE.moss, M(0.15, 0.32, 1.17, { sx: 0.5, sy: 0.36, sz: 0.04 }), false), wm);
+    batchPart(P(GEO.box, PALETTE.moss, M(0.62, 0.55, 1.17, { sx: 0.22, sy: 0.7, sz: 0.04 }), false), wm);
+    batchPart(P(GEO.box, PALETTE.moss, M(-0.97, 0.36, -0.2, { sx: 0.04, sy: 0.44, sz: 0.7 }), false), wm);
+    batchPart(P(GEO.box, PALETTE.moss, M(-0.97, 1.2, 0.7, { sx: 0.04, sy: 0.3, sz: 0.3 }), false), wm);
+    // crenellations along the roof edge
+    for (let i = -2; i <= 2; i++) {
+      batchPart(P(GEO.box, dark, M(i * 0.4, H + 0.17, 1.17, { sx: 0.22, sy: 0.26, sz: 0.16 })), wm);
+      batchPart(P(GEO.box, dark, M(i * 0.4, H + 0.17, -1.37, { sx: 0.22, sy: 0.26, sz: 0.16 })), wm);
+    }
+    for (let i = -2; i <= 2; i++) {
+      batchPart(P(GEO.box, dark, M(-0.92, H + 0.17, -0.1 + i * 0.5, { sx: 0.16, sy: 0.26, sz: 0.22 })), wm);
+      batchPart(P(GEO.box, dark, M(0.92, H + 0.17, -0.1 + i * 0.5, { sx: 0.16, sy: 0.26, sz: 0.22 })), wm);
+    }
+    // corner towers with mushroom-cap roofs: two at the front, one at the back
+    const towers = [[-0.95, 1.15, 2.5], [0.95, 1.15, 2.5], [-0.95, -1.35, 2.3]];
+    for (const [tx, tz, th] of towers) {
+      batchPart(P(GEO.cyl, stone, M(tx, th / 2, tz, { sx: 0.38, sy: th, sz: 0.38 })), wm);
+      batchPart(P(GEO.cyl, dark, M(tx, th, tz, { sx: 0.45, sy: 0.1, sz: 0.45 })), wm);
+      batchPart(P(GEO.dome, PALETTE.capBrown, M(tx, th + 0.03, tz, { sx: 0.56, sy: 0.46, sz: 0.56 })), wm);
+      for (let i = 0; i < 3; i++) {
+        const a = i * 2.1 + tx, d = 0.32;
+        batchPart(P(GEO.sphereLo, PALETTE.cream, M(tx + Math.cos(a) * d, th + 0.36, tz + Math.sin(a) * d, { s: 0.08 }), false), wm);
+      }
+    }
+    // the tall central keep tower behind, with the banner on top
+    const KT = 3.3, kx = 0.35, kz = -0.55;
+    batchPart(P(GEO.cyl, stone, M(kx, KT / 2, kz, { sx: 0.48, sy: KT, sz: 0.48 })), wm);
+    batchPart(P(GEO.cyl, dark, M(kx, KT, kz, { sx: 0.56, sy: 0.1, sz: 0.56 })), wm);
+    batchPart(P(GEO.dome, PALETTE.capRed, M(kx, KT + 0.03, kz, { sx: 0.7, sy: 0.6, sz: 0.7 })), wm);
+    for (let i = 0; i < 4; i++) {
+      const a = i * 1.6, d = 0.4;
+      batchPart(P(GEO.sphereLo, PALETTE.cream, M(kx + Math.cos(a) * d, KT + 0.45, kz + Math.sin(a) * d, { s: 0.09 }), false), wm);
+    }
+    // the gate on the road side (south face), an arch with a wooden door
+    const gx = -0.5, gz = 1.16;
+    batchPart(P(GEO.box, 0x2b211b, M(gx, 0.4, gz, { sx: 0.66, sy: 0.8, sz: 0.08 }), false), wm);
+    batchPart(P(GEO.cyl, 0x2b211b, M(gx, 0.8, gz, { sx: 0.33, sy: 0.08, sz: 0.33, rx: Math.PI / 2 }), false), wm);
+    batchPart(P(GEO.box, PALETTE.wood, M(gx, 0.36, gz + 0.02, { sx: 0.54, sy: 0.72, sz: 0.05 }), false), wm);
+    batchPart(P(GEO.cyl, PALETTE.wood, M(gx, 0.72, gz + 0.02, { sx: 0.27, sy: 0.05, sz: 0.27, rx: Math.PI / 2 }), false), wm);
+    batchPart(P(GEO.box, PALETTE.woodLight, M(gx, 0.2, gz + 0.045, { sx: 0.5, sy: 0.06, sz: 0.03 }), false), wm);
+    batchPart(P(GEO.box, PALETTE.woodLight, M(gx, 0.56, gz + 0.045, { sx: 0.5, sy: 0.06, sz: 0.03 }), false), wm);
+    // stone steps and a doormat of flagstones leading down to the road
+    batchPart(P(GEO.box, dark, M(gx, 0.05, gz + 0.2, { sx: 0.9, sy: 0.1, sz: 0.28 })), wm);
+    batchPart(P(GEO.box, PALETTE.cobble, M(gx, 0.02, gz + 0.42, { sx: 0.8, sy: 0.04, sz: 0.2 }), false), wm);
+    // lantern posts flanking the gate, warm and glowing
+    const lanterns = [];
+    for (const lx of [gx - 0.55, gx + 0.55]) {
+      batchPart(P(GEO.cyl, PALETTE.wood, M(lx, 0.3, gz + 0.3, { sx: 0.035, sy: 0.6, sz: 0.035 })), wm);
+      batchPart(P(GEO.box, dark, M(lx, 0.66, gz + 0.3, { sx: 0.12, sy: 0.16, sz: 0.12 })), wm);
+      const l = new THREE.Mesh(GEO.sphereLo, new THREE.MeshBasicMaterial({ color: PALETTE.windowWarm }));
+      l.position.set(cx + lx, 0.66, cz + gz + 0.3);
+      l.scale.setScalar(0.05);
+      l.userData.phase = lx * 7;
+      scene.add(l);
+      lanterns.push(l);
+    }
+    // warm lit windows, live so they can flicker
+    const windows = [];
+    const winSpots = [
+      [-0.5, 1.35, 1.16, 'z'], [0.4, 0.75, 1.16, 'z'], [0.4, 1.4, 1.16, 'z'],
+      [-0.96, 0.9, 0.2, 'x'], [-0.96, 1.4, -0.6, 'x'],
+      [-0.95, 1.9, 1.5, 'z'], [0.95, 1.9, 1.5, 'z'], [kx, 2.6, kz + 0.45, 'z'],
+    ];
+    for (const [wx, wy, wz, axis] of winSpots) {
+      const w = new THREE.Mesh(GEO.box, new THREE.MeshBasicMaterial({ color: PALETTE.windowWarm }));
+      w.position.set(cx + wx, wy, cz + wz);
+      if (axis === 'z') w.scale.set(0.16, 0.24, 0.05); else w.scale.set(0.05, 0.24, 0.16);
+      w.userData.phase = wx * 3 + wz * 5;
+      scene.add(w);
+      windows.push(w);
+    }
+    // banner: pole + a waving cloth built from a segmented plane
+    const pole = new THREE.Mesh(GEO.cyl, toon(PALETTE.wood));
+    pole.position.set(cx + kx, KT + 0.9, cz + kz);
+    pole.scale.set(0.035, 1.2, 0.035);
+    scene.add(pole);
+    const bannerGeo = new THREE.PlaneGeometry(0.8, 0.46, 8, 3);
+    const bp = bannerGeo.attributes.position, bcols = new Float32Array(bp.count * 3);
+    const gold = new THREE.Color(PALETTE.gold), green = new THREE.Color(PALETTE.tunic);
+    for (let i = 0; i < bp.count; i++) {
+      const col = Math.abs(bp.getY(i)) < 0.08 ? green : gold;
+      bcols[i * 3] = col.r; bcols[i * 3 + 1] = col.g; bcols[i * 3 + 2] = col.b;
+    }
+    bannerGeo.setAttribute('color', new THREE.BufferAttribute(bcols, 3));
+    const banner = new THREE.Mesh(bannerGeo, toon(0xffffff, { vc: true, side: THREE.DoubleSide }));
+    banner.position.set(cx + kx + 0.4, KT + 1.2, cz + kz);
+    scene.add(banner);
+    const base = bp.array.slice();
+    animated.push({
+      update(t) {
+        for (let i = 0; i < bp.count; i++) {
+          const x = base[i * 3], u = (x + 0.4) / 0.8;
+          bp.setZ(i, Math.sin(t * 5.5 - u * 4.5) * 0.1 * u);
+          bp.setY(i, base[i * 3 + 1] + Math.sin(t * 2.2 - u * 2) * 0.03 * u);
+        }
+        bp.needsUpdate = true;
+        bannerGeo.computeVertexNormals();
+        for (const w of windows) {
+          const f = 0.86 + 0.14 * Math.sin(t * 9 + w.userData.phase) * Math.sin(t * 3.3 + w.userData.phase * 0.7);
+          w.material.color.setHex(PALETTE.windowWarm).multiplyScalar(f);
+        }
+        for (const l of lanterns) {
+          const f = 0.8 + 0.2 * Math.sin(t * 11 + l.userData.phase) * Math.sin(t * 2.7 + l.userData.phase);
+          l.material.color.setHex(PALETTE.windowWarm).multiplyScalar(f);
+          l.scale.setScalar(0.05 + 0.008 * f);
+        }
+      },
+    });
+  }
+
+  function buildCountryside() {
+    const rng = srand(2026);
+    const swayTrees = [];
+    const spawnAt = (c, r) => {
+      const inGrid = GameState.inGrid(c, r);
+      const h = GameState.hollowness(c, r);
+      const x = worldX(c) + (rng() - 0.5) * 0.5, z = worldZ(r) + (rng() - 0.5) * 0.5;
+      const roll = rng();
+      if (h > 0.45) {
+        // blighted ground: dead trees, pale rocks, very little else
+        if (roll < 0.35) {
+          const { parts, radius } = deadTreeParts(rng);
+          for (const p of parts) batchPart(p, M(x, 0, z));
+          batchDecal(x, z, radius);
+        } else if (roll < 0.6) {
+          const { parts, radius } = rockParts(rng, true);
+          for (const p of parts) batchPart(p, M(x, 0, z));
+          batchDecal(x, z, radius);
+        }
+        return;
+      }
+      const nearBastion = c >= 14 && r >= 4;
+      if (nearBastion) {
+        // keep the keep's skyline clear: only low props around it
+        if (roll < 0.4) {
+          const { parts } = tuftParts(rng);
+          for (const p of parts) batchPart(p, M(x, 0, z));
+        } else if (roll < 0.65) {
+          const { parts } = flowerParts(rng);
+          for (const p of parts) batchPart(p, M(x, 0, z));
+        }
+        return;
+      }
+      if (!inGrid) {
+        // the framing forest outside the grid is dense
+        if (roll < 0.7) {
+          const { parts, radius } = treeParts(rng);
+          for (const p of parts) batchPart(p, M(x, 0, z));
+          batchDecal(x, z, radius);
+        } else if (roll < 0.8) {
+          const { parts, radius } = mushroomParts(rng, true);
+          for (const p of parts) batchPart(p, M(x, 0, z));
+          batchDecal(x, z, radius);
+        }
+        return;
+      }
+      if (roll < 0.22) {
+        const { parts, radius } = treeParts(rng);
+        if (swayTrees.length < 8) {
+          const g = liveProp(parts, x, 0, z);
+          g.userData.phase = rng() * 6.28;
+          swayTrees.push(g);
+          decal(x, z, radius);
+        } else {
+          for (const p of parts) batchPart(p, M(x, 0, z));
+          batchDecal(x, z, radius);
+        }
+      } else if (roll < 0.36) {
+        const { parts, radius } = mushroomParts(rng, rng() < 0.35);
+        for (const p of parts) batchPart(p, M(x, 0, z));
+        batchDecal(x, z, radius);
+      } else if (roll < 0.5) {
+        const { parts } = tuftParts(rng);
+        for (const p of parts) batchPart(p, M(x, 0, z));
+      } else if (roll < 0.62) {
+        const { parts } = flowerParts(rng);
+        for (const p of parts) batchPart(p, M(x, 0, z));
+      } else if (roll < 0.72) {
+        const { parts, radius } = rockParts(rng, false);
+        for (const p of parts) batchPart(p, M(x, 0, z));
+        batchDecal(x, z, radius);
+      } else if (roll < 0.8) {
+        const { parts, radius } = acornParts(rng);
+        for (const p of parts) batchPart(p, M(x, 0, z));
+        batchDecal(x, z, radius);
+      }
+    };
+    for (let r = -border; r < rows + border; r++) {
+      for (let c = -border; c < cols + border; c++) {
+        if (GameState.inGrid(c, r)) {
+          const kind = GameState.cellKind(c, r);
+          if (kind !== 'ground' || GameState.isBuildable(c, r) || GameState.isSpawn(c, r)) continue;
+        } else if (c === GameState.STREAM_COL) continue;
+        spawnAt(c, r);
+      }
+    }
+    animated.push({
+      update(t) {
+        for (const g of swayTrees) {
+          g.rotation.z = Math.sin(t * 1.1 + g.userData.phase) * 0.035;
+          g.rotation.x = Math.cos(t * 0.9 + g.userData.phase) * 0.025;
+        }
+      },
+    });
+
+    // Butterflies over the meadow: small flapping planes on lazy loops.
+    const rngB = srand(5);
+    const butterflies = [];
+    const homes = [[6, 4], [12, 8], [10, 1]];
+    const colors = [PALETTE.flowerPink, PALETTE.flowerYellow, PALETTE.magic];
+    homes.forEach(([c, r], i) => {
+      const g = new THREE.Group();
+      const wingGeo = new THREE.PlaneGeometry(0.13, 0.18);
+      const mat = unlit(colors[i], { side: THREE.DoubleSide });
+      const l = new THREE.Mesh(wingGeo, mat), rr = new THREE.Mesh(wingGeo, mat);
+      l.position.x = -0.065; rr.position.x = 0.065;
+      const lp = new THREE.Group(), rp = new THREE.Group();
+      lp.add(l); rp.add(rr); g.add(lp, rp);
+      g.rotation.x = -Math.PI / 2;
+      g.userData = { home: [worldX(c), worldZ(r)], phase: rngB() * 6.28, lp, rp };
+      scene.add(g);
+      butterflies.push(g);
+    });
+    animated.push({
+      update(t) {
+        for (const b of butterflies) {
+          const u = b.userData, p = u.phase;
+          b.position.set(u.home[0] + Math.sin(t * 0.5 + p) * 1.3, 0.7 + Math.sin(t * 2.3 + p) * 0.15, u.home[1] + Math.sin(t * 0.35 + p * 2) * 1.0);
+          const flap = Math.sin(t * 16 + p) * 0.9;
+          u.lp.rotation.y = flap; u.rp.rotation.y = -flap;
+          b.rotation.z = Math.cos(t * 0.5 + p) * 0.9;
+        }
+      },
+    });
+  }
+
+  // The M1 outline test shape: a gnome-knight standing on a buildable tile.
+  function buildTestGnome() {
+    const cell = [6, 5];
+    const parts = [
+      P(GEO.sphereLo, PALETTE.tunic, M(0, 0.3, 0, { sx: 0.27, sy: 0.24, sz: 0.25 }), true, { name: 'body' }),
+      P(GEO.sphereLo, PALETTE.woodLight, M(0, 0.06, 0.1, { sx: 0.1, sy: 0.06, sz: 0.12 }), true, { name: 'footL' }),
+      P(GEO.sphereLo, PALETTE.woodLight, M(-0.15, 0.06, 0.06, { sx: 0.1, sy: 0.06, sz: 0.12 }), true, { name: 'footR' }),
+      P(GEO.sphere, PALETTE.skin, M(0, 0.62, 0, { s: 0.23 }), true, { name: 'head' }),
+      P(GEO.sphereLo, PALETTE.cream, M(0, 0.5, 0.15, { sx: 0.18, sy: 0.16, sz: 0.12 }), true, { name: 'beard' }),
+      P(GEO.sphereLo, 0xf0a98a, M(0, 0.62, 0.22, { s: 0.06 }), false, { name: 'nose' }),
+      P(GEO.cone, PALETTE.capRed, M(0.02, 1.02, -0.02, { sx: 0.24, sy: 0.55, sz: 0.24, rz: -0.12 }), true, { name: 'hat' }),
+      P(GEO.cyl, PALETTE.capRed, M(0, 0.78, 0, { sx: 0.27, sy: 0.05, sz: 0.27 }), true, { name: 'brim' }),
+      P(GEO.sphereLo, PALETTE.stone, M(0.3, 0.3, 0.05, { sx: 0.12, sy: 0.16, sz: 0.05 }), true, { name: 'shield' }),
+    ];
+    const x = worldX(cell[0]), z = worldZ(cell[1]);
+    const g = liveProp(parts, x, 0, z);
+    g.name = 'testGnome';
+    decal(0, 0, 0.32, g).position.y = 0.012;
+    const hat = g.getObjectByName('hat');
+    const hatBaseRz = hat.rotation.z;
+    animated.push({
+      update(t) {
+        const bob = Math.sin(t * 2.4);
+        g.scale.set(1 - 0.022 * bob, 1 + 0.045 * bob, 1 - 0.022 * bob);
+        g.position.y = 0.03 * Math.max(0, bob);
+        g.rotation.y = Math.sin(t * 0.7) * 0.25;
+        hat.rotation.z = hatBaseRz + Math.sin(t * 2.4 + 0.6) * 0.06;
+      },
+    });
+    return g;
+  }
+
+  function buildSelection() {
+    const ringGeo = new THREE.RingGeometry(0.34, 0.44, 24);
+    ringGeo.rotateX(-Math.PI / 2);
+    selectionRing = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: PALETTE.gold, transparent: true, opacity: 0.95, depthWrite: false }));
+    selectionRing.position.y = 0.02;
+    selectionRing.visible = false;
+    scene.add(selectionRing);
+    rejectRing = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: 0xff5a6e, transparent: true, opacity: 0.9, depthWrite: false }));
+    rejectRing.position.y = 0.02;
+    rejectRing.visible = false;
+    scene.add(rejectRing);
+    animated.push({
+      update(t, dt) {
+        const sel = GameState.state.selected;
+        selectionRing.visible = !!sel;
+        if (sel) {
+          selectionRing.position.x = worldX(sel.c);
+          selectionRing.position.z = worldZ(sel.r);
+          const s = 1 + 0.06 * Math.sin(t * 5);
+          selectionRing.scale.set(s, 1, s);
+          selectionRing.rotation.y = t * 0.6;
+        }
+        if (rejectTimer > 0) {
+          rejectTimer -= dt;
+          rejectRing.visible = rejectTimer > 0;
+          const k = Math.max(0, rejectTimer / 0.4);
+          rejectRing.material.opacity = k;
+          rejectRing.position.x = worldX(rejectCell.c) + Math.sin(rejectTimer * 60) * 0.05 * k;
+          rejectRing.position.z = worldZ(rejectCell.r);
+          rejectRing.scale.setScalar(1.2 - 0.2 * k);
+        }
+      },
+    });
+    GameState.on('tileRejected', (res) => {
+      if (!GameState.inGrid(res.c, res.r)) return;
+      rejectTimer = 0.4;
+      rejectCell = res;
+    });
+  }
+
+  // -------- camera --------
+  function placeCamera() {
+    const el = THREE.MathUtils.degToRad(CONFIG.cameraElevation);
+    const yaw = THREE.MathUtils.degToRad(CONFIG.cameraYaw);
+    const dir = new THREE.Vector3(Math.sin(yaw) * Math.cos(el), Math.sin(el), Math.cos(yaw) * Math.cos(el));
+    camera.position.copy(dir.multiplyScalar(40));
+    camera.lookAt(0, 0, 0);
+    camera.updateMatrixWorld(true);
+  }
+  function fitCamera() {
+    const aspect = cssW / cssH;
+    const box = new THREE.Box3(
+      new THREE.Vector3(-cols / 2 - 0.9, -tileHeight, -rows / 2 - 0.6),
+      new THREE.Vector3(cols / 2 + 0.9, 4.6, rows / 2 + 0.6),
+    );
+    const inv = camera.matrixWorldInverse;
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    const v = new THREE.Vector3();
+    for (let i = 0; i < 8; i++) {
+      v.set(i & 1 ? box.max.x : box.min.x, i & 2 ? box.max.y : box.min.y, i & 4 ? box.max.z : box.min.z).applyMatrix4(inv);
+      minX = Math.min(minX, v.x); maxX = Math.max(maxX, v.x);
+      minY = Math.min(minY, v.y); maxY = Math.max(maxY, v.y);
+    }
+    const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+    let hw = (maxX - minX) / 2, hh = (maxY - minY) / 2;
+    if (hw / hh > aspect) hh = hw / aspect; else hw = hh * aspect;
+    camera.left = cx - hw; camera.right = cx + hw;
+    camera.top = cy + hh; camera.bottom = cy - hh;
+    camera.near = 1; camera.far = 100;
+    camera.updateProjectionMatrix();
+    unitsPerPixel = (hw * 2) / cssW;
+    outlineMat.uniforms.thickness.value = CONFIG.outlinePx * unitsPerPixel;
+  }
+
+  function resize() {
+    cssW = Math.max(1, window.innerWidth);
+    cssH = Math.max(1, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, CONFIG.maxPixelRatio));
+    renderer.setSize(cssW, cssH, false);
+    fitCamera();
+  }
+
+  // -------- picking --------
+  const raycaster = new THREE.Raycaster();
+  const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+  const hit = new THREE.Vector3();
+  function screenToCell(x, y) {
+    const ndc = new THREE.Vector2((x / cssW) * 2 - 1, -(y / cssH) * 2 + 1);
+    raycaster.setFromCamera(ndc, camera);
+    if (!raycaster.ray.intersectPlane(groundPlane, hit)) return null;
+    return { c: Math.floor(hit.x + cols / 2), r: Math.floor(hit.z + rows / 2) };
+  }
+
+  // -------- init / frame --------
+  function init(canvasEl) {
+    canvas = canvasEl;
+    renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+    renderer.setClearColor(PALETTE.backdrop);
+    scene = new THREE.Scene();
+    camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 1, 100);
+
+    gradientMap = new THREE.DataTexture(new Uint8Array([128, 199, 255]), 3, 1, THREE.LuminanceFormat);
+    gradientMap.minFilter = THREE.NearestFilter;
+    gradientMap.magFilter = THREE.NearestFilter;
+    gradientMap.generateMipmaps = false;
+    gradientMap.needsUpdate = true;
+    outlineMat = makeOutlineMaterial();
+    buildPrimitives();
+
+    scene.add(new THREE.AmbientLight(0xffffff, 0.38));
+    const sun = new THREE.DirectionalLight(0xfff0d8, 0.68);
+    sun.position.set(-6, 10, 7);
+    scene.add(sun);
+
+    placeCamera();
+    buildGround();
+    buildStream();
+    buildBridge();
+    buildHollow();
+    buildBastion();
+    buildCountryside();
+    buildTestGnome();
+    buildSelection();
+    flushBatch();
+
+    resize();
+    window.addEventListener('resize', resize);
+    window.addEventListener('orientationchange', () => setTimeout(resize, 60));
+  }
+
+  function render(t, dt) {
+    for (const a of animated) a.update(t, dt);
+    renderer.render(scene, camera);
+  }
+
+  function stats() {
+    const r = renderer.info.render;
+    return { calls: r.calls, triangles: r.triangles };
+  }
+
+  return { init, render, resize, screenToCell, stats };
+})();
+
+// ===================================================================
+// Input  (Pointer Events: mouse and touch share one path, handleTap)
+// ===================================================================
+const Input = (() => {
+  let down = null;
+  const TAP_SLOP = 12;   // px of movement still counted as a tap
+
+  function handleTap(x, y) {
+    const cell = Renderer.screenToCell(x, y);
+    if (!cell) return null;
+    return GameState.selectTile(cell.c, cell.r);
+  }
+
+  function init(canvas) {
+    canvas.addEventListener('pointerdown', (e) => {
+      Audio.unlock();
+      down = { x: e.clientX, y: e.clientY, id: e.pointerId };
+      if (canvas.setPointerCapture) { try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* older browsers */ } }
+    });
+    canvas.addEventListener('pointerup', (e) => {
+      if (!down || down.id !== e.pointerId) return;
+      const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y);
+      down = null;
+      if (moved <= TAP_SLOP) handleTap(e.clientX, e.clientY);
+    });
+    canvas.addEventListener('pointercancel', () => { down = null; });
+    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+  }
+
+  return { init, handleTap };
+})();
+
+// ===================================================================
+// UI  (DOM overlay; reads GameState)
+// ===================================================================
+const UI = (() => {
+  const $ = (id) => document.getElementById(id);
+  let toastTimer = 0;
+  let debugOn = false, fpsAcc = 0, fpsFrames = 0, fpsShown = 0;
+
+  function updateHud() {
+    const s = GameState.state;
+    $('hud-gold').textContent = s.gold;
+    $('hud-lives').textContent = s.lives;
+    $('hud-wave').textContent = s.wave > 0 ? `Wave ${s.wave}/${CONFIG.totalWaves}` : 'Prep';
+  }
+
+  function toast(text, bad) {
+    const el = $('toast');
+    el.textContent = text;
+    el.classList.toggle('bad', !!bad);
+    el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+  }
+
+  function updateOrientation() {
+    const portrait = window.innerHeight > window.innerWidth;
+    const mobile = (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) || window.innerWidth < 720;
+    $('rotate').classList.toggle('show', portrait && mobile);
+  }
+
+  function init() {
+    debugOn = /[?&]debug\b/.test(location.search);
+    $('debug').classList.toggle('show', debugOn);
+    updateHud();
+    updateOrientation();
+    window.addEventListener('resize', updateOrientation);
+    window.addEventListener('orientationchange', () => setTimeout(updateOrientation, 60));
+    GameState.on('tileSelected', () => toast('A fine spot for a tower.'));
+    GameState.on('tileRejected', (res) => toast(res.reason, true));
+  }
+
+  function frame(dt) {
+    if (!debugOn) return;
+    fpsAcc += dt; fpsFrames++;
+    if (fpsAcc >= 0.5) {
+      fpsShown = Math.round(fpsFrames / fpsAcc);
+      fpsAcc = 0; fpsFrames = 0;
+      const s = Renderer.stats();
+      $('debug').textContent = `${fpsShown} fps\n${s.calls} draw calls\n${s.triangles} tris\n${window.innerWidth}x${window.innerHeight} @${Math.min(window.devicePixelRatio || 1, CONFIG.maxPixelRatio)}x`;
+    }
+  }
+
+  return { init, frame, updateHud, toast };
+})();
+
+// ===================================================================
+// Audio  (Web Audio, synthesized; unlocked on the first pointer event)
+// ===================================================================
+const Audio = (() => {
+  let ctx = null, master = null;
+
+  function unlock() {
+    if (!ctx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      ctx = new AC();
+      master = ctx.createGain();
+      master.gain.value = 0.5;
+      master.connect(ctx.destination);
+    }
+    if (ctx.state === 'suspended') ctx.resume();
+  }
+
+  // One shaped voice: oscillator -> lowpass -> gain envelope. The filter
+  // and the exponential decay are what keep this from sounding tinny.
+  function voice({ type = 'sine', freq = 440, to = null, dur = 0.15, vol = 0.4, cutoff = 2400, delay = 0 }) {
+    if (!ctx) return;
+    const t0 = ctx.currentTime + delay;
+    const osc = ctx.createOscillator();
+    const filt = ctx.createBiquadFilter();
+    const g = ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t0);
+    if (to) osc.frequency.exponentialRampToValueAtTime(to, t0 + dur);
+    filt.type = 'lowpass';
+    filt.frequency.setValueAtTime(cutoff, t0);
+    filt.frequency.exponentialRampToValueAtTime(Math.max(200, cutoff * 0.35), t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    osc.connect(filt); filt.connect(g); g.connect(master);
+    osc.start(t0);
+    osc.stop(t0 + dur + 0.02);
+  }
+
+  const sfx = {
+    select() {   // a bright little two-note "pip!"
+      voice({ type: 'triangle', freq: 520, to: 640, dur: 0.09, vol: 0.35, cutoff: 3200 });
+      voice({ type: 'sine', freq: 780, to: 1040, dur: 0.14, vol: 0.28, cutoff: 3600, delay: 0.06 });
+    },
+    reject() {   // a soft, low "nuh-uh" thud
+      voice({ type: 'triangle', freq: 190, to: 120, dur: 0.16, vol: 0.4, cutoff: 900 });
+      voice({ type: 'square', freq: 140, to: 95, dur: 0.12, vol: 0.12, cutoff: 500, delay: 0.09 });
+    },
+  };
+
+  function init() {
+    GameState.on('tileSelected', () => sfx.select());
+    GameState.on('tileRejected', () => sfx.reject());
+  }
+
+  return { init, unlock, sfx };
+})();
+
+// ===================================================================
+// Boot
+// ===================================================================
+(function boot() {
+  if (!window.THREE) {
+    document.getElementById('load-error').classList.add('show');
+    return;
+  }
+  const canvas = document.getElementById('game');
+  Renderer.init(canvas);
+  Input.init(canvas);
+  UI.init();
+  Audio.init();
+
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    GameState.update(dt);
+    Renderer.render(GameState.state.time, dt);
+    UI.frame(dt);
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
