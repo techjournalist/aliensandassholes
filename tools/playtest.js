@@ -81,12 +81,13 @@ const simulate = (page, seconds) => page.evaluate((sec) => { for (let i = 0; i <
   let st = await S(page);
   check('buildable tile selected', st.selected && st.selected.kind === 'tile' && st.selected.c === 6);
   check('build panel visible', await page.locator('#panel').isVisible());
-  check('build button enabled at 150 gold', await page.locator('.build-btn').isEnabled());
-  check('tip moves to the build button once a tile is picked', (await page.locator('#tip').innerText()).includes('button'));
-  await page.locator('.build-btn').click(); await page.waitForTimeout(250);
+  check('build button enabled at 150 gold', await page.locator('.build-btn[data-tower="slinger"]').isEnabled());
+  const tipSays = (word) => page.waitForFunction((w) => document.querySelector('#tip .tip-text').textContent.includes(w), word, { timeout: 4000 }).then(() => true).catch(() => false);
+  check('tip moves to the tower buttons once a tile is picked', await tipSays('pick'));
+  await page.locator('.build-btn[data-tower="slinger"]').click(); await page.waitForTimeout(250);
   st = await S(page);
   check('tower placed by mouse', st.towers === 1 && st.gold === 80, `towers=${st.towers} gold=${st.gold}`);
-  check('tip moves to the wave button after the first tower', (await page.locator('#tip').innerText()).includes('wave'));
+  check('tip moves to the wave button after the first tower', await tipSays('wave'));
   check('placed tower becomes selection', st.selected && st.selected.kind === 'tower');
   check('tower panel shows name', (await page.locator('#panel').innerText()).includes('Sprout Slinger'));
   await page.screenshot({ path: `${OUT}/placed.png` });
@@ -106,12 +107,12 @@ const simulate = (page, seconds) => page.evaluate((sec) => { for (let i = 0; i <
   // a second tower leaves 10 gold: third spot shows a disabled button
   [x, y] = await cellToScreen(page, 10, 5);
   await page.mouse.click(x, y); await page.waitForTimeout(150);
-  await page.locator('.build-btn').click(); await page.waitForTimeout(150);
+  await page.locator('.build-btn[data-tower="slinger"]').click(); await page.waitForTimeout(150);
   st = await S(page);
   check('second tower placed', st.towers === 2 && st.gold === 10);
   [x, y] = await cellToScreen(page, 12, 4);
   await page.mouse.click(x, y); await page.waitForTimeout(150);
-  check('build button disabled when broke', !(await page.locator('.build-btn').isEnabled()));
+  check('build button disabled when broke', !(await page.locator('.build-btn[data-tower="slinger"]').isEnabled()));
   check('placeTower refuses when broke', !(await page.evaluate(() => GameState.placeTower('slinger').ok)));
   check('tower on occupied tile refused', await page.evaluate(() => { GameState.selectTile(6, 5); return GameState.state.selected.kind === 'tower'; }));
 
@@ -162,9 +163,9 @@ const simulate = (page, seconds) => page.evaluate((sec) => { for (let i = 0; i <
   console.log('DEBUG OVERLAY (after wave): ' + (await page.locator('#debug').innerText()).replace(/\n/g, ' | '));
 
   await page.setViewportSize({ width: 900, height: 600 });
-  await page.waitForTimeout(250);
-  const cv = await page.evaluate(() => { const c = document.getElementById('game'); return [c.width, c.height]; });
-  check('canvas follows resize', cv[0] === 900 && cv[1] === 600);
+  // resize events dispatch at frame time, and headless frames are slow: poll
+  const resized = await page.waitForFunction(() => { const c = document.getElementById('game'); return c.width === 900 && c.height === 600; }, null, { timeout: 5000 }).then(() => true).catch(() => false);
+  check('canvas follows resize', resized);
   // balance probe: keep sending waves with the same two towers and see when the line breaks
   const probe = await page.evaluate(() => {
     const out = [];
@@ -179,6 +180,98 @@ const simulate = (page, seconds) => page.evaluate((sec) => { for (let i = 0; i <
   });
   console.log('balance probe (2 Slingers, no more building): ' + JSON.stringify(probe));
   await page.waitForTimeout(1500);
+
+  // ---- M4: all five towers, upgrades, sell, flying rule ----
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.waitForTimeout(200);
+  // the probe may have bled the Bastion dry: revive it for the rest of the suite (test-only)
+  await page.evaluate(() => { GameState.state.gold = 2000; GameState.state.lives = 20; GameState.state.phase = 'playing'; document.getElementById('end').classList.remove('show'); GameState.emit('goldChanged', 2000); });
+  const spots = { warden: [7, 5], druid: [9, 5], golem: [12, 4], artillery: [13, 7] };
+  for (const [type, [c, r]] of Object.entries(spots)) {
+    const before = (await S(page)).towers;
+    [x, y] = await cellToScreen(page, c, r);
+    await page.mouse.click(x, y); await page.waitForTimeout(200);
+    const btn = page.locator(`.build-btn[data-tower="${type}"]`);
+    check(`${type} button present`, await btn.count() === 1);
+    await btn.click(); await page.waitForTimeout(200);
+    check(`${type} placed`, (await S(page)).towers === before + 1);
+  }
+  check('five tower types on the field', await page.evaluate(() => new Set(GameState.state.towers.map((t) => t.type)).size) === 5);
+  await page.screenshot({ path: `${OUT}/towers.png` });
+  for (const [type, [c, r]] of Object.entries({ slinger: [6, 5], ...spots })) {
+    const [zx, zy] = await cellToScreen(page, c, r);
+    await page.screenshot({ path: `${OUT}/tower-${type}.png`, clip: { x: zx - 70, y: zy - 110, width: 140, height: 150 } });
+  }
+  // upgrade and sell through the panel
+  [x, y] = await cellToScreen(page, 7, 5);
+  await page.mouse.click(x, y); await page.waitForTimeout(200);
+  const goldBefore = (await S(page)).gold;
+  await page.locator('button[data-upgrade]').click(); await page.waitForTimeout(250);
+  const tw = await page.evaluate(() => GameState.state.towers.find((t) => t.type === 'warden'));
+  check('warden upgraded to tier 2 and charged', tw.tier === 2 && (await S(page)).gold === goldBefore - 88, `tier=${tw.tier} gold=${(await S(page)).gold}`);
+  check('tier 2 stats grow', await page.evaluate(() => { const t = GameState.state.towers.find((t) => t.type === 'warden'); const s = GameState.towerStats(t); return s.damage === 21 && s.range > 2.3; }));
+  await page.locator('button[data-upgrade]').click(); await page.waitForTimeout(250);
+  check('tier 3 reached and upgrade button retires', await page.evaluate(() => GameState.state.towers.find((t) => t.type === 'warden').tier === 3) && await page.locator('button[data-upgrade]').count() === 0);
+  const [zx2, zy2] = await cellToScreen(page, 7, 5);
+  await page.screenshot({ path: `${OUT}/tower-warden-t3.png`, clip: { x: zx2 - 70, y: zy2 - 110, width: 140, height: 150 } });
+  const goldPreSell = (await S(page)).gold;
+  await page.locator('button[data-sell]').click(); await page.waitForTimeout(250);
+  st = await S(page);
+  check('sell removes the tower and refunds 60%', st.towers === 5 && st.gold === goldPreSell + Math.round((110 + 88 + 143) * 0.6), `gold=${st.gold}`);
+  check('sold tile is buildable again', await page.evaluate(() => !GameState.towerAt(7, 5)));
+  const leftover = await page.evaluate(() => Renderer.debugScene().children.filter((c) => /^tower-/.test(c.name)).length);
+  check('sold tower view removed', leftover === 5, `views=${leftover}`);
+
+  // flying rule: a lone bat past ground-only towers must be untouched
+  const flyRes = await page.evaluate(() => {
+    const keep = new Set(['slinger', 'warden', 'golem']);
+    GameState.state.towers = GameState.state.towers.filter((t) => keep.has(t.type));
+    GameState.state.enemies.length = 0; GameState.state.projectiles.length = 0;
+    const bat = GameState.spawnEnemy('bat');
+    let hits = 0; GameState.on('enemyHit', ({ enemy }) => { if (enemy.id === bat.id) hits++; });
+    for (let i = 0; i < 60 * 8 && GameState.state.enemies.includes(bat); i++) GameState.update(1 / 60);
+    const groundOnlyHits = hits, hpAfter = bat.hp, maxHp = bat.maxHp, dist = bat.dist;
+    // now bring in a druid and an artillery and run another bat through
+    GameState.state.enemies.length = 0;
+    GameState.state.selected = { kind: 'tile', c: 9, r: 5 }; GameState.placeTower('druid');
+    GameState.state.selected = { kind: 'tile', c: 13, r: 7 }; GameState.placeTower('artillery');
+    const bat2 = GameState.spawnEnemy('bat');
+    let hits2 = 0, chilled = false; GameState.on('enemyHit', ({ enemy }) => { if (enemy.id === bat2.id) hits2++; }); GameState.on('enemyChilled', (e) => { if (e.id === bat2.id) chilled = true; });
+    for (let i = 0; i < 60 * 12 && GameState.state.enemies.includes(bat2); i++) GameState.update(1 / 60);
+    return { groundOnlyHits, hpAfter, maxHp, dist, flyerHits: hits2, chilled, bat2hp: bat2.hp };
+  });
+  check('ground-only towers never touch a bat', flyRes.groundOnlyHits === 0 && flyRes.hpAfter === flyRes.maxHp && flyRes.dist > 8, JSON.stringify(flyRes));
+  check('druid and artillery do hit the bat, and the druid chills it', flyRes.flyerHits > 0 && flyRes.chilled, JSON.stringify(flyRes));
+  // rooting: a warden thorn burst stops a grunt in its tracks
+  const rootRes = await page.evaluate(() => {
+    GameState.state.enemies.length = 0; GameState.state.projectiles.length = 0;
+    GameState.state.towers = GameState.state.towers.filter((t) => t.type === 'warden');
+    GameState.state.selected = { kind: 'tile', c: 7, r: 5 }; GameState.placeTower('warden');
+    const g = GameState.spawnEnemy('grunt');
+    let rooted = false, frozenFrames = 0;
+    GameState.on('enemyRooted', (e) => { if (e.id === g.id) rooted = true; });
+    for (let i = 0; i < 60 * 12 && GameState.state.enemies.includes(g); i++) { const d0 = g.dist; GameState.update(1 / 60); if (rooted && g.dist === d0) frozenFrames++; }
+    return { rooted, frozenFrames };
+  });
+  check('warden roots a grunt and it stops moving', rootRes.rooted && rootRes.frozenFrames > 20, JSON.stringify(rootRes));
+  await page.waitForTimeout(800);
+  // a wave-5 style mix with everything on the field, for the screenshot and a sanity check
+  await page.evaluate(() => {
+    GameState.state.enemies.length = 0;
+    GameState.state.towers.length = 0;
+    const put = (type, c, r) => { GameState.state.selected = { kind: 'tile', c, r }; GameState.placeTower(type); };
+    put('slinger', 6, 5); put('warden', 7, 5); put('druid', 9, 5); put('golem', 12, 4); put('artillery', 13, 7);
+    GameState.state.wave = 4; GameState.state.lives = 20; GameState.startWave();
+    for (let i = 0; i < 60 * 9; i++) GameState.update(1 / 60);
+  });
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: `${OUT}/wave5.png` });
+  const hasBat = await page.evaluate(() => GameState.state.enemies.some((e) => e.flying));
+  check('wave 5 contains bats', hasBat);
+  await page.evaluate(() => { for (let i = 0; i < 60 * 60 && GameState.state.waveActive; i++) GameState.update(1 / 60); });
+  const w5 = await S(page);
+  console.log('wave 5 with one of each tower: lives ' + w5.lives + ', gold ' + w5.gold);
+  await page.waitForTimeout(2500);
   await ctx.close();
 
   // ---------------- Mobile, touch ----------------
@@ -201,7 +294,7 @@ const simulate = (page, seconds) => page.evaluate((sec) => { for (let i = 0; i <
   await page.touchscreen.tap(x, y); await page.waitForTimeout(200);
   st = await S(page);
   check('touch tap selects tile', st.selected && st.selected.kind === 'tile' && st.selected.c === 9);
-  const bb = await page.locator('.build-btn').boundingBox();
+  const bb = await page.locator('.build-btn[data-tower="slinger"]').boundingBox();
   check('build button is at least 44px tall', bb && bb.height >= 44, `h=${bb && bb.height}`);
   await page.touchscreen.tap(bb.x + bb.width / 2, bb.y + bb.height / 2); await page.waitForTimeout(250);
   st = await S(page);
