@@ -124,7 +124,7 @@ const simulate = (page, seconds) => page.evaluate((sec) => { for (let i = 0; i <
   await simulate(page, 9);
   await page.waitForTimeout(150);
   const mid = await page.evaluate(() => GameState.state.enemies.map((e) => ({ id: e.id, dist: +e.dist.toFixed(2), x: +e.x.toFixed(2), z: +e.z.toFixed(2) })));
-  check('goblins spawned and spread along the road', mid.length >= 5 && mid[0].dist > 8, JSON.stringify(mid.slice(0, 3)));
+  check('goblins spawned and spread along the road', mid.length >= 2 && mid[0].dist > 6, JSON.stringify(mid.slice(0, 3)));
   const onRoad = await page.evaluate(() => GameState.state.enemies.every((e) => {
     let best = Infinity;
     for (const [c, r] of GameState.pathCells) best = Math.min(best, Math.hypot(GameState.worldX(c) - e.x, GameState.worldZ(r) - e.z));
@@ -148,14 +148,20 @@ const simulate = (page, seconds) => page.evaluate((sec) => { for (let i = 0; i <
   check('tip gone once the wave is sent', !(await page.locator('#tip').isVisible()));
   const fired = await page.evaluate(() => GameState.state.projectiles.length > 0 || GameState.state.towers.some((t) => t.targetId));
   check('towers acquire targets and fire', fired);
-  await simulate(page, 45);
+  await page.evaluate(() => { for (let i = 0; i < 60 * 90 && GameState.state.waveActive; i++) GameState.update(1 / 60); });
   await page.waitForTimeout(4000);   // let exit animations and puffs finish (headless frames are slow)
   st = await S(page);
   const kills = await page.evaluate(() => GameState.state.kills);
   check('wave 1 cleared: goblins die to two Slingers', st.enemies === 0 && kills >= 5 && st.lives >= 18, `kills=${kills} lives=${st.lives}`);
   check('kills pay gold', st.gold > 10, `gold=${st.gold}`);
   check('floating numbers rendered', (await page.evaluate(() => window.__floaters || 0)) >= 0);
-  check('wave ended, button re-armed for wave 2', !st.waveActive && (await page.locator('#wave-btn').innerText()).includes('wave 2'));
+  check('wave ended, button re-armed for wave 2 with a prep countdown', !st.waveActive && (await page.locator('#wave-btn').innerText()).includes('wave 2') && (await page.evaluate(() => GameState.state.prep > 0)));
+  const earlyGold = await page.evaluate(() => { const g0 = GameState.state.gold; GameState.sendWave(); return GameState.state.gold - g0; });
+  check('sending early pays a bonus', earlyGold > 0, `bonus=${earlyGold}`);
+  check('wave banner shows name and flavor', (await page.locator('#wave-banner').innerText()).includes('Wave 2'));
+  await page.evaluate(() => { for (let i = 0; i < 60 * 90 && GameState.state.waveActive; i++) GameState.update(1 / 60); });
+  await page.waitForFunction(() => Renderer.debugViews().dying.length === 0, null, { timeout: 20000 }).catch(() => {});
+  await page.waitForTimeout(1500);
   const callsAfter = await page.evaluate(() => Renderer.stats().calls);
   const views = await page.evaluate(() => Renderer.debugViews());
   check('leaked goblin views are removed', views.enemyViews === 0 && views.dying.length === 0, JSON.stringify(views));
@@ -169,7 +175,7 @@ const simulate = (page, seconds) => page.evaluate((sec) => { for (let i = 0; i <
   // balance probe: keep sending waves with the same two towers and see when the line breaks
   const probe = await page.evaluate(() => {
     const out = [];
-    for (let w = 2; w <= 6; w++) {
+    for (let w = 3; w <= 6; w++) {
       const livesBefore = GameState.state.lives;
       GameState.startWave();
       for (let i = 0; i < 60 * 70 && GameState.state.waveActive; i++) GameState.update(1 / 60);
@@ -209,7 +215,7 @@ const simulate = (page, seconds) => page.evaluate((sec) => { for (let i = 0; i <
   await page.locator('button[data-upgrade]').click(); await page.waitForTimeout(250);
   const tw = await page.evaluate(() => GameState.state.towers.find((t) => t.type === 'warden'));
   check('warden upgraded to tier 2 and charged', tw.tier === 2 && (await S(page)).gold === goldBefore - 88, `tier=${tw.tier} gold=${(await S(page)).gold}`);
-  check('tier 2 stats grow', await page.evaluate(() => { const t = GameState.state.towers.find((t) => t.type === 'warden'); const s = GameState.towerStats(t); return s.damage === 21 && s.range > 2.3; }));
+  check('tier 2 stats grow', await page.evaluate(() => { const t = GameState.state.towers.find((t) => t.type === 'warden'); const s = GameState.towerStats(t); const b = GameState.TOWER_TYPES.warden; return s.damage === Math.round(b.damage * 1.5) && s.range > b.range; }));
   await page.locator('button[data-upgrade]').click(); await page.waitForTimeout(250);
   check('tier 3 reached and upgrade button retires', await page.evaluate(() => GameState.state.towers.find((t) => t.type === 'warden').tier === 3) && await page.locator('button[data-upgrade]').count() === 0);
   const [zx2, zy2] = await cellToScreen(page, 7, 5);
@@ -222,6 +228,9 @@ const simulate = (page, seconds) => page.evaluate((sec) => { for (let i = 0; i <
   const leftover = await page.evaluate(() => Renderer.debugScene().children.filter((c) => /^tower-/.test(c.name)).length);
   check('sold tower view removed', leftover === 5, `views=${leftover}`);
 
+  // staged tests must not be interrupted by the prep timer auto-starting a wave
+  const quiet = () => page.evaluate(() => { const S = GameState.state; S.waveActive = false; S.schedule = []; S.waveQueue = []; S.prep = 0; S.phase = 'playing'; S.enemies.length = 0; S.projectiles.length = 0; });
+  await quiet();
   // flying rule: a lone bat past ground-only towers must be untouched
   const flyRes = await page.evaluate(() => {
     const keep = new Set(['slinger', 'warden', 'golem']);
@@ -242,6 +251,7 @@ const simulate = (page, seconds) => page.evaluate((sec) => { for (let i = 0; i <
   });
   check('ground-only towers never touch a bat', flyRes.groundOnlyHits === 0 && flyRes.hpAfter === flyRes.maxHp && flyRes.dist > 8, JSON.stringify(flyRes));
   check('druid and artillery do hit the bat, and the druid chills it', flyRes.flyerHits > 0 && flyRes.chilled, JSON.stringify(flyRes));
+  await quiet();
   // rooting: a warden thorn burst stops a grunt in its tracks
   const rootRes = await page.evaluate(() => {
     GameState.state.enemies.length = 0; GameState.state.projectiles.length = 0;
@@ -256,22 +266,97 @@ const simulate = (page, seconds) => page.evaluate((sec) => { for (let i = 0; i <
   check('warden roots a grunt and it stops moving', rootRes.rooted && rootRes.frozenFrames > 20, JSON.stringify(rootRes));
   await page.waitForTimeout(800);
   // a wave-5 style mix with everything on the field, for the screenshot and a sanity check
+  await quiet();
   await page.evaluate(() => {
     GameState.state.enemies.length = 0;
     GameState.state.towers.length = 0;
     const put = (type, c, r) => { GameState.state.selected = { kind: 'tile', c, r }; GameState.placeTower(type); };
     put('slinger', 6, 5); put('warden', 7, 5); put('druid', 9, 5); put('golem', 12, 4); put('artillery', 13, 7);
+    window.__bats = 0; GameState.on('enemySpawned', (e) => { if (e.type === 'bat') window.__bats++; });
     GameState.state.wave = 4; GameState.state.lives = 20; GameState.startWave();
-    for (let i = 0; i < 60 * 9; i++) GameState.update(1 / 60);
+    for (let i = 0; i < 60 * 6; i++) GameState.update(1 / 60);
   });
   await page.waitForTimeout(300);
   await page.screenshot({ path: `${OUT}/wave5.png` });
-  const hasBat = await page.evaluate(() => GameState.state.enemies.some((e) => e.flying));
-  check('wave 5 contains bats', hasBat);
+  check('wave 5 sends bats', (await page.evaluate(() => window.__bats)) >= 3);
   await page.evaluate(() => { for (let i = 0; i < 60 * 60 && GameState.state.waveActive; i++) GameState.update(1 / 60); });
   const w5 = await S(page);
   console.log('wave 5 with one of each tower: lives ' + w5.lives + ', gold ' + w5.gold);
   await page.waitForTimeout(2500);
+
+  // Bastion damage state 2, staged for a screenshot, then restored
+  await page.evaluate(() => { GameState.state.lives = 5; GameState.state.bastionState = 2; GameState.emit('bastionStateChanged', 2); });
+  await page.waitForTimeout(1200);
+  await page.screenshot({ path: `${OUT}/bastion-damaged.png`, clip: { x: 820, y: 330, width: 360, height: 330 } });
+  await page.evaluate(() => { GameState.state.lives = 20; GameState.state.bastionState = 0; GameState.emit('bastionStateChanged', 0); });
+  // ---- full play-through bots: a mixed builder, then one tower type only ----
+  const runBot = (plan) => page.evaluate((plan) => {
+    const S = GameState.state;
+    S.enemies.length = 0; S.projectiles.length = 0; S.towers.length = 0;
+    S.gold = 150; S.lives = 20; S.wave = 0; S.prep = 0; S.waveActive = false; S.schedule = []; S.waveQueue = []; S.phase = 'playing'; S.bastionState = 0; S.kills = 0;
+    const flyersIn = (n) => { const w = GameState.waveInfo(n); return !!w && w.groups.some((g) => g.type === 'bat' || g.type === 'boss'); };
+    const antiAir = () => S.towers.filter((t) => GameState.TOWER_TYPES[t.type].hitsFlying).length;
+    const spots = [[7, 5], [6, 5], [9, 5], [7, 7], [10, 5], [12, 4], [13, 7], [15, 8], [5, 5], [3, 3], [13, 4], [15, 10], [5, 7], [12, 7], [3, 1], [15, 4]];
+    let next = 0;
+    const act = () => {
+      // build first, then upgrade the earliest towers
+      while (next < spots.length) {
+        let type = plan[next % plan.length];
+        // a player who sees bats on the horizon builds something that can reach them
+        const upcoming = S.waveActive ? S.wave : S.wave + 1;
+        if (plan.length > 1 && flyersIn(upcoming) && antiAir() < 2 + Math.floor(upcoming / 4)) type = antiAir() % 2 ? 'artillery' : 'druid';
+        if (S.gold < GameState.TOWER_TYPES[type].cost) break;
+        S.selected = { kind: 'tile', c: spots[next][0], r: spots[next][1] };
+        if (!GameState.placeTower(type).ok) { next++; continue; }
+        next++;
+      }
+      const order = S.towers.slice().sort((a, b) => (GameState.TOWER_TYPES[b.type].hitsFlying - GameState.TOWER_TYPES[a.type].hitsFlying));
+      for (const t of order) { const c = GameState.upgradeCost(t); if (c !== null && S.gold >= c + 40) GameState.upgradeTower(t.id); }
+    };
+    const leaks = [];
+    for (let w = 1; w <= 12; w++) {
+      act();
+      const l0 = S.lives;
+      GameState.startWave();
+      let steps = 0;
+      while (S.waveActive && steps++ < 60 * 150) { GameState.update(1 / 60); if (steps % 120 === 0) act(); }
+      leaks.push(l0 - S.lives);
+      if (S.phase !== 'playing') break;
+    }
+    return { leaks, lives: S.lives, phase: S.phase, towers: S.towers.length, tiers: S.towers.map((t) => t.tier).join(''), gold: S.gold, stars: S.phase === 'won' ? GameState.stars() : 0 };
+  }, plan);
+  const mixed = await runBot(['slinger', 'slinger', 'warden', 'druid', 'artillery', 'golem', 'druid', 'warden', 'slinger', 'golem', 'artillery', 'warden', 'druid', 'slinger', 'golem', 'artillery']);
+  console.log('MIXED BOT: ' + JSON.stringify(mixed));
+  check('a mixed defense can win all 12 waves', mixed.phase === 'won', `lives=${mixed.lives} leaks=${mixed.leaks}`);
+  check('waves 1 and 2 are nearly unloseable', mixed.leaks[0] + mixed.leaks[1] <= 1, `leaks=${mixed.leaks.slice(0, 2)}`);
+  await page.waitForTimeout(1500);
+  check('win screen shows stars after a win', mixed.phase !== 'won' || (await page.locator('#end').isVisible() && await page.locator('#stars span.lit').count() === mixed.stars));
+  await page.screenshot({ path: `${OUT}/win.png` });
+  for (const type of ['slinger', 'warden', 'druid', 'golem', 'artillery']) {
+    const r = await runBot([type]);
+    const clean = r.leaks.filter((l) => l <= 1).length;
+    console.log(`ONLY ${type}: ` + JSON.stringify(r) + ` clean waves=${clean}/12`);
+    check(`only ${type} does not trivialize the level`, !(r.phase === 'won' && clean > 7), `phase=${r.phase} clean=${clean}`);
+  }
+  await page.waitForTimeout(1600);   // the last bot's end screen arrives 900ms after its loss
+  await page.evaluate(() => { GameState.state.enemies.length = 0; document.getElementById('end').classList.remove('show'); });
+  await quiet();
+  await page.evaluate(() => {
+    const S = GameState.state; S.towers.length = 0; S.enemies.length = 0; S.projectiles.length = 0; S.phase = 'playing'; S.lives = 20; S.gold = 5000;
+    const put = (type, c, r) => { S.selected = { kind: 'tile', c, r }; GameState.placeTower(type); };
+    put('druid', 9, 5); put('artillery', 13, 7); put('druid', 7, 5); put('artillery', 5, 5); put('golem', 12, 4); put('warden', 10, 5);
+    S.wave = 11; GameState.startWave();
+    for (let i = 0; i < 60 * 25; i++) GameState.update(1 / 60);
+  });
+  await page.waitForTimeout(400);
+  check('boss is on the field on wave 12', await page.evaluate(() => GameState.state.enemies.some((e) => e.boss)));
+  check('boss bar shows while the boss lives', await page.waitForFunction(() => document.getElementById('boss-bar').classList.contains('show'), null, { timeout: 8000 }).then(() => true).catch(() => false));
+  await page.screenshot({ path: `${OUT}/boss.png` });
+  await page.evaluate(() => { for (let i = 0; i < 60 * 120 && GameState.state.waveActive; i++) GameState.update(1 / 60); });
+  check('wave 12 ends in a win when the swarm falls', await page.evaluate(() => GameState.state.phase === 'won'));
+  await page.waitForFunction(() => Renderer.debugViews().dying.length === 0, null, { timeout: 20000 }).catch(() => {});
+  await page.evaluate(() => { document.getElementById('end').classList.remove('show'); });
+  await page.waitForTimeout(500);
   await ctx.close();
 
   // ---------------- Mobile, touch ----------------

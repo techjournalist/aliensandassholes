@@ -169,6 +169,38 @@
     .howto li { margin: 4px 0; }
     .screen button { min-height: 46px; font-size: 17px; }
   }
+  #wave-btn .sub { display: block; font-size: 12px; font-weight: 700; opacity: 0.8; line-height: 1.1; }
+  #boss-bar {
+    position: absolute; top: max(64px, calc(env(safe-area-inset-top) + 54px)); left: 50%; transform: translateX(-50%);
+    width: min(420px, 46vw); display: none; text-align: center;
+  }
+  #boss-bar.show { display: block; }
+  .boss-name { font-size: 13px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: var(--magic); text-shadow: 0 2px 0 var(--ink); }
+  .boss-track { height: 12px; border: 2px solid var(--ink); border-radius: 8px; background: rgba(27,20,16,0.7); overflow: hidden; }
+  .boss-fill { height: 100%; width: 100%; background: linear-gradient(90deg, #7a3fd1, var(--magic)); transition: width 0.15s ease; }
+  #wave-banner {
+    position: absolute; left: 50%; top: 22%; transform: translate(-50%, 0); pointer-events: none;
+    text-align: center; opacity: 0; display: none;
+  }
+  #wave-banner.show { display: block; animation: wavebanner 2.6s ease-out forwards; }
+  .wb-title { font-size: clamp(30px, 5vw, 46px); font-weight: 900; color: var(--gold); text-shadow: 0 3px 0 var(--ink), 0 0 18px rgba(0,0,0,0.5); letter-spacing: 1px; }
+  .wb-flavor { font-size: 17px; font-weight: 700; color: var(--cream); text-shadow: 0 2px 0 var(--ink), 0 0 12px rgba(0,0,0,0.6); margin-top: 4px; max-width: 520px; }
+  @keyframes wavebanner {
+    0% { opacity: 0; transform: translate(-50%, 12px) scale(0.9); }
+    12% { opacity: 1; transform: translate(-50%, 0) scale(1.04); }
+    18% { transform: translate(-50%, 0) scale(1); }
+    80% { opacity: 1; }
+    100% { opacity: 0; transform: translate(-50%, -10px); }
+  }
+  .floater.armored { color: #bfc3c9; font-size: 15px; }
+  .floater.bonus { color: var(--gold); font-size: 22px; }
+  #stars { display: none; justify-content: center; gap: 10px; font-size: 44px; line-height: 1; margin: 2px 0 10px; }
+  #stars.show { display: flex; }
+  #stars span { color: #4a3f36; transform: scale(0.6); opacity: 0.5; }
+  #stars span.lit { color: var(--gold); text-shadow: 0 3px 0 var(--ink); animation: starpop 0.5s cubic-bezier(0.3, 1.6, 0.5, 1) forwards; opacity: 1; }
+  #stars span.lit:nth-child(2) { animation-delay: 0.25s; }
+  #stars span.lit:nth-child(3) { animation-delay: 0.5s; }
+  @keyframes starpop { 0% { transform: scale(0.2) rotate(-30deg); } 100% { transform: scale(1) rotate(0); } }
   #tip {
     position: absolute; display: none; pointer-events: none; transform: translate(-50%, 0);
     align-items: center; flex-direction: column; gap: 2px;
@@ -233,6 +265,8 @@
     <div class="pill wave"><span class="icon">&#9873;</span><span id="hud-wave">Wave</span></div>
   </div>
   <button id="wave-btn" type="button">Send the first wave</button>
+  <div id="boss-bar"><div class="boss-name">Shadow-Crow Swarm</div><div class="boss-track"><div class="boss-fill"></div></div></div>
+  <div id="wave-banner"><div class="wb-title"></div><div class="wb-flavor"></div></div>
   <div id="panel"></div>
   <div id="tip"><div class="tip-arrow"></div><div class="tip-text"></div></div>
   <div id="floaters"></div>
@@ -258,6 +292,7 @@
 <div id="end" class="screen">
   <div class="card">
     <h1 id="end-title">The Bastion holds!</h1>
+    <div id="stars"><span>&#9733;</span><span>&#9733;</span><span>&#9733;</span></div>
     <p id="end-text" class="stakes"></p>
     <button id="restart-btn" type="button">Play again</button>
   </div>
@@ -333,6 +368,10 @@ const PALETTE = {
   goblinDark:   0x5f7d2a,
   bat:          0x5b3d7a,
   batDark:      0x3a2650,
+  trickster:    0x5fb8a0,
+  tricksterDark: 0x3d8a74,
+  troll:        0x7a8f5a,
+  trollDark:    0x55653c,
   cloak:        0x3e6f2f,
   cloakDark:    0x2c4f22,
   frost:        0x9fdcf0,
@@ -373,10 +412,10 @@ const GameState = (() => {
   // the other four arrive in M4 and slot into this same table.
   const TOWER_TYPES = {
     slinger:   { id: 'slinger',   name: 'Sprout Slinger',     cost: 70,  range: 2.6, damage: 8,  cooldown: 0.62, windup: 0.16, projectileSpeed: 7.5, projectile: 'acorn',   splash: 0,   hitsFlying: false, icon: '&#127793;', blurb: 'Quick acorn shots. Cheap. Ground only.' },
-    warden:    { id: 'warden',    name: 'Bramblecast Warden', cost: 110, range: 2.3, damage: 14, cooldown: 1.7,  windup: 0.3,  projectileSpeed: 5.5, projectile: 'thorn',   splash: 0.9, hitsFlying: false, icon: '&#127807;', blurb: 'Thorn bursts hit a crowd and root it. Ground only.', effect: { root: 0.9 } },
+    warden:    { id: 'warden',    name: 'Bramblecast Warden', cost: 110, range: 2.3, damage: 16, cooldown: 1.5,  windup: 0.3,  projectileSpeed: 5.5, projectile: 'thorn',   splash: 0.9, hitsFlying: false, icon: '&#127807;', blurb: 'Thorn bursts hit a crowd and root it. Ground only.', effect: { root: 0.9 } },
     druid:     { id: 'druid',     name: 'Frostmoss Druid',    cost: 90,  range: 2.9, damage: 5,  cooldown: 0.8,  windup: 0.2,  projectileSpeed: 9,   projectile: 'wisp',    splash: 0,   hitsFlying: true,  icon: '&#10052;',  blurb: 'Light frost that chills. Reaches flyers.', effect: { chill: 2.2, chillMul: 0.55 } },
     golem:     { id: 'golem',     name: 'Stonebark Golem',    cost: 130, range: 2.2, damage: 46, cooldown: 2.4,  windup: 0.45, projectileSpeed: 8,   projectile: 'boulder', splash: 0,   hitsFlying: false, icon: '&#129704;', blurb: 'One huge hit, slow to wind up. Ground only.' },
-    artillery: { id: 'artillery', name: 'Acorn Artillery',    cost: 120, range: 4.2, damage: 18, cooldown: 2.1,  windup: 0.35, projectileSpeed: 5,   projectile: 'bigacorn', splash: 0.7, hitsFlying: true, icon: '&#127792;', blurb: 'Lobs a huge acorn far. Splashes. Reaches flyers.' },
+    artillery: { id: 'artillery', name: 'Acorn Artillery',    cost: 120, range: 4.2, minRange: 1.4, damage: 15, cooldown: 2.4, windup: 0.35, projectileSpeed: 5, projectile: 'bigacorn', splash: 0.7, hitsFlying: true, icon: '&#127792;', blurb: 'Lobs a huge acorn far, not near. Splashes. Reaches flyers.' },
   };
   const TOWER_ORDER = ['slinger', 'warden', 'druid', 'golem', 'artillery'];
   // Flat tier progression: tiers 2 and 3 multiply damage, trim cooldown and
@@ -388,9 +427,30 @@ const GameState = (() => {
   ];
   const SELL_REFUND = 0.6;
   const ENEMY_TYPES = {
-    grunt: { id: 'grunt', name: 'Goblin Grunt', hp: 30, speed: 1.25, bounty: 8,  flying: false },
-    bat:   { id: 'bat',   name: 'Bramble Bat',  hp: 22, speed: 1.75, bounty: 10, flying: true },
+    grunt:     { id: 'grunt',     name: 'Goblin Grunt',      hp: 30,  speed: 1.25, bounty: 8,   flying: false, armor: 0 },
+    trickster: { id: 'trickster', name: 'Bog-Trickster',     hp: 16,  speed: 2.3,  bounty: 6,   flying: false, armor: 0, wobble: true },
+    troll:     { id: 'troll',     name: 'Moss Troll',        hp: 170, speed: 0.72, bounty: 25,  flying: false, armor: 4 },
+    bat:       { id: 'bat',       name: 'Bramble Bat',       hp: 22,  speed: 1.75, bounty: 10,  flying: true,  armor: 0 },
+    boss:      { id: 'boss',      name: 'Shadow-Crow Swarm', hp: 640, speed: 0.78, bounty: 150, flying: true,  armor: 1, boss: true },
   };
+  // The twelve waves. Each group spawns after `delay` seconds, one enemy
+  // every `gap` seconds. Flavor lines teach the new threat in-world.
+  const g = (type, count, gap, delay = 0) => ({ type, count, gap, delay });
+  const WAVES = [
+    { name: 'Scouts',           flavor: 'A few grunts, bumbling down the road.',                          groups: [g('grunt', 5, 2.4)] },
+    { name: 'The Rabble',       flavor: 'More grunts. They travel in bunches.',                            groups: [g('grunt', 8, 1.4)] },
+    { name: 'Tricksters',       flavor: 'Bog-Tricksters: fast, flimsy, and annoying. Slingers love them.', groups: [g('grunt', 5, 1.2), g('trickster', 7, 0.65, 2)] },
+    { name: 'The Big One',      flavor: 'A Moss Troll. Thick hide shrugs off small hits. Hit it hard.',   groups: [g('grunt', 8, 1.0), g('troll', 1, 1, 3)] },
+    { name: 'Wings',            flavor: 'Bramble Bats take wing. Only Druids and Artillery can reach them.', groups: [g('bat', 5, 1.2), g('grunt', 8, 0.9, 2)] },
+    { name: 'Bog Rush',         flavor: 'A flood of Tricksters, with Trolls lumbering behind.',            groups: [g('trickster', 10, 0.55), g('troll', 2, 3, 3)] },
+    { name: 'Mixed Company',    flavor: 'Grunts on the ground, bats overhead. Cover both.',                groups: [g('grunt', 12, 0.8), g('bat', 6, 0.9, 1)] },
+    { name: 'Troll Column',     flavor: 'Four Trolls. Rooting and heavy hits win this one.',              groups: [g('troll', 4, 2.4), g('trickster', 8, 0.5, 4)] },
+    { name: 'Dark Sky',         flavor: 'A swarm of bats. The valley grows dim.',                          groups: [g('bat', 10, 0.65), g('grunt', 10, 0.7, 1)] },
+    { name: 'The Push',         flavor: 'Everything at once. Hold the bridge.',                            groups: [g('troll', 5, 2), g('grunt', 14, 0.55, 1), g('bat', 6, 0.8, 4)] },
+    { name: 'Last Light',       flavor: 'The Hollow empties itself onto the road.',                        groups: [g('trickster', 16, 0.42), g('troll', 4, 2.2, 3), g('bat', 8, 0.7, 2)] },
+    { name: 'The Shadow-Crow',  flavor: 'The Shadow-Crow Swarm rises from the Hollow. Hold the line.',    groups: [g('bat', 6, 0.9), g('grunt', 10, 0.7, 1), g('boss', 1, 1, 6)] },
+  ];
+  const PREP_SECONDS = 14;
 
   const listeners = {};
   function on(event, fn) { (listeners[event] = listeners[event] || []).push(fn); }
@@ -485,6 +545,10 @@ const GameState = (() => {
     spawnTimer: 0,
     spawnGap: 1.5,
     hpScale: 1,
+    schedule: [],     // [{t, type}] for the running wave
+    waveTime: 0,
+    prep: 0,          // seconds until the next wave auto-starts
+    bastionState: 0,  // 0 pristine, 1 damaged, 2 heavily damaged
     projectiles: [],
     phase: 'title',   // title | playing | won | lost
     kills: 0,
@@ -615,9 +679,10 @@ const GameState = (() => {
     const e = {
       id: nextId++, type: typeId, name: t.name, hp, maxHp: hp, speed: t.speed,
       flying: t.flying, bounty: t.bounty,
-      dist: 0, lane: (Math.random() - 0.5) * 0.44,   // lateral offset so a crowd doesn't walk single file
+      dist: 0, lane: t.boss ? 0 : (Math.random() - 0.5) * 0.44,   // lateral offset so a crowd doesn't walk single file
       x: pathPoints[0].x, z: pathPoints[0].z, dirX: 1, dirZ: 0, age: 0,
       chillUntil: 0, chillMul: 1, rootUntil: 0, speedMul: 1,
+      armor: t.armor || 0, wobble: !!t.wobble, boss: !!t.boss,
     };
     state.enemies.push(e);
     emit('enemySpawned', e);
@@ -640,14 +705,19 @@ const GameState = (() => {
     pathPosAt(e.dist, _a);
     // lane offset fades out over the last stretch so everyone funnels into the gate
     const funnel = Math.min(1, Math.max(0, (pathLength - e.dist) / 1.2));
-    e.x = _a.x + -dz * e.lane * funnel;
-    e.z = _a.z + dx * e.lane * funnel;
+    const lane = e.lane + (e.wobble ? Math.sin(e.dist * 3.1 + e.id) * 0.22 : 0);
+    e.x = _a.x + -dz * lane * funnel;
+    e.z = _a.z + dx * lane * funnel;
   }
 
+  function bastionStateFor(lives) { return lives > 13 ? 0 : lives > 6 ? 1 : 2; }
+  function stars() { return state.lives >= 16 ? 3 : state.lives >= 8 ? 2 : 1; }
   function leak(e) {
-    state.lives = Math.max(0, state.lives - 1);
+    state.lives = Math.max(0, state.lives - (e.boss ? 5 : 1));
     emit('enemyLeaked', e);
     emit('livesChanged', state.lives);
+    const bs = bastionStateFor(state.lives);
+    if (bs !== state.bastionState) { state.bastionState = bs; emit('bastionStateChanged', bs); }
     if (state.lives <= 0 && state.phase === 'playing') {
       state.phase = 'lost';
       emit('gameLost');
@@ -663,7 +733,7 @@ const GameState = (() => {
     for (const e of state.enemies) {
       if (e.flying && !type.hitsFlying) continue;
       const d = Math.hypot(e.x - tower.x, e.z - tower.z);
-      if (d > tower.range) continue;
+      if (d > tower.range || d < (type.minRange || 0)) continue;
       if (!best || e.dist > best.dist) best = e;
     }
     return best;
@@ -674,7 +744,10 @@ const GameState = (() => {
     const stats = towerStats(tower);
     tower.cooldown = Math.max(0, tower.cooldown - dt);
     let target = tower.targetId ? enemyById(tower.targetId) : null;
-    if (target && Math.hypot(target.x - tower.x, target.z - tower.z) > tower.range + 0.2) target = null;
+    if (target) {
+      const d = Math.hypot(target.x - tower.x, target.z - tower.z);
+      if (d > tower.range + 0.2 || d < (type.minRange || 0)) target = null;
+    }
     if (!target) { target = pickTarget(tower, type); tower.targetId = target ? target.id : null; }
     if (target) tower.facing = Math.atan2(target.x - tower.x, target.z - tower.z);
     if (tower.windup > 0) {
@@ -696,7 +769,7 @@ const GameState = (() => {
     const p = {
       id: nextId++, towerId: tower.id, targetId: target.id, damage: stats.damage,
       kind: type.projectile, splash: stats.splash, effect: stats.effect, hitsFlying: type.hitsFlying,
-      targetFlying: target.flying,
+      targetFlying: target.flying, targetBoss: !!target.boss,
       x: tower.x, z: tower.z, sx: tower.x, sz: tower.z, speed: type.projectileSpeed, t: 0, total: 1,
     };
     p.total = Math.max(0.2, Math.hypot(target.x - tower.x, target.z - tower.z));
@@ -750,8 +823,9 @@ const GameState = (() => {
   }
 
   function damage(e, amount, source) {
-    e.hp -= amount;
-    emit('enemyHit', { enemy: e, amount, x: e.x, z: e.z, kind: source && source.kind });
+    const dealt = Math.max(1, amount - e.armor);
+    e.hp -= dealt;
+    emit('enemyHit', { enemy: e, amount: dealt, armored: dealt < amount, x: e.x, z: e.z, kind: source && source.kind });
     if (e.hp <= 0) {
       const i = state.enemies.indexOf(e);
       if (i >= 0) state.enemies.splice(i, 1);
@@ -764,20 +838,34 @@ const GameState = (() => {
 
   // -------- waves (scaffold; M7 replaces this with the 12-wave table) --------
   function startWave() {
-    if (state.waveActive || state.phase !== 'playing') return false;
+    if (state.waveActive || state.phase !== 'playing' || state.wave >= WAVES.length) return false;
     state.wave += 1;
-    state.waveQueue = new Array(5 + state.wave).fill('grunt');
-    if (state.wave >= 5) {   // Bramble Bats join from wave 5, mixed into the column
-      const bats = state.wave - 3;
-      for (let i = 0; i < bats; i++) state.waveQueue.splice(2 + i * 2, 0, 'bat');
+    const def = WAVES[state.wave - 1];
+    const sched = [];
+    let t = 0.6;
+    for (const grp of def.groups) {
+      t += grp.delay;
+      for (let i = 0; i < grp.count; i++) { sched.push({ t, type: grp.type }); t += grp.gap; }
     }
-    state.spawnTimer = 0.6;
-    state.spawnGap = Math.max(0.9, 1.5 - (state.wave - 1) * 0.08);
-    state.hpScale = 1 + (state.wave - 1) * 0.25;   // goblins toughen each wave
+    state.schedule = sched;
+    state.waveQueue = sched.map((e) => e.type);
+    state.waveTime = 0;
+    state.prep = 0;
+    state.hpScale = 1 + (state.wave - 1) * 0.05;   // a gentle stiffening on top of the roster
     state.waveActive = true;
     emit('waveStarted', state.wave);
     return true;
   }
+  // The player's Send button: during prep it starts early for a gold bonus.
+  function sendWave() {
+    if (state.waveActive || state.phase !== 'playing') return false;
+    const bonus = state.prep > 0 ? Math.round(state.prep * 1.5) : 0;
+    if (!startWave()) return false;
+    if (bonus > 0) { state.gold += bonus; emit('earlyBonus', bonus); emit('goldChanged', state.gold); }
+    return true;
+  }
+  function waveInfo(n) { return WAVES[n - 1] || null; }
+  function enemiesLeft() { return state.waveQueue.length + state.enemies.length; }
 
   function update(dt) {
     if (state.phase !== 'playing') return;
@@ -785,11 +873,14 @@ const GameState = (() => {
     for (const t of state.towers) updateTower(t, dt);
     updateProjectiles(dt);
     if (state.waveActive) {
-      state.spawnTimer -= dt;
-      if (state.spawnTimer <= 0 && state.waveQueue.length) {
-        spawnEnemy(state.waveQueue.shift());
-        state.spawnTimer = state.spawnGap;
+      state.waveTime += dt;
+      while (state.schedule.length && state.schedule[0].t <= state.waveTime) {
+        spawnEnemy(state.schedule.shift().type);
+        state.waveQueue.shift();
       }
+    } else if (state.prep > 0) {
+      state.prep -= dt;
+      if (state.prep <= 0) { state.prep = 0; startWave(); }
     }
     for (let i = state.enemies.length - 1; i >= 0; i--) {
       const e = state.enemies[i];
@@ -799,12 +890,16 @@ const GameState = (() => {
         leak(e);
       }
     }
-    if (state.waveActive && !state.waveQueue.length && !state.enemies.length) {
+    if (state.waveActive && !state.schedule.length && !state.enemies.length) {
       state.waveActive = false;
-      emit('waveEnded', state.wave);
-      if (state.wave >= CONFIG.totalWaves && state.phase === 'playing') {
-        state.phase = 'won';
-        emit('gameWon');
+      const bonus = 15 + state.wave * 5;
+      state.gold += bonus;
+      emit('waveEnded', { wave: state.wave, bonus });
+      emit('goldChanged', state.gold);
+      if (state.wave >= WAVES.length) {
+        if (state.phase === 'playing') { state.phase = 'won'; emit('gameWon'); }
+      } else {
+        state.prep = PREP_SECONDS;
       }
     }
   }
@@ -814,7 +909,7 @@ const GameState = (() => {
     TOWER_TYPES, TOWER_ORDER, TIERS, ENEMY_TYPES, towerStats, upgradeCost, sellValue, towerById, upgradeTower, sellTower,
     pathCells, pathWaypoints: PATH_WAYPOINTS, pathPoints, pathLength, pathPosAt, gate,
     state, on, emit, update, worldX, worldZ, startGame,
-    selectTile, clearSelection, placeTower, canAfford, towerAt, startWave, spawnEnemy,
+    selectTile, clearSelection, placeTower, canAfford, towerAt, startWave, sendWave, spawnEnemy, waveInfo, enemiesLeft, stars, WAVES, PREP_SECONDS,
     inGrid, isPath, isStream, isBridge, isBastion, isSpawn, isBuildable, isCobble,
     cellKind, hollowness, pathIndexOf,
   };
@@ -1442,18 +1537,69 @@ const Renderer = (() => {
     const banner = new THREE.Mesh(bannerGeo, toon(0xffffff, { vc: true, side: THREE.DoubleSide }));
     banner.position.set(cx + kx + 0.4, KT + 1.2, cz + kz);
     scene.add(banner);
+    // damage overlay: cracks appear when hurt, rubble and smoke when nearly lost
+    const dmg = { cracks: new THREE.Group(), rubble: new THREE.Group(), smokeTimer: 0, state: 0 };
+    const crackSpots = [[-0.4, 0.5, 1.17, 0.25, 0.7], [0.55, 1.1, 1.17, 0.18, 0.5], [-0.97, 0.9, 0.6, 0.2, 0.6], [-0.97, 1.5, -0.4, 0.14, 0.45], [0.2, 1.5, 1.17, 0.2, 0.5]];
+    crackSpots.forEach(([wx, wy, wz, ww, wh], i) => {
+      const c = new THREE.Mesh(GEO.box, unlit(0x2b211b));
+      c.position.set(cx + wx, wy, cz + wz);
+      c.scale.set(wz > 1 ? ww : 0.05, wh, wz > 1 ? 0.05 : ww);
+      c.rotation.z = (i % 2 ? 0.5 : -0.4);
+      dmg.cracks.add(c);
+    });
+    for (let i = 0; i < 6; i++) {
+      const r = new THREE.Mesh(GEO.rock, toon(PALETTE.stoneDark));
+      const a = i * 1.1, d = 1.05 + (i % 2) * 0.25;
+      r.position.set(cx + (i < 3 ? -0.98 - (i % 2) * 0.2 : Math.cos(a) * 0.6), 0.08, cz + (i < 3 ? -0.6 + i * 0.5 : 1.3 + (i % 2) * 0.2));
+      r.scale.set(0.2, 0.13, 0.17); r.rotation.y = a;
+      addOutline(r);
+      dmg.rubble.add(r);
+    }
+    // a fire glow in the breach above the gate, plus a scorch on the roof, for the worst state
+    dmg.fire = new THREE.Mesh(GEO.sphereLo, new THREE.MeshBasicMaterial({ color: 0xff8a3d, transparent: true, opacity: 0.9 }));
+    dmg.fire.position.set(cx - 0.5, 1.3, cz + 1.05); dmg.fire.scale.set(0.3, 0.42, 0.2);
+    dmg.scorch = new THREE.Mesh(GEO.circle, unlit(0x2b211b, { opacity: 0.85, depthWrite: false }));
+    dmg.scorch.position.set(cx - 0.3, H + 0.08, cz + 0.4); dmg.scorch.scale.setScalar(0.55);
+    dmg.cracks.visible = false; dmg.rubble.visible = false; dmg.fire.visible = false; dmg.scorch.visible = false;
+    scene.add(dmg.cracks, dmg.rubble, dmg.fire, dmg.scorch);
+    GameState.on('bastionStateChanged', (st) => {
+      dmg.state = st;
+      dmg.cracks.visible = st >= 1;
+      dmg.rubble.visible = st >= 2;
+      dmg.fire.visible = st >= 2;
+      dmg.scorch.visible = st >= 2;
+      shakeCamera(0.12, 0.4);
+      puff(cx - 0.6, 0.6, cz + 1.2, { count: 16, color: PALETTE.stone, speed: 2, size: 0.12, up: 1.6, ttl: 0.8 });
+    });
     const base = bp.array.slice();
     animated.push({
-      update(t) {
+      update(t, dt) {
+        const droop = dmg.state === 2 ? 0.35 : dmg.state === 1 ? 0.7 : 1;
+        banner.rotation.z = dmg.state === 2 ? -0.6 : 0;
         for (let i = 0; i < bp.count; i++) {
           const x = base[i * 3], u = (x + 0.4) / 0.8;
-          bp.setZ(i, Math.sin(t * 5.5 - u * 4.5) * 0.1 * u);
-          bp.setY(i, base[i * 3 + 1] + Math.sin(t * 2.2 - u * 2) * 0.03 * u);
+          bp.setZ(i, Math.sin(t * 5.5 - u * 4.5) * 0.1 * u * droop);
+          bp.setY(i, base[i * 3 + 1] + Math.sin(t * 2.2 - u * 2) * 0.03 * u * droop);
+        }
+        if (dmg.state >= 1) {
+          dmg.smokeTimer -= dt;
+          if (dmg.smokeTimer <= 0) {
+            dmg.smokeTimer = dmg.state === 2 ? 0.07 : 0.4;
+            const heavy = dmg.state === 2;
+            puff(cx - 0.3 + Math.random() * 0.5 - 0.25, H + 0.2, cz + 0.4, { count: 1, color: heavy ? 0x3a322c : 0x8c847a, speed: 0.15, size: heavy ? 0.26 : 0.16, up: heavy ? 1.3 : 0.9, ttl: heavy ? 2.2 : 1.6 });
+            if (heavy && Math.random() < 0.35) puff(cx - 0.5, 1.4, cz + 1.05, { count: 1, color: 0xffb347, speed: 0.4, size: 0.05, up: 1.8, ttl: 0.7 });
+          }
+          if (dmg.state === 2) {
+            const f = 0.85 + 0.15 * Math.sin(t * 17) * Math.sin(t * 7.3);
+            dmg.fire.scale.set(0.3 * f, 0.42 * (2 - f), 0.2 * f);
+            dmg.fire.material.opacity = 0.75 + 0.2 * Math.sin(t * 23);
+          }
         }
         bp.needsUpdate = true;
         bannerGeo.computeVertexNormals();
         for (const w of windows) {
-          const f = 0.86 + 0.14 * Math.sin(t * 9 + w.userData.phase) * Math.sin(t * 3.3 + w.userData.phase * 0.7);
+          const dim = dmg.state === 2 ? 0.35 : 1;
+          const f = (0.86 + 0.14 * Math.sin(t * 9 + w.userData.phase) * Math.sin(t * 3.3 + w.userData.phase * 0.7)) * dim;
           w.material.color.setHex(PALETTE.windowWarm).multiplyScalar(f);
         }
         for (const l of lanterns) {
@@ -1776,6 +1922,81 @@ const Renderer = (() => {
     ];
   }
 
+  // Bog-Trickster: lanky, teal, a leaf cap and a long nose, all feet and
+  // elbows. Faces +z. Silhouette: tall thin with a big leaf on top.
+  function tricksterParts() {
+    const g = PALETTE.trickster, gd = PALETTE.tricksterDark;
+    return [
+      P(GEO.sphereLo, g, M(0, 0.28, 0, { sx: 0.12, sy: 0.2, sz: 0.11 }), true, { name: 'body' }),
+      P(GEO.sphereLo, gd, M(0.09, 0.05, 0.04, { sx: 0.1, sy: 0.04, sz: 0.15 }), true, { name: 'footL', live: true }),
+      P(GEO.sphereLo, gd, M(-0.09, 0.05, 0.04, { sx: 0.1, sy: 0.04, sz: 0.15 }), true, { name: 'footR', live: true }),
+      P(GEO.cyl, g, M(0.08, 0.14, 0.02, { sx: 0.03, sy: 0.16, sz: 0.03 }), false),
+      P(GEO.cyl, g, M(-0.08, 0.14, 0.02, { sx: 0.03, sy: 0.16, sz: 0.03 }), false),
+      P(GEO.sphere, g, M(0, 0.56, 0, { sx: 0.17, sy: 0.19, sz: 0.16 }), true, { name: 'head' }),
+      P(GEO.cone, g, pivotMatrix(0.13, 0.62, 0, 0, 0, -1.4, 0, 0.12, 0, 0.05, 0.24, 0.04), true, { name: 'earL', live: true }),
+      P(GEO.cone, g, pivotMatrix(-0.13, 0.62, 0, 0, 0, 1.4, 0, 0.12, 0, 0.05, 0.24, 0.04), true, { name: 'earR', live: true }),
+      P(GEO.sphereLo, PALETTE.cream, M(0.07, 0.6, 0.13, { s: 0.045 }), false, { unlit: true }),
+      P(GEO.sphereLo, PALETTE.cream, M(-0.07, 0.6, 0.13, { s: 0.045 }), false, { unlit: true }),
+      P(GEO.sphereLo, PALETTE.outline, M(0.08, 0.6, 0.17, { s: 0.02 }), false, { unlit: true }),
+      P(GEO.sphereLo, PALETTE.outline, M(-0.06, 0.6, 0.17, { s: 0.02 }), false, { unlit: true }),
+      P(GEO.cone, gd, M(0, 0.54, 0.3, { sx: 0.035, sy: 0.3, sz: 0.035, rx: Math.PI / 2 }), true, { name: 'nose' }),
+      P(GEO.sphereLo, PALETTE.meadowLight, M(0.04, 0.78, -0.04, { sx: 0.16, sy: 0.05, sz: 0.24, rz: -0.3, ry: 0.4 }), true, { name: 'leaf', live: true }),
+      P(GEO.cyl, PALETTE.meadowDark, M(0, 0.74, 0, { sx: 0.02, sy: 0.1, sz: 0.02 }), false),
+    ];
+  }
+
+  // Moss Troll: a hunched boulder of a beast, mossy back, tusks and
+  // knuckles on the ground. Faces +z. Silhouette: wide hump, low head.
+  function trollParts() {
+    const t = PALETTE.troll, td = PALETTE.trollDark;
+    return [
+      P(GEO.sphereLo, t, M(0, 0.42, -0.04, { sx: 0.4, sy: 0.4, sz: 0.36 }), true, { name: 'body' }),
+      P(GEO.sphereLo, PALETTE.moss, M(0, 0.68, -0.12, { sx: 0.34, sy: 0.16, sz: 0.28 }), true, { name: 'mossBack' }),
+      P(GEO.sphereLo, PALETTE.meadowLight, M(0.14, 0.78, -0.16, { sx: 0.08, sy: 0.05, sz: 0.08 }), false),
+      P(GEO.cone, PALETTE.capRed, M(-0.12, 0.84, -0.1, { sx: 0.06, sy: 0.1, sz: 0.06 }), false),
+      P(GEO.sphereLo, t, M(0, 0.5, 0.3, { sx: 0.24, sy: 0.2, sz: 0.2 }), true, { name: 'head' }),
+      P(GEO.sphereLo, td, M(0, 0.44, 0.44, { sx: 0.12, sy: 0.07, sz: 0.1 }), true, { name: 'snout' }),
+      P(GEO.cone, PALETTE.cream, M(0.09, 0.42, 0.44, { sx: 0.03, sy: 0.1, sz: 0.03 }), false, { unlit: true }),
+      P(GEO.cone, PALETTE.cream, M(-0.09, 0.42, 0.44, { sx: 0.03, sy: 0.1, sz: 0.03 }), false, { unlit: true }),
+      P(GEO.sphereLo, PALETTE.cream, M(0.08, 0.56, 0.46, { s: 0.04 }), false, { unlit: true }),
+      P(GEO.sphereLo, PALETTE.cream, M(-0.08, 0.56, 0.46, { s: 0.04 }), false, { unlit: true }),
+      P(GEO.sphereLo, PALETTE.outline, M(0.08, 0.56, 0.49, { s: 0.02 }), false, { unlit: true }),
+      P(GEO.sphereLo, PALETTE.outline, M(-0.08, 0.56, 0.49, { s: 0.02 }), false, { unlit: true }),
+      P(GEO.cyl, t, M(0.36, 0.3, 0.14, { sx: 0.1, sy: 0.4, sz: 0.1, rz: -0.25 }), true, { name: 'armL', live: true }),
+      P(GEO.cyl, t, M(-0.36, 0.3, 0.14, { sx: 0.1, sy: 0.4, sz: 0.1, rz: 0.25 }), true, { name: 'armR', live: true }),
+      P(GEO.sphereLo, td, M(0.42, 0.08, 0.2, { sx: 0.14, sy: 0.09, sz: 0.14 }), true, { name: 'fistL', live: true }),
+      P(GEO.sphereLo, td, M(-0.42, 0.08, 0.2, { sx: 0.14, sy: 0.09, sz: 0.14 }), true, { name: 'fistR', live: true }),
+      P(GEO.sphereLo, td, M(0.14, 0.06, -0.02, { sx: 0.13, sy: 0.07, sz: 0.16 }), true, { name: 'footL', live: true }),
+      P(GEO.sphereLo, td, M(-0.14, 0.06, -0.02, { sx: 0.13, sy: 0.07, sz: 0.16 }), true, { name: 'footR', live: true }),
+    ];
+  }
+
+  // Shadow-Crow Swarm: a dark churning core with crows wheeling around it.
+  // The crows peel away as it weakens. Flies. Silhouette: a big dark ball
+  // with wings all round it.
+  const BOSS_CROWS = 7;
+  function bossParts() {
+    const parts = [
+      P(GEO.sphereLo, PALETTE.batDark, M(0, 0, 0, { s: 0.36 }), true, { name: 'core', live: true }),
+      P(GEO.sphereLo, PALETTE.magic, M(0, 0, 0, { s: 0.2 }), false, { name: 'heart', live: true, unlit: true }),
+      P(GEO.sphereLo, PALETTE.gold, M(0.12, 0.08, 0.32, { s: 0.05 }), false, { unlit: true }),
+      P(GEO.sphereLo, PALETTE.gold, M(-0.12, 0.08, 0.32, { s: 0.05 }), false, { unlit: true }),
+    ];
+    for (let i = 0; i < BOSS_CROWS; i++) {
+      parts.push(P(GEO.sphereLo, PALETTE.batDark, M(0, 0, 0, { sx: 0.1, sy: 0.08, sz: 0.14 }), true, { name: `crow${i}`, live: true }));
+      parts.push(P(GEO.box, PALETTE.batDark, M(0, 0, 0, { sx: 0.4, sy: 0.02, sz: 0.14 }), true, { name: `crowWing${i}`, live: true }));
+      parts.push(P(GEO.cone, PALETTE.gold, M(0, 0, 0, { sx: 0.03, sy: 0.08, sz: 0.03 }), false, { name: `crowBeak${i}`, live: true, unlit: true }));
+    }
+    return parts;
+  }
+
+  const WALK = {
+    grunt:     { freq: 7.5, bounce: 0.09, lean: 0.1, sway: 0.08 },
+    trickster: { freq: 12,  bounce: 0.15, lean: 0.25, sway: 0.16 },
+    troll:     { freq: 3.6, bounce: 0.05, lean: 0.06, sway: 0.05 },
+  };
+  const ENEMY_RECIPES = { grunt: gruntParts, trickster: tricksterParts, troll: trollParts, bat: batParts, boss: bossParts };
+
   // -------- particles: a pooled dust puff --------
   const particles = [];
   function buildParticles() {
@@ -1878,7 +2099,8 @@ const Renderer = (() => {
         g.visible = true;
         projViews.set(p.id, g);
       }
-      const baseY = p.targetFlying ? 0.75 + p.t * (BAT_HEIGHT - 0.75) : 0.75;
+      const targetY = p.targetBoss ? BOSS_HEIGHT : BAT_HEIGHT;
+      const baseY = p.targetFlying ? 0.75 + p.t * (targetY - 0.75) : 0.75;
       g.position.set(p.x, baseY + Math.sin(p.t * Math.PI) * PROJ_ARC[p.kind], p.z);
       g.rotation.x += 0.4; g.rotation.z += 0.25;
     }
@@ -2016,19 +2238,24 @@ const Renderer = (() => {
   // -------- enemy views --------
   const enemyViews = new Map();
   const dying = [];   // views playing an exit animation before removal
-  const BAT_HEIGHT = 0.95;
+  const BAT_HEIGHT = 0.95, BOSS_HEIGHT = 1.25;
   function addEnemyView(e) {
-    const g = liveProp(e.flying ? batParts() : gruntParts(), e.x, 0, e.z);
+    const g = liveProp(ENEMY_RECIPES[e.type](), e.x, 0, e.z);
     g.name = `enemy-${e.id}`;
-    const v = { group: g, e, decal: decal(0, 0, 0.3, g), pop: 0 };
-    if (e.flying) {
-      v.wingL = g.getObjectByName('wingL'); v.wingR = g.getObjectByName('wingR');
+    const v = { group: g, e, decal: decal(0, 0, e.type === 'troll' ? 0.45 : 0.3, g), pop: 0, live: {} };
+    g.traverse((o) => { if (o.name && o !== g) v.live[o.name] = o; });
+    if (e.boss) {
+      v.decal.scale.setScalar(0.7);
+    } else if (e.flying) {
+      v.wingL = v.live.wingL; v.wingR = v.live.wingR;
       v.wingL.matrixAutoUpdate = false; v.wingR.matrixAutoUpdate = false;
       v.decal.scale.setScalar(0.22);
     } else {
-      v.earL = g.getObjectByName('earL'); v.earR = g.getObjectByName('earR');
-      v.footL = g.getObjectByName('footL'); v.footR = g.getObjectByName('footR');
-      v.earL.matrixAutoUpdate = false; v.earR.matrixAutoUpdate = false;
+      v.earL = v.live.earL; v.earR = v.live.earR;
+      v.footL = v.live.footL; v.footR = v.live.footR;
+      if (v.earL) { v.earL.matrixAutoUpdate = false; v.earR.matrixAutoUpdate = false; }
+      v.baseFootY = v.footL.position.y;
+      v.walk = WALK[e.type];
     }
     // status effect dressing: frost crystals when chilled, a thorn ring when rooted
     v.frost = new THREE.Group();
@@ -2044,7 +2271,7 @@ const Renderer = (() => {
     v.roots.rotation.x = Math.PI / 2; v.roots.position.y = 0.05; v.roots.scale.setScalar(0.28);
     v.roots.visible = false; g.add(v.roots);
     enemyViews.set(e.id, v);
-    puff(e.x, e.flying ? BAT_HEIGHT : 0.3, e.z, { count: 7, color: PALETTE.spore, speed: 0.8, size: 0.09, up: 1.2 });
+    puff(e.x, e.flying ? BAT_HEIGHT : 0.3, e.z, { count: e.boss ? 24 : 7, color: PALETTE.spore, speed: e.boss ? 2 : 0.8, size: e.boss ? 0.16 : 0.09, up: 1.2 });
     return v;
   }
   function updateEnemyViews(t, dt) {
@@ -2053,29 +2280,43 @@ const Renderer = (() => {
       v.frost.visible = !!e.chilled;
       v.roots.visible = !!e.rooted;
       if (e.chilled) v.frost.rotation.y = t * 2;
+      if (e.boss) { updateBossView(v, t, dt); continue; }
       if (e.flying) { updateBatView(v, t, dt); continue; }
-      const cycle = e.dist * 7.5;
+      const w = v.walk;
+      const cycle = e.dist * w.freq;
       const bounce = e.rooted ? 0 : Math.abs(Math.sin(cycle));
       const struggle = e.rooted ? Math.sin(t * 30) * 0.03 : 0;
       const born = Math.min(1, e.age / 0.35);   // pop out of the crack
-      g.position.set(e.x + struggle, 0.09 * bounce, e.z);
+      g.position.set(e.x + struggle, w.bounce * bounce, e.z);
       g.rotation.y = Math.atan2(e.dirX, e.dirZ);
-      g.rotation.x = 0.1;
-      g.rotation.z = Math.sin(cycle) * 0.08 + struggle * 4;
+      g.rotation.x = w.lean;
+      g.rotation.z = Math.sin(cycle) * w.sway + struggle * 4;
       const stretch = 0.9 + 0.22 * bounce;
       v.pop = Math.max(0, v.pop - dt * 5);
       const popK = Math.sin(Math.min(1, v.pop) * Math.PI) * 0.35;   // scale-pop when hit
       const s = born * (1 - (1 - born) * 0.5);
       g.scale.set(s * (1.06 - 0.1 * bounce + popK), s * (stretch - popK * 0.6), s * (1.06 - 0.1 * bounce + popK));
       const flap = 0.35 + 0.45 * bounce;
-      pivotMatrix(0.2, 0.56, 0, 0, 0, -1.2 + flap, 0, 0.13, 0, 0.07, 0.26, 0.05, v.earL.matrix);
-      pivotMatrix(-0.2, 0.56, 0, 0, 0, 1.2 - flap, 0, 0.13, 0, 0.07, 0.26, 0.05, v.earR.matrix);
-      v.footL.position.z = 0.02 + Math.sin(cycle) * 0.12;
-      v.footR.position.z = 0.02 - Math.sin(cycle) * 0.12;
-      v.footL.position.y = 0.05 + Math.max(0, Math.sin(cycle)) * 0.06 - 0.09 * bounce;
-      v.footR.position.y = 0.05 + Math.max(0, -Math.sin(cycle)) * 0.06 - 0.09 * bounce;
-      v.decal.scale.setScalar(0.3 * (1 - 0.3 * bounce));
-      v.decal.position.y = 0.012 - 0.09 * bounce;   // keep the shadow flat on the ground while the body hops
+      if (e.type === 'grunt') {
+        pivotMatrix(0.2, 0.56, 0, 0, 0, -1.2 + flap, 0, 0.13, 0, 0.07, 0.26, 0.05, v.earL.matrix);
+        pivotMatrix(-0.2, 0.56, 0, 0, 0, 1.2 - flap, 0, 0.13, 0, 0.07, 0.26, 0.05, v.earR.matrix);
+      } else if (e.type === 'trickster') {
+        pivotMatrix(0.13, 0.62, 0, 0, 0, -1.4 + flap * 0.8, 0, 0.12, 0, 0.05, 0.24, 0.04, v.earL.matrix);
+        pivotMatrix(-0.13, 0.62, 0, 0, 0, 1.4 - flap * 0.8, 0, 0.12, 0, 0.05, 0.24, 0.04, v.earR.matrix);
+        v.live.leaf.rotation.z = -0.3 + Math.sin(cycle) * 0.2;
+      } else if (e.type === 'troll') {
+        // knuckle-walk: fists swing opposite the feet
+        v.live.fistL.position.z = 0.2 - Math.sin(cycle) * 0.16;
+        v.live.fistR.position.z = 0.2 + Math.sin(cycle) * 0.16;
+        v.live.armL.rotation.x = -Math.sin(cycle) * 0.3; v.live.armR.rotation.x = Math.sin(cycle) * 0.3;
+      }
+      const stride = e.type === 'troll' ? 0.1 : 0.12;
+      v.footL.position.z = 0.02 + Math.sin(cycle) * stride;
+      v.footR.position.z = 0.02 - Math.sin(cycle) * stride;
+      v.footL.position.y = v.baseFootY + Math.max(0, Math.sin(cycle)) * 0.06 - w.bounce * bounce;
+      v.footR.position.y = v.baseFootY + Math.max(0, -Math.sin(cycle)) * 0.06 - w.bounce * bounce;
+      v.decal.scale.setScalar((e.type === 'troll' ? 0.45 : 0.3) * (1 - 0.3 * bounce));
+      v.decal.position.y = 0.012 - w.bounce * bounce;   // keep the shadow flat on the ground while the body hops
     }
     for (let i = dying.length - 1; i >= 0; i--) {
       const d = dying[i];
@@ -2084,6 +2325,35 @@ const Renderer = (() => {
       if (k >= 1) { scene.remove(d.group); dying.splice(i, 1); continue; }
       d.update(k);
     }
+  }
+  function updateBossView(v, t, dt) {
+    const e = v.e, g = v.group;
+    const born = Math.min(1, e.age / 0.6);
+    v.pop = Math.max(0, v.pop - dt * 5);
+    const popK = Math.sin(Math.min(1, v.pop) * Math.PI) * 0.2;
+    const bob = Math.sin(t * 2.2) * 0.1;
+    g.position.set(e.x, BOSS_HEIGHT + bob, e.z);
+    g.rotation.y = Math.atan2(e.dirX, e.dirZ);
+    g.scale.setScalar(born * (1 + popK));
+    v.live.heart.scale.setScalar(0.2 + Math.sin(t * 9) * 0.04 + popK);
+    v.live.core.rotation.y = t * 0.8; v.live.core.rotation.x = Math.sin(t) * 0.3;
+    const alive = Math.max(1, Math.ceil(BOSS_CROWS * e.hp / e.maxHp));
+    for (let i = 0; i < BOSS_CROWS; i++) {
+      const show = i < alive;
+      const a = t * 2.2 + i * (Math.PI * 2 / BOSS_CROWS);
+      const r = 0.55 + Math.sin(t * 3 + i) * 0.08, y = Math.sin(t * 4 + i * 1.3) * 0.16;
+      const body = v.live[`crow${i}`], wing = v.live[`crowWing${i}`], beak = v.live[`crowBeak${i}`];
+      body.visible = wing.visible = beak.visible = show;
+      if (!show) continue;
+      body.position.set(Math.cos(a) * r, y, Math.sin(a) * r);
+      body.rotation.y = -a;   // nose along the orbit
+      wing.position.copy(body.position);
+      wing.rotation.y = -a; wing.rotation.z = Math.sin(t * 20 + i) * 0.7;
+      beak.position.set(Math.cos(a) * r - Math.sin(a) * 0.14, y, Math.sin(a) * r + Math.cos(a) * 0.14);
+      beak.rotation.set(Math.PI / 2, 0, 0); beak.rotation.y = -a;
+    }
+    v.decal.position.y = -(BOSS_HEIGHT + bob) + 0.012;
+    v.decal.scale.setScalar(0.7 - bob * 0.5);
   }
   function updateBatView(v, t, dt) {
     const e = v.e, g = v.group;
@@ -2115,15 +2385,17 @@ const Renderer = (() => {
       group: g, t: 0, dur: 0.55,
       update(k) {
         const hop = Math.sin(Math.min(1, k * 1.6) * Math.PI);
-        g.position.y = v.e.flying ? Math.max(0.1, y0 - k * k * 1.1) : y0 + hop * 0.5;
+        g.position.y = v.e.flying ? Math.max(0.1, y0 - k * k * (v.e.boss ? 1.4 : 1.1)) : y0 + hop * 0.5;
         g.rotation.y += 0.7;
         g.rotation.x = 0.1 + k * 0.4;
         const shrink = k < 0.7 ? 1 : 1 - (k - 0.7) / 0.3;
         g.scale.set(s0.x * (1 - k * 0.35) * shrink, s0.y * (1 + hop * 0.6) * shrink, s0.z * (1 - k * 0.35) * shrink);
         if (k > 0.62 && !puffed) {
           puffed = true;
-          puff(g.position.x, 0.45, g.position.z, { count: 12, color: PALETTE.cream, speed: 1.6, size: 0.13, up: 1.2, ttl: 0.7 });
-          puff(g.position.x, 0.4, g.position.z, { count: 6, color: PALETTE.goblin, speed: 2.2, size: 0.08, up: 2.2, ttl: 0.6 });
+          const big = v.e.boss ? 3 : 1;
+          puff(g.position.x, 0.45, g.position.z, { count: 12 * big, color: PALETTE.cream, speed: 1.6 * big, size: 0.13, up: 1.2, ttl: 0.7 });
+          puff(g.position.x, 0.4, g.position.z, { count: 6 * big, color: v.e.flying ? PALETTE.batDark : PALETTE.goblin, speed: 2.2, size: 0.08, up: 2.2, ttl: 0.6 });
+          if (v.e.boss) { puff(g.position.x, 0.6, g.position.z, { count: 16, color: PALETTE.magic, speed: 3, size: 0.1, up: 2.5, ttl: 0.9 }); shakeCamera(0.16, 0.6); }
         }
       },
     });
@@ -2421,14 +2693,20 @@ const UI = (() => {
     const wave = s.wave > 0 ? `Wave ${s.wave}/${CONFIG.totalWaves}` : 'Prep';
     if (shown.wave !== wave) { $('hud-wave').textContent = wave; shown.wave = wave; }
     const btn = $('wave-btn');
-    const label = s.waveActive
-      ? `${s.waveQueue.length + s.enemies.length} goblins coming`
-      : (s.wave === 0 ? 'Send the first wave' : `Send wave ${s.wave + 1}`);
+    let label;
+    if (s.waveActive) label = `${GameState.enemiesLeft()} coming`;
+    else if (s.wave === 0) label = 'Send the first wave';
+    else if (s.wave >= CONFIG.totalWaves) label = 'The valley is quiet';
+    else if (s.prep > 0) label = `Send wave ${s.wave + 1}<span class="sub">auto in ${Math.ceil(s.prep)}s &middot; now for +${Math.round(s.prep * 1.5)} gold</span>`;
+    else label = `Send wave ${s.wave + 1}`;
     if (shown.waveBtn !== label) {
-      btn.textContent = label;
-      btn.disabled = s.waveActive;
+      btn.innerHTML = label;
+      btn.disabled = s.waveActive || s.wave >= CONFIG.totalWaves;
       shown.waveBtn = label;
     }
+    const boss = s.enemies.find((e) => e.boss);
+    $('boss-bar').classList.toggle('show', !!boss);
+    if (boss) $('boss-bar').querySelector('.boss-fill').style.width = Math.max(0, 100 * boss.hp / boss.maxHp) + '%';
   }
 
   function toast(text, bad) {
@@ -2552,10 +2830,26 @@ const UI = (() => {
   function showEnd(won) {
     const s = GameState.state;
     $('end-title').textContent = won ? 'The Bastion holds!' : 'The Bastion has fallen';
-    $('end-text').textContent = won
-      ? `Twelve waves turned back with ${s.lives} of 20 lives to spare. The valley sleeps easy tonight.`
-      : `The goblins got through on wave ${s.wave}. Plant towers where the road bends and keep gold moving.`;
+    const stars = won ? GameState.stars() : 0;
+    const lines = {
+      3: 'Twelve waves turned back and the walls barely scratched. The valley sings your name.',
+      2: `Twelve waves turned back with ${s.lives} lives to spare. The masons have some work to do.`,
+      1: `Twelve waves turned back with ${s.lives} lives left. The Bastion holds, just.`,
+      0: `The goblins got through on wave ${s.wave}. Plant towers where the road bends, and remember only Druids and Artillery reach flyers.`,
+    };
+    $('end-text').textContent = lines[stars];
+    $('stars').classList.toggle('show', won);
+    $('stars').querySelectorAll('span').forEach((el, i) => el.classList.toggle('lit', i < stars));
     $('end').classList.add('show');
+  }
+  function waveBanner(n) {
+    const info = GameState.waveInfo(n);
+    const el = $('wave-banner');
+    el.querySelector('.wb-title').textContent = `Wave ${n}: ${info.name}`;
+    el.querySelector('.wb-flavor').textContent = info.flavor;
+    el.classList.remove('show');
+    void el.offsetWidth;
+    el.classList.add('show');
   }
 
   function updateOrientation() {
@@ -2587,11 +2881,14 @@ const UI = (() => {
       if (res && !res.ok && res.reason) toast(res.reason, true);
       renderPanel();
     });
-    $('wave-btn').addEventListener('click', () => { Audio.unlock(); GameState.startWave(); });
+    $('wave-btn').addEventListener('click', () => { Audio.unlock(); GameState.sendWave(); });
     $('title').classList.add('show');
     $('start-btn').addEventListener('click', () => { Audio.unlock(); $('title').classList.remove('show'); GameState.startGame(); });
     $('restart-btn').addEventListener('click', () => location.reload());
-    GameState.on('enemyHit', ({ enemy, amount, x, z }) => floater(x, 0.7, z, amount));
+    GameState.on('enemyHit', ({ enemy, amount, armored, x, z }) => floater(x, enemy.boss ? 1.6 : enemy.flying ? 1.2 : 0.7, z, armored ? `${amount} clink` : amount, armored ? 'armored' : ''));
+    GameState.on('waveEnded', ({ bonus }) => floater(GameState.gate.x, 1.4, GameState.gate.z, `+${bonus} wave bonus`, 'bonus'));
+    GameState.on('earlyBonus', (b) => floater(GameState.gate.x, 1.4, GameState.gate.z, `+${b} for courage`, 'bonus'));
+    GameState.on('bastionStateChanged', (st) => toast(st === 2 ? 'The Bastion is crumbling!' : 'The Bastion is taking damage!', true));
     GameState.on('enemyKilled', (e) => floater(e.x, 0.9, e.z, `+${e.bounty}`, 'gold'));
     GameState.on('gameWon', () => setTimeout(() => showEnd(true), 900));
     GameState.on('gameLost', () => setTimeout(() => showEnd(false), 900));
@@ -2607,8 +2904,8 @@ const UI = (() => {
     GameState.on('tileRejected', (res) => { renderPanel(); toast(res.reason, true); });
     GameState.on('placeRejected', (res) => toast(res.reason, true));
     GameState.on('enemyLeaked', (e) => { flash('leak'); toast(`A ${e.name} slipped into the Bastion!`, true); });
-    GameState.on('waveStarted', (w) => { updateHud(); toast(w === 1 ? 'The Hollow stirs. Goblins on the road!' : `Wave ${w}. Here they come!`); });
-    GameState.on('waveEnded', () => { updateHud(); toast('The road is quiet, for now.'); });
+    GameState.on('waveStarted', (w) => { updateHud(); waveBanner(w); });
+    GameState.on('waveEnded', ({ wave }) => { updateHud(); if (wave < CONFIG.totalWaves) toast('The road is quiet. Build, upgrade, breathe.'); });
   }
 
   function frame(dt) {
@@ -2721,6 +3018,33 @@ const Audio = (() => {
     sell() {     // a handful of coins
       [1318, 1568, 1046, 1760].forEach((f, i) => voice({ type: 'sine', freq: f, to: f, dur: 0.08, vol: 0.14, cutoff: 5000, delay: i * 0.06 }));
     },
+    troll() {    // a slow, heavy grunt
+      voice({ type: 'sawtooth', freq: 110, to: 70, dur: 0.4, vol: 0.28, cutoff: 500 });
+      voice({ type: 'triangle', freq: 60, to: 45, dur: 0.3, vol: 0.4, cutoff: 400, delay: 0.05 });
+    },
+    trickster() {   // a quick giggle
+      [700, 880, 760, 990].forEach((f, i) => voice({ type: 'square', freq: f, to: f * 1.1, dur: 0.05, vol: 0.07, cutoff: 2500, delay: i * 0.06 }));
+    },
+    clink() {    // armor shrugging off a hit
+      voice({ type: 'square', freq: 2400, to: 1800, dur: 0.04, vol: 0.08, cutoff: 6000 });
+    },
+    bonus() {    // a warm rising chime
+      [784, 988, 1175].forEach((f, i) => voice({ type: 'sine', freq: f, to: f, dur: 0.16, vol: 0.18, cutoff: 4000, delay: i * 0.08 }));
+    },
+    crumble() {  // stone giving way
+      voice({ type: 'sawtooth', freq: 90, to: 40, dur: 0.6, vol: 0.4, cutoff: 500 });
+      voice({ type: 'square', freq: 300, to: 120, dur: 0.2, vol: 0.1, cutoff: 900, delay: 0.1 });
+    },
+    bossArrive() {   // a dark chord and a rasping caw
+      [110, 131, 165].forEach((f) => voice({ type: 'sawtooth', freq: f, to: f * 0.98, dur: 1.4, vol: 0.14, cutoff: 700 }));
+      voice({ type: 'sawtooth', freq: 620, to: 380, dur: 0.3, vol: 0.14, cutoff: 1800, delay: 0.5 });
+      voice({ type: 'sawtooth', freq: 560, to: 340, dur: 0.35, vol: 0.14, cutoff: 1800, delay: 0.85 });
+    },
+    bossDeath() {
+      voice({ type: 'sawtooth', freq: 400, to: 60, dur: 0.9, vol: 0.3, cutoff: 1400 });
+      voice({ type: 'triangle', freq: 80, to: 40, dur: 0.5, vol: 0.5, cutoff: 400, delay: 0.3 });
+      [523, 659, 784, 1047].forEach((f, i) => voice({ type: 'triangle', freq: f, to: f, dur: 0.25, vol: 0.2, cutoff: 3000, delay: 0.9 + i * 0.12 }));
+    },
     bat() {      // a squeaky flutter
       voice({ type: 'square', freq: 1400, to: 1900, dur: 0.06, vol: 0.06, cutoff: 4000 });
       voice({ type: 'square', freq: 1600, to: 1200, dur: 0.07, vol: 0.06, cutoff: 4000, delay: 0.08 });
@@ -2760,7 +3084,11 @@ const Audio = (() => {
     GameState.on('tileRejected', () => sfx.reject());
     GameState.on('placeRejected', () => sfx.reject());
     GameState.on('towerPlaced', () => sfx.place());
-    GameState.on('enemySpawned', (e) => (e.flying ? sfx.bat() : sfx.spawn()));
+    GameState.on('enemySpawned', (e) => { if (e.boss) sfx.bossArrive(); else if (e.flying) sfx.bat(); else if (e.type === 'troll') sfx.troll(); else if (e.type === 'trickster') sfx.trickster(); else sfx.spawn(); });
+    GameState.on('enemyHit', ({ armored }) => { if (armored) sfx.clink(); });
+    GameState.on('waveEnded', () => sfx.bonus());
+    GameState.on('earlyBonus', () => sfx.bonus());
+    GameState.on('bastionStateChanged', () => sfx.crumble());
     GameState.on('enemyLeaked', () => sfx.leak());
     GameState.on('waveStarted', () => sfx.waveStart());
     GameState.on('waveEnded', () => sfx.waveEnd());
@@ -2770,7 +3098,7 @@ const Audio = (() => {
     GameState.on('towerUpgraded', () => sfx.upgrade());
     GameState.on('towerSold', () => sfx.sell());
     GameState.on('enemyHit', () => sfx.hit());
-    GameState.on('enemyKilled', () => { sfx.death(); sfx.gold(); });
+    GameState.on('enemyKilled', (e) => { if (e.boss) sfx.bossDeath(); else sfx.death(); sfx.gold(); });
     GameState.on('gameWon', () => sfx.win());
     GameState.on('gameLost', () => sfx.lose());
   }
