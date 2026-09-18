@@ -55,6 +55,16 @@ const simulate = (page, seconds) => page.evaluate((sec) => { for (let i = 0; i <
   check('game does not run behind the title', (await S(page)).wave === 0 && await page.evaluate(() => GameState.state.phase === 'title'));
   await page.locator('#start-btn').click(); await page.waitForTimeout(300);
   check('start button begins play', await page.evaluate(() => GameState.state.phase === 'playing'));
+  // sound: mute toggle persists, ticks fire in the last prep seconds
+  const mb = await page.locator('#mute-btn').boundingBox();
+  check('mute button is a 44px target', mb && mb.height >= 44 && mb.width >= 44);
+  await page.locator('#mute-btn').click(); await page.waitForTimeout(100);
+  check('mute toggles and persists', await page.evaluate(() => Audio.isMuted() && localStorage.getItem('bb-muted') === '1'));
+  await page.locator('#mute-btn').click(); await page.waitForTimeout(100);
+  check('unmute toggles back', await page.evaluate(() => !Audio.isMuted()));
+  const ticks = await page.evaluate(() => { const S = GameState.state; let n = 0; GameState.on('prepTick', () => n++); S.wave = 1; S.prep = 3.5; for (let i = 0; i < 60 * 4 && S.prep > 0; i++) GameState.update(1 / 60); const started = S.waveActive; S.waveActive = false; S.schedule = []; S.waveQueue = []; S.enemies.length = 0; S.wave = 0; S.prep = 0; return { n, started }; });
+  check('prep countdown ticks 3, 2, 1 then auto-starts', ticks.n === 3 && ticks.started, JSON.stringify(ticks));
+  await page.evaluate(() => { GameState.state.wave = 0; UI.updateHud(); });
   check('tip points at a tile before the first tower', await page.locator('#tip').isVisible() && (await page.locator('#tip').innerText()).includes('plant'));
   await page.screenshot({ path: `${OUT}/desktop.png` });
   console.log('DEBUG OVERLAY: ' + (await page.locator('#debug').innerText()).replace(/\n/g, ' | '));
