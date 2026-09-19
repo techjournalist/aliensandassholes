@@ -2,6 +2,7 @@
 const { chromium } = (() => { try { return require('playwright'); } catch (e) { return require('/opt/node22/lib/node_modules/playwright'); } })();
 const fs = require('fs');
 const path = require('path');
+const LEVEL_FIXTURES = require('./level-fixtures.js');
 const THREE_LOCAL = process.env.THREE_LOCAL || path.join(__dirname, '..', 'node_modules/three/build/three.min.js');
 const PAGE = 'file://' + path.resolve(__dirname, '..', 'index.html') + '?debug=1';
 const OUT = path.join(__dirname, 'shots');
@@ -410,6 +411,81 @@ async function enterLevel(page, levelId) {
   await page.waitForFunction(() => Renderer.debugViews().dying.length === 0, null, { timeout: 20000 }).catch(() => {});
   await page.evaluate(() => { document.getElementById('end').classList.remove('show'); });
   await page.waitForTimeout(500);
+
+  // ---------------- Level 2: The Millbrook Watch ----------------
+  check('winning Level 1 unlocked Level 2', await page.evaluate(() => Progress.isUnlocked('millbrook-watch')));
+  await page.reload(); await page.waitForTimeout(1000);
+  await enterLevel(page, 'millbrook-watch');
+  check('Level 2 loads with its own path/theme', await page.evaluate(() => GameState.currentLevel().id === 'millbrook-watch'));
+  await page.waitForTimeout(1500);
+  await page.screenshot({ path: `${OUT}/level2-title.png` });
+  console.log('LEVEL 2 DEBUG OVERLAY: ' + (await page.locator('#debug').innerText()).replace(/\n/g, ' | '));
+
+  // isolated wave-1 check: the exact technique that caught Level 1's real shipped bug
+  const lone = await page.evaluate(() => {
+    const S = GameState.state; S.towers.length = 0; S.enemies.length = 0; S.projectiles.length = 0;
+    S.gold = 150; S.lives = 20; S.wave = 0; S.phase = 'playing';
+    S.selected = { kind: 'tile', c: 2, r: 4 };
+    GameState.placeTower('slinger');
+    GameState.startWave();
+    let leaks = 0; GameState.on('enemyLeaked', () => leaks++);
+    for (let i = 0; i < 60 * 60 && GameState.state.waveActive; i++) GameState.update(1 / 60);
+    return { leaks, lives: S.lives };
+  });
+  check('Level 2 wave 1 is winnable by a single lone tower (no leaks)', lone.leaks === 0 && lone.lives === 20, JSON.stringify(lone));
+
+  const runBotOn = (plan, spots, totalWaves) => page.evaluate(({ plan, spots, totalWaves }) => {
+    const S = GameState.state;
+    S.enemies.length = 0; S.projectiles.length = 0; S.towers.length = 0;
+    S.gold = 150; S.lives = 20; S.wave = 0; S.prep = 0; S.waveActive = false; S.schedule = []; S.waveQueue = []; S.phase = 'playing'; S.endpointState = 0; S.kills = 0;
+    const flyersIn = (n) => { const w = GameState.waveInfo(n); return !!w && w.groups.some((g) => g.type === 'bat' || g.type === 'boss'); };
+    const antiAir = () => S.towers.filter((t) => GameState.TOWER_TYPES[t.type].hitsFlying).length;
+    let next = 0;
+    const act = () => {
+      while (next < spots.length) {
+        let type = plan[next % plan.length];
+        const upcoming = S.waveActive ? S.wave : S.wave + 1;
+        if (plan.length > 1 && flyersIn(upcoming) && antiAir() < 2 + Math.floor(upcoming / 4)) type = antiAir() % 2 ? 'artillery' : 'druid';
+        if (S.gold < GameState.TOWER_TYPES[type].cost) break;
+        S.selected = { kind: 'tile', c: spots[next][0], r: spots[next][1] };
+        if (!GameState.placeTower(type).ok) { next++; continue; }
+        next++;
+      }
+      const order = S.towers.slice().sort((a, b) => (GameState.TOWER_TYPES[b.type].hitsFlying - GameState.TOWER_TYPES[a.type].hitsFlying));
+      for (const t of order) { const c = GameState.upgradeCost(t); if (c !== null && S.gold >= c + 40) GameState.upgradeTower(t.id); }
+    };
+    const leaks = [];
+    for (let w = 1; w <= totalWaves; w++) {
+      act();
+      const l0 = S.lives;
+      GameState.startWave();
+      let steps = 0;
+      while (S.waveActive && steps++ < 60 * 150) { GameState.update(1 / 60); if (steps % 120 === 0) act(); }
+      leaks.push(l0 - S.lives);
+      if (S.phase !== 'playing') break;
+    }
+    return { leaks, lives: S.lives, phase: S.phase, towers: S.towers.length, gold: S.gold, stars: S.phase === 'won' ? GameState.stars() : 0 };
+  }, { plan, spots, totalWaves });
+
+  const L2F = LEVEL_FIXTURES['millbrook-watch'];
+  const mixed2 = await runBotOn(['slinger', 'slinger', 'warden', 'druid', 'artillery', 'golem', 'druid', 'warden', 'slinger', 'golem'], L2F.botBuildSpots, L2F.waveCount);
+  console.log('LEVEL 2 MIXED BOT: ' + JSON.stringify(mixed2));
+  check('Level 2: a mixed defense can win all 10 waves', mixed2.phase === 'won', `lives=${mixed2.lives} leaks=${JSON.stringify(mixed2.leaks)}`);
+  check('Level 2: waves 1 and 2 are nearly unloseable', mixed2.leaks[0] + mixed2.leaks[1] <= 1, `leaks=${JSON.stringify(mixed2.leaks.slice(0, 2))}`);
+  await page.waitForTimeout(1500);
+  check('Level 2 win screen shows stars', mixed2.phase !== 'won' || (await page.locator('#end').isVisible() && await page.locator('#stars span.lit').count() === mixed2.stars));
+  await page.screenshot({ path: `${OUT}/level2-win.png` });
+  check('Level 2 win recorded progress', await page.evaluate(() => Progress.starsFor('millbrook-watch') > 0));
+  await page.evaluate(() => { document.getElementById('end').classList.remove('show'); });
+
+  for (const type of ['slinger', 'warden', 'druid', 'golem', 'artillery']) {
+    const r = await runBotOn([type], L2F.botBuildSpots, L2F.waveCount);
+    const clean = r.leaks.filter((l) => l <= 1).length;
+    console.log(`LEVEL 2 ONLY ${type}: ` + JSON.stringify(r) + ` clean waves=${clean}/${L2F.waveCount}`);
+    check(`Level 2: only ${type} does not trivialize the level`, !(r.phase === 'won' && clean > Math.floor(L2F.waveCount * 0.6)), `phase=${r.phase} clean=${clean}`);
+  }
+  await page.waitForTimeout(1600);
+  await page.evaluate(() => { GameState.state.enemies.length = 0; document.getElementById('end').classList.remove('show'); });
   await ctx.close();
 
   // ---------------- Mobile, touch ----------------

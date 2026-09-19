@@ -22,8 +22,11 @@ no server). Load order matters: each level's file (e.g.
 then `js/input.js`/`js/ui.js`/`js/audio.js`/`js/boot.js`.
 
 `tools/level-fixtures.js` holds the tile coordinates, gold amounts, and wave
-counts that are literal to one level's geometry, one entry per level id.
-`playtest.js` still drives Level 1 directly rather than looping this table
-(there is only one entry so far); once a second level exists, fold the
-Level-1-specific literals in `playtest.js` into a loop over this table
-instead of duplicating them per level.
+counts that are literal to one level's geometry, one entry per level id. As
+of Level 2, `playtest.js` runs Level 1's mechanic-level checks (M1-M9,
+upgrades/sell, flying rule, rooting, boss, pause/speed/mute, resize) inline
+as before — those don't vary by level — then runs a `runBotOn(plan, spots,
+totalWaves)` mixed-defense and single-tower-type pass against each
+additional level, reading its `botBuildSpots`/`waveCount` from this fixture
+table. A third level should extend that same per-level block rather than
+duplicating Level 1's full mechanic suite again.

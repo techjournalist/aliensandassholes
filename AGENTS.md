@@ -383,17 +383,23 @@ saved to `localStorage` under `bb-progress`, alongside the existing
 `bb-muted` key. Zero new player-visible content; the gate was the
 existing test suite behaving identically afterward.
 
-- **P3-M1 — Level 2: The Millbrook Watch.** First ground reclaimed from
-  the Hollow. Endpoint: the Watch-Mill (built with the Bastion's proven
-  batched-props + damage-overlay technique, plus a continuously turning
-  mill wheel). Chokepoint: the Sluice Gate, a stone millrace lock
-  narrowed to a single plank causeway (distinct from Level 1's wooden
-  bridge). ~30% corrupted. 10 waves, same 5-enemy roster, no boss;
-  finale is a simultaneous Troll column + Bat swarm. Same 18x11 grid as
-  Level 1. Re-verify "waves 1-2 nearly unloseable" against this level's
-  own geometry by direct simulation (a lone recommended tower vs. wave
-  1 in isolation) before trusting a full playthrough — this is exactly
-  the class of bug Level 1's own M11 fix pass found.
+**P3-M1 — Level 2: The Millbrook Watch** *(done)*. First ground reclaimed
+from the Hollow. Endpoint: the Watch-Mill (built with the Bastion's proven
+batched-props + damage-overlay technique, plus a continuously turning mill
+wheel — the one new animation idea this level introduces). Chokepoint: the
+Sluice Gate, a stone millrace lock narrowed to a plank-and-iron causeway
+(distinct from Level 1's wooden bridge). ~30% corrupted. 10 waves, same
+5-enemy roster, no boss; finale is a simultaneous Troll column + Bat swarm.
+Same 18x11 grid as Level 1. The wave-1 lone-tower simulation check (the
+exact technique that caught Level 1's own M11 balance bug) came back clean
+on the first try; the single-tower-type stress test shows no type winning
+alone, so no dominant strategy. Fixed as part of this milestone: switching
+levels via the world map (a genuinely different level than the one already
+loaded) reloads the page to rebuild the scene, per P3-M0's design — but it
+was dropping the player back on the title screen a second time instead of
+straight into play, even though they'd already confirmed their choice. The
+reload now carries that intent through a `bb-enter-play` sessionStorage
+flag so it lands directly in gameplay.
 - **P3-M2 — Level 3: The Cairnwatch.** A genuinely contested border,
   ~50% corrupted. Endpoint: the Cairnwatch Tower, already scarred
   before the player arrives. Chokepoint: the Ravine Stair, a switchback

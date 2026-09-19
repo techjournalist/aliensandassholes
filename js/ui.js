@@ -218,7 +218,14 @@ const UI = (() => {
       GameState.startGame();
       return;
     }
-    try { sessionStorage.setItem('bb-active-level', id); } catch (e) { /* ignore */ }
+    // Switching to a level that isn't loaded needs a reload (see P3-M0's
+    // no-disposal-code rationale). The player already chose and confirmed
+    // this level once, so the reload should drop them straight into play,
+    // not replay the title screen and world map a second time.
+    try {
+      sessionStorage.setItem('bb-active-level', id);
+      sessionStorage.setItem('bb-enter-play', '1');
+    } catch (e) { /* ignore */ }
     location.reload();
   }
 
@@ -246,7 +253,9 @@ const UI = (() => {
       renderPanel();
     });
     $('wave-btn').addEventListener('click', () => { Audio.unlock(); GameState.sendWave(); });
-    $('title').classList.add('show');
+    let skipToPlay = false;
+    try { skipToPlay = sessionStorage.getItem('bb-enter-play') === '1'; sessionStorage.removeItem('bb-enter-play'); } catch (e) { /* ignore */ }
+    if (skipToPlay) GameState.startGame(); else $('title').classList.add('show');
     $('start-btn').addEventListener('click', () => { Audio.unlock(); $('title').classList.remove('show'); enterWorldMap(); });
     $('wm-svg').addEventListener('click', (e) => {
       const node = e.target.closest('.wm-node');

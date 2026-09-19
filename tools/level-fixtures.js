@@ -15,4 +15,12 @@ module.exports = {
     bossStagePlacements: { druid: [[9, 5], [7, 5]], artillery: [[13, 7], [5, 5]], golem: [[12, 4]], warden: [[10, 5]] },
     waveCount: 12, hasBossOnWave: 12,
   },
+  'millbrook-watch': {
+    roadTile: [4, 3], streamTile: [9, 2], farTile: [1, 9],
+    firstSlingerTile: [2, 4], secondSlingerTile: [3, 2],
+    towerSpots: { warden: [10, 5], druid: [10, 7], golem: [12, 5], artillery: [14, 7] },
+    upgradeProbeTile: [2, 4],
+    botBuildSpots: [[2, 4], [3, 2], [5, 7], [6, 7], [10, 3], [10, 5], [10, 7], [12, 3], [12, 5], [12, 7], [14, 5], [14, 7], [15, 3], [16, 3], [16, 4], [6, 9]],
+    waveCount: 10, hasBossOnWave: null,
+  },
 };
