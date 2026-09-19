@@ -23,4 +23,12 @@ module.exports = {
     botBuildSpots: [[2, 4], [3, 2], [5, 7], [6, 7], [10, 3], [10, 5], [10, 7], [12, 3], [12, 5], [12, 7], [14, 5], [14, 7], [15, 3], [16, 3], [16, 4], [6, 9]],
     waveCount: 10, hasBossOnWave: null,
   },
+  'cairnwatch': {
+    roadTile: [3, 5], streamTile: [9, 2], farTile: [0, 11],
+    firstSlingerTile: [2, 6], secondSlingerTile: [2, 4],
+    towerSpots: { warden: [8, 4], druid: [8, 7], golem: [13, 5], artillery: [13, 7] },
+    upgradeProbeTile: [2, 6],
+    botBuildSpots: [[2, 4], [2, 6], [4, 1], [5, 1], [8, 4], [8, 7], [6, 7], [10, 10], [11, 8], [13, 5], [13, 7], [14, 2], [15, 4], [15, 5], [16, 7], [18, 7]],
+    waveCount: 12, hasBossOnWave: null,
+  },
 };

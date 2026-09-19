@@ -486,6 +486,47 @@ async function enterLevel(page, levelId) {
   }
   await page.waitForTimeout(1600);
   await page.evaluate(() => { GameState.state.enemies.length = 0; document.getElementById('end').classList.remove('show'); });
+
+  // ---------------- Level 3: The Cairnwatch ----------------
+  check('winning Level 2 unlocked Level 3', await page.evaluate(() => Progress.isUnlocked('cairnwatch')));
+  await page.reload(); await page.waitForTimeout(1000);
+  await enterLevel(page, 'cairnwatch');
+  check('Level 3 loads with its own path/theme', await page.evaluate(() => GameState.currentLevel().id === 'cairnwatch'));
+  await page.waitForTimeout(1500);
+  await page.screenshot({ path: `${OUT}/level3-title.png` });
+  console.log('LEVEL 3 DEBUG OVERLAY: ' + (await page.locator('#debug').innerText()).replace(/\n/g, ' | '));
+
+  const L3F = LEVEL_FIXTURES['cairnwatch'];
+  const lone3 = await page.evaluate((tip) => {
+    const S = GameState.state; S.towers.length = 0; S.enemies.length = 0; S.projectiles.length = 0;
+    S.gold = 150; S.lives = 20; S.wave = 0; S.phase = 'playing';
+    S.selected = { kind: 'tile', c: tip[0], r: tip[1] };
+    GameState.placeTower('slinger');
+    GameState.startWave();
+    let leaks = 0; GameState.on('enemyLeaked', () => leaks++);
+    for (let i = 0; i < 60 * 90 && GameState.state.waveActive; i++) GameState.update(1 / 60);
+    return { leaks, lives: S.lives };
+  }, LEVEL_FIXTURES['cairnwatch'].firstSlingerTile);
+  check('Level 3 wave 1 is winnable by a single lone tower (no leaks)', lone3.leaks === 0 && lone3.lives === 20, JSON.stringify(lone3));
+
+  const mixed3 = await runBotOn(['slinger', 'slinger', 'warden', 'druid', 'artillery', 'golem', 'druid', 'warden', 'slinger', 'golem', 'artillery', 'warden', 'druid', 'slinger', 'golem', 'artillery'], L3F.botBuildSpots, L3F.waveCount);
+  console.log('LEVEL 3 MIXED BOT: ' + JSON.stringify(mixed3));
+  check('Level 3: a mixed defense can win all 12 waves', mixed3.phase === 'won', `lives=${mixed3.lives} leaks=${JSON.stringify(mixed3.leaks)}`);
+  check('Level 3: waves 1 and 2 are nearly unloseable', mixed3.leaks[0] + mixed3.leaks[1] <= 1, `leaks=${JSON.stringify(mixed3.leaks.slice(0, 2))}`);
+  await page.waitForTimeout(1500);
+  check('Level 3 win screen shows stars', mixed3.phase !== 'won' || (await page.locator('#end').isVisible() && await page.locator('#stars span.lit').count() === mixed3.stars));
+  await page.screenshot({ path: `${OUT}/level3-win.png` });
+  check('Level 3 win recorded progress', await page.evaluate(() => Progress.starsFor('cairnwatch') > 0));
+  await page.evaluate(() => { document.getElementById('end').classList.remove('show'); });
+
+  for (const type of ['slinger', 'warden', 'druid', 'golem', 'artillery']) {
+    const r = await runBotOn([type], L3F.botBuildSpots, L3F.waveCount);
+    const clean = r.leaks.filter((l) => l <= 1).length;
+    console.log(`LEVEL 3 ONLY ${type}: ` + JSON.stringify(r) + ` clean waves=${clean}/${L3F.waveCount}`);
+    check(`Level 3: only ${type} does not trivialize the level`, !(r.phase === 'won' && clean > Math.floor(L3F.waveCount * 0.6)), `phase=${r.phase} clean=${clean}`);
+  }
+  await page.waitForTimeout(1600);
+  await page.evaluate(() => { GameState.state.enemies.length = 0; document.getElementById('end').classList.remove('show'); });
   await ctx.close();
 
   // ---------------- Mobile, touch ----------------

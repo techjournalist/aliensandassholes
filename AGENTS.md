@@ -400,14 +400,33 @@ was dropping the player back on the title screen a second time instead of
 straight into play, even though they'd already confirmed their choice. The
 reload now carries that intent through a `bb-enter-play` sessionStorage
 flag so it lands directly in gameplay.
-- **P3-M2 — Level 3: The Cairnwatch.** A genuinely contested border,
-  ~50% corrupted. Endpoint: the Cairnwatch Tower, already scarred
-  before the player arrives. Chokepoint: the Ravine Stair, a switchback
-  stone stairway with a rope-hauled cart over a fissure. 12 waves, no
-  boss; a denser non-staggered finale than Level 1's own penultimate
-  wave. Grid 20x12 (room for the switchback to read as real elevation
-  change; `fitCamera` is already generic to grid size, so this is a
-  camera-framing check, not new engineering).
+**P3-M2 — Level 3: The Cairnwatch** *(done)*. A genuinely contested
+border, ~50% corrupted (the theme radius covers roughly half the 20x12
+grid, confirmed by eye against the title-screen screenshot). Endpoint:
+the Cairnwatch Tower, already scarred before the player arrives — a
+permanent collapsed corner and old scorch mark are baked into the base
+geometry itself, separate from the usual dynamic 3-state damage overlay
+that still layers fresh cracks and fire on top as lives are lost during
+this fight. Chokepoint: the Ravine Stair, a fissure crossing with a
+narrow plank walkway and a swaying rope-and-pulley cart beside it
+(rendered as a dark chasm, not water, distinct from both Level 1's
+bridge and Level 2's stone causeway). The path itself is a genuine
+switchback (three direction reversals) rather than Levels 1-2's gentler
+S-curves, on a 20x12 grid to give the elevation-change framing room to
+read; `fitCamera`'s existing grid-size generality meant no new camera
+code was needed. 12 waves, no boss; the finale starts a Troll column, a
+Trickster rush, and a Bat swarm all at delay 0 together, genuinely
+simultaneous rather than staggered like every earlier finale. The
+isolated wave-1 lone-tower simulation came back clean first try; the
+single-tower-type stress test shows no type winning alone. The initial
+full-playthrough check surfaced a real tuning gap worth naming: the
+first mixed-bot pass won with only 1 of 20 lives left, a much thinner
+margin than Levels 1-2's 14 and 8-10 — not a level-balance problem on
+inspection, but a weaker tower-rotation plan in the test's own bot
+script for this level; fixing the bot to rotate through all 5 tower
+types the way the other two levels' tests already did brought the
+margin back in line (9-13 lives across repeated runs) without touching
+the level's own wave numbers.
 - **P3-M3 — M5: tier-3 upgrade branches**, reordered here per the
   user's decision. Two permanent specializations per tower (all 5),
   built to the Sprout Slinger worked example already in this document.
