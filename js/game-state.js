@@ -1,0 +1,523 @@
+// ===================================================================
+// GameState  (pure logic: no THREE, no DOM, no audio in here)
+// ===================================================================
+const GameState = (() => {
+  let level = null, cols = 0, rows = 0;
+  let pathCells = [], pathIndex = new Map(), pathPoints = [], pathLens = [0], pathLength = 0, gate = { x: 0, z: 0 };
+
+  // Every tower is a character with a job.
+  const TOWER_TYPES = {
+    slinger:   { id: 'slinger',   name: 'Sprout Slinger',     cost: 70,  range: 2.6, damage: 8,  cooldown: 0.62, windup: 0.16, projectileSpeed: 7.5, projectile: 'acorn',   splash: 0,   hitsFlying: false, icon: '&#127793;', blurb: 'Quick acorn shots. Cheap. Ground only.' },
+    warden:    { id: 'warden',    name: 'Bramblecast Warden', cost: 110, range: 2.3, damage: 16, cooldown: 1.5,  windup: 0.3,  projectileSpeed: 5.5, projectile: 'thorn',   splash: 0.9, hitsFlying: false, icon: '&#127807;', blurb: 'Thorn bursts hit a crowd and root it. Ground only.', effect: { root: 0.9 } },
+    druid:     { id: 'druid',     name: 'Frostmoss Druid',    cost: 90,  range: 2.9, damage: 5,  cooldown: 0.8,  windup: 0.2,  projectileSpeed: 9,   projectile: 'wisp',    splash: 0,   hitsFlying: true,  icon: '&#10052;',  blurb: 'Light frost that chills. Reaches flyers.', effect: { chill: 2.2, chillMul: 0.55 } },
+    golem:     { id: 'golem',     name: 'Stonebark Golem',    cost: 130, range: 2.2, damage: 46, cooldown: 2.4,  windup: 0.45, projectileSpeed: 8,   projectile: 'boulder', splash: 0,   hitsFlying: false, icon: '&#129704;', blurb: 'One huge hit, slow to wind up. Ground only.' },
+    artillery: { id: 'artillery', name: 'Acorn Artillery',    cost: 120, range: 4.2, minRange: 1.4, damage: 15, cooldown: 2.4, windup: 0.35, projectileSpeed: 5, projectile: 'bigacorn', splash: 0.7, hitsFlying: true, icon: '&#127792;', blurb: 'Lobs a huge acorn far, not near. Splashes. Reaches flyers.' },
+  };
+  const TOWER_ORDER = ['slinger', 'warden', 'druid', 'golem', 'artillery'];
+  // Flat tier progression: tiers 2 and 3 multiply damage, trim cooldown and
+  // add range. Tier 3 becomes the branch choice in a later milestone.
+  const TIERS = [
+    { damage: 1,    cooldown: 1,    range: 0,    costMul: 0 },
+    { damage: 1.5,  cooldown: 0.92, range: 0.25, costMul: 0.8 },
+    { damage: 2.25, cooldown: 0.84, range: 0.5,  costMul: 1.3 },
+  ];
+  const SELL_REFUND = 0.6;
+  const ENEMY_TYPES = {
+    grunt:     { id: 'grunt',     name: 'Goblin Grunt',      hp: 30,  speed: 1.25, bounty: 8,   flying: false, armor: 0 },
+    trickster: { id: 'trickster', name: 'Bog-Trickster',     hp: 16,  speed: 2.3,  bounty: 6,   flying: false, armor: 0, wobble: true },
+    troll:     { id: 'troll',     name: 'Moss Troll',        hp: 170, speed: 0.72, bounty: 25,  flying: false, armor: 4 },
+    bat:       { id: 'bat',       name: 'Bramble Bat',       hp: 22,  speed: 1.75, bounty: 10,  flying: true,  armor: 0 },
+    boss:      { id: 'boss',      name: 'Shadow-Crow Swarm', hp: 640, speed: 0.78, bounty: 150, flying: true,  armor: 1, boss: true },
+  };
+
+  const listeners = {};
+  function on(event, fn) { (listeners[event] = listeners[event] || []).push(fn); }
+  function emit(event, payload) { (listeners[event] || []).forEach((fn) => fn(payload)); }
+
+  const worldX = (c) => c - cols / 2 + 0.5;
+  const worldZ = (r) => r - rows / 2 + 0.5;
+
+  function key(c, r) { return `${c},${r}`; }
+  function inGrid(c, r) { return c >= 0 && r >= 0 && c < cols && r < rows; }
+  function isPath(c, r) { return pathIndex.has(key(c, r)); }
+  function isStream(c, r) { return c === level.chokepoint.streamCol && !(c === level.chokepoint.cell[0] && r === level.chokepoint.cell[1]); }
+  function isBridge(c, r) { return c === level.chokepoint.cell[0] && r === level.chokepoint.cell[1]; }
+  function isBastion(c, r) { return level.endpoint.cells.some(([bc, br]) => bc === c && br === r); }
+  function isSpawn(c, r) { return c === level.spawn[0] && r === level.spawn[1]; }
+
+  // 0 = pleasant countryside, 1 = deep in this level's dangerous zone.
+  // Defined for any cell, including the decorative border, so the danger
+  // bleeds off the edge of the map instead of stopping at a hard line.
+  function zoneFalloff(c, r) {
+    const { center, radiusOut, radiusIn, falloffWidth } = level.theme;
+    const dx = (c - center[0]) / radiusOut.x, dz = (r - center[1]) / radiusOut.z;
+    const d = Math.sqrt(dx * dx + dz * dz);
+    return Math.max(0, Math.min(1, (radiusIn - d) / falloffWidth));
+  }
+
+  // Buildable = inside the grid, on plain ground, and touching the road.
+  function isBuildable(c, r) {
+    if (!inGrid(c, r) || isPath(c, r) || isStream(c, r) || isBastion(c, r) || isSpawn(c, r)) return false;
+    for (let dc = -1; dc <= 1; dc++) for (let dr = -1; dr <= 1; dr++) {
+      if ((dc || dr) && isPath(c + dc, r + dr)) return true;
+    }
+    return false;
+  }
+
+  function cellKind(c, r) {
+    if (isBastion(c, r)) return 'bastion';
+    if (isBridge(c, r)) return 'bridge';
+    if (isStream(c, r)) return 'stream';
+    if (isPath(c, r)) return 'path';
+    return 'ground';
+  }
+
+  function pathIndexOf(c, r) { const i = pathIndex.get(key(c, r)); return i === undefined ? -1 : i; }
+  function isCobble(c, r) { const i = pathIndexOf(c, r); return i >= 0 && i >= pathCells.length - level.cobbleTailCells; }
+
+  const state = {};
+  let nextId = 1;
+
+  // Load a level's data: derive its path geometry once and reset the whole
+  // run. Levels/UI/Renderer all read `state`/`currentLevel()` afterward.
+  function loadLevel(def) {
+    level = def; cols = def.grid.cols; rows = def.grid.rows; nextId = 1;
+
+    pathCells = [];
+    for (let i = 0; i < def.pathWaypoints.length - 1; i++) {
+      const [ax, az] = def.pathWaypoints[i];
+      const [bx, bz] = def.pathWaypoints[i + 1];
+      const dx = Math.sign(bx - ax), dz = Math.sign(bz - az);
+      let x = ax, z = az;
+      if (i === 0) pathCells.push([x, z]);
+      while (x !== bx || z !== bz) { x += dx; z += dz; pathCells.push([x, z]); }
+    }
+    pathIndex = new Map(pathCells.map(([c, r], i) => [`${c},${r}`, i]));
+
+    // World-space polyline the enemies walk: waypoint centers, plus a final
+    // step into the endpoint's gate so leaks visibly go through the door.
+    pathPoints = def.pathWaypoints.map(([c, r]) => ({ x: worldX(c), z: worldZ(r) }));
+    gate = { x: worldX(def.endpoint.gateCell[0]), z: worldZ(def.endpoint.gateCell[1] + 1) - 0.72 };
+    pathPoints.push(gate);
+    pathLens = [0];
+    for (let i = 1; i < pathPoints.length; i++) {
+      const a = pathPoints[i - 1], b = pathPoints[i];
+      pathLens.push(pathLens[i - 1] + Math.hypot(b.x - a.x, b.z - a.z));
+    }
+    pathLength = pathLens[pathLens.length - 1];
+
+    Object.assign(state, {
+      gold: def.startGold, lives: def.startLives, wave: 0, time: 0,
+      selected: null, towers: [], enemies: [], waveActive: false, waveQueue: [],
+      hpScale: 1, schedule: [], waveTime: 0, prep: 0, endpointState: 0,
+      projectiles: [], phase: 'title', paused: false, speed: 1, kills: 0,
+    });
+    emit('levelLoaded', def);
+  }
+  function currentLevel() { return level; }
+  function totalWaves() { return level.waves.length; }
+
+  function pathPosAt(d, out) {
+    out = out || { x: 0, z: 0 };
+    if (d <= 0) { out.x = pathPoints[0].x; out.z = pathPoints[0].z; return out; }
+    if (d >= pathLength) { out.x = gate.x; out.z = gate.z; return out; }
+    let i = 1;
+    while (pathLens[i] < d) i++;
+    const a = pathPoints[i - 1], b = pathPoints[i];
+    const t = (d - pathLens[i - 1]) / (pathLens[i] - pathLens[i - 1]);
+    out.x = a.x + (b.x - a.x) * t;
+    out.z = a.z + (b.z - a.z) * t;
+    return out;
+  }
+
+  function pause() {
+    if (state.phase !== 'playing' || state.paused) return false;
+    state.paused = true;
+    emit('paused');
+    return true;
+  }
+  function resume() {
+    if (!state.paused) return false;
+    state.paused = false;
+    emit('resumed');
+    return true;
+  }
+  function setSpeed(x) {
+    state.speed = x === 2 ? 2 : 1;
+    emit('speedChanged', state.speed);
+    return state.speed;
+  }
+
+  function startGame() {
+    if (state.phase !== 'title') return;
+    state.phase = 'playing';
+    emit('gameStarted');
+  }
+
+  function towerAt(c, r) { return state.towers.find((t) => t.c === c && t.r === r) || null; }
+
+  function clearSelection() {
+    if (!state.selected) return;
+    state.selected = null;
+    emit('selectionCleared');
+  }
+
+  // Tap on a tile: select a tower, select an empty buildable tile, or
+  // explain in-world why nothing can go there.
+  function selectTile(c, r) {
+    if (!inGrid(c, r)) { clearSelection(); return { ok: false, c, r, reason: null }; }
+    const tower = towerAt(c, r);
+    if (tower) {
+      state.selected = { kind: 'tower', id: tower.id, c, r };
+      emit('towerSelected', tower);
+      return { ok: true, c, r, tower };
+    }
+    let reason = null;
+    if (isPath(c, r)) reason = "Can't build on the road, the goblins walk there.";
+    else if (isStream(c, r)) reason = "Can't build in the stream.";
+    else if (isBastion(c, r)) reason = `That's ${level.endpoint.name}. Build around it.`;
+    else if (isSpawn(c, r)) reason = level.spawnBlockedText;
+    else if (!isBuildable(c, r)) reason = 'Too far from the road. A tower needs a road to watch.';
+    if (reason) {
+      clearSelection();
+      const res = { ok: false, c, r, reason };
+      emit('tileRejected', res);
+      return res;
+    }
+    state.selected = { kind: 'tile', c, r };
+    const res = { ok: true, c, r };
+    emit('tileSelected', res);
+    return res;
+  }
+
+  function canAfford(typeId) { return state.gold >= TOWER_TYPES[typeId].cost; }
+  function towerStats(tower) {
+    const type = TOWER_TYPES[tower.type], tier = TIERS[tower.tier - 1];
+    return {
+      damage: Math.round(type.damage * tier.damage), cooldown: type.cooldown * tier.cooldown,
+      range: type.range + tier.range, splash: type.splash, effect: type.effect || null,
+    };
+  }
+  function upgradeCost(tower) {
+    if (tower.tier >= TIERS.length) return null;
+    return Math.round(TOWER_TYPES[tower.type].cost * TIERS[tower.tier].costMul);
+  }
+  function sellValue(tower) {
+    const type = TOWER_TYPES[tower.type];
+    let spent = type.cost;
+    for (let t = 1; t < tower.tier; t++) spent += Math.round(type.cost * TIERS[t].costMul);
+    return Math.round(spent * SELL_REFUND);
+  }
+  function towerById(id) { return state.towers.find((t) => t.id === id) || null; }
+
+  function upgradeTower(id) {
+    const tower = towerById(id);
+    if (!tower) return { ok: false, reason: 'No tower there.' };
+    const cost = upgradeCost(tower);
+    if (cost === null) return { ok: false, reason: 'Already at full strength.' };
+    if (state.gold < cost) {
+      const res = { ok: false, reason: `Not enough gold. The upgrade costs ${cost}.` };
+      emit('placeRejected', res);
+      return res;
+    }
+    state.gold -= cost;
+    tower.tier += 1;
+    tower.range = towerStats(tower).range;
+    emit('towerUpgraded', tower);
+    emit('goldChanged', state.gold);
+    return { ok: true, tower };
+  }
+
+  function sellTower(id) {
+    const tower = towerById(id);
+    if (!tower) return { ok: false };
+    const value = sellValue(tower);
+    state.gold += value;
+    state.towers.splice(state.towers.indexOf(tower), 1);
+    for (const p of state.projectiles) if (p.towerId === id) p.orphan = true;
+    if (state.selected && state.selected.kind === 'tower' && state.selected.id === id) state.selected = null;
+    emit('towerSold', { tower, value });
+    emit('selectionCleared');
+    emit('goldChanged', state.gold);
+    return { ok: true, value };
+  }
+
+  // Place a tower of the given type on the currently selected tile.
+  function placeTower(typeId) {
+    const sel = state.selected, type = TOWER_TYPES[typeId];
+    if (!sel || sel.kind !== 'tile' || !type) return { ok: false, reason: 'Pick a spot by the road first.' };
+    if (towerAt(sel.c, sel.r)) return { ok: false, reason: 'Something already stands there.' };
+    if (state.gold < type.cost) {
+      const res = { ok: false, reason: `Not enough gold. A ${type.name} costs ${type.cost}.` };
+      emit('placeRejected', res);
+      return res;
+    }
+    state.gold -= type.cost;
+    const tower = {
+      id: nextId++, type: typeId, c: sel.c, r: sel.r, tier: 1,
+      x: worldX(sel.c), z: worldZ(sel.r), range: type.range, facing: 0,
+      cooldown: 0, windup: 0, targetId: null,
+    };
+    state.towers.push(tower);
+    state.selected = { kind: 'tower', id: tower.id, c: sel.c, r: sel.r };
+    emit('towerPlaced', tower);
+    emit('goldChanged', state.gold);
+    return { ok: true, tower };
+  }
+
+  // -------- enemies --------
+  function spawnEnemy(typeId) {
+    const t = ENEMY_TYPES[typeId];
+    const hp = Math.round(t.hp * state.hpScale);
+    const e = {
+      id: nextId++, type: typeId, name: t.name, hp, maxHp: hp, speed: t.speed,
+      flying: t.flying, bounty: t.bounty,
+      dist: 0, lane: t.boss ? 0 : (Math.random() - 0.5) * 0.44,   // lateral offset so a crowd doesn't walk single file
+      x: pathPoints[0].x, z: pathPoints[0].z, dirX: 1, dirZ: 0, age: 0,
+      chillUntil: 0, chillMul: 1, rootUntil: 0, speedMul: 1,
+      armor: t.armor || 0, wobble: !!t.wobble, boss: !!t.boss,
+    };
+    state.enemies.push(e);
+    emit('enemySpawned', e);
+    return e;
+  }
+
+  const _a = { x: 0, z: 0 }, _b = { x: 0, z: 0 };
+  function moveEnemy(e, dt) {
+    e.age += dt;
+    e.rooted = state.time < e.rootUntil;
+    e.chilled = state.time < e.chillUntil;
+    e.speedMul = e.rooted ? 0 : (e.chilled ? e.chillMul : 1);
+    e.dist += e.speed * e.speedMul * dt;
+    pathPosAt(e.dist - 0.3, _a);
+    pathPosAt(e.dist + 0.3, _b);
+    let dx = _b.x - _a.x, dz = _b.z - _a.z;
+    const l = Math.hypot(dx, dz) || 1;
+    dx /= l; dz /= l;
+    e.dirX = dx; e.dirZ = dz;
+    pathPosAt(e.dist, _a);
+    // lane offset fades out over the last stretch so everyone funnels into the gate
+    const funnel = Math.min(1, Math.max(0, (pathLength - e.dist) / 1.2));
+    const lane = e.lane + (e.wobble ? Math.sin(e.dist * 3.1 + e.id) * 0.22 : 0);
+    e.x = _a.x + -dz * lane * funnel;
+    e.z = _a.z + dx * lane * funnel;
+  }
+
+  // Scale the endpoint's 3 damage-state thresholds to this level's starting
+  // lives, so a level with a different startLives still swaps states at
+  // roughly 65%/30% remaining, matching Level 1's original 13/6-of-20 feel.
+  function endpointStateFor(lives) {
+    const L = level.startLives;
+    return lives > L * 0.65 ? 0 : lives > L * 0.3 ? 1 : 2;
+  }
+  function stars() {
+    const [three, two] = level.starThresholds;
+    return state.lives >= three ? 3 : state.lives >= two ? 2 : 1;
+  }
+  function leak(e) {
+    state.lives = Math.max(0, state.lives - (e.boss ? 5 : 1));
+    emit('enemyLeaked', e);
+    emit('livesChanged', state.lives);
+    const es = endpointStateFor(state.lives);
+    if (es !== state.endpointState) { state.endpointState = es; emit('endpointStateChanged', es); }
+    if (state.lives <= 0 && state.phase === 'playing') {
+      state.phase = 'lost';
+      emit('gameLost');
+    }
+  }
+
+  // -------- combat --------
+  function enemyById(id) { return state.enemies.find((e) => e.id === id) || null; }
+
+  // Towers shoot whichever reachable enemy is furthest down the road.
+  function pickTarget(tower, type) {
+    let best = null;
+    for (const e of state.enemies) {
+      if (e.flying && !type.hitsFlying) continue;
+      const d = Math.hypot(e.x - tower.x, e.z - tower.z);
+      if (d > tower.range || d < (type.minRange || 0)) continue;
+      if (!best || e.dist > best.dist) best = e;
+    }
+    return best;
+  }
+
+  function updateTower(tower, dt) {
+    const type = TOWER_TYPES[tower.type];
+    const stats = towerStats(tower);
+    tower.cooldown = Math.max(0, tower.cooldown - dt);
+    let target = tower.targetId ? enemyById(tower.targetId) : null;
+    if (target) {
+      const d = Math.hypot(target.x - tower.x, target.z - tower.z);
+      if (d > tower.range + 0.2 || d < (type.minRange || 0)) target = null;
+    }
+    if (!target) { target = pickTarget(tower, type); tower.targetId = target ? target.id : null; }
+    if (target) tower.facing = Math.atan2(target.x - tower.x, target.z - tower.z);
+    if (tower.windup > 0) {
+      // anticipation: the wind-up beat before the shot
+      tower.windup -= dt;
+      if (tower.windup <= 0) {
+        if (target) fire(tower, type, stats, target);
+        tower.cooldown = stats.cooldown;
+      }
+      return;
+    }
+    if (target && tower.cooldown <= 0) {
+      tower.windup = type.windup;
+      emit('towerWindup', tower);
+    }
+  }
+
+  function fire(tower, type, stats, target) {
+    const p = {
+      id: nextId++, towerId: tower.id, targetId: target.id, damage: stats.damage,
+      kind: type.projectile, splash: stats.splash, effect: stats.effect, hitsFlying: type.hitsFlying,
+      targetFlying: target.flying, targetBoss: !!target.boss,
+      x: tower.x, z: tower.z, sx: tower.x, sz: tower.z, speed: type.projectileSpeed, t: 0, total: 1,
+    };
+    p.total = Math.max(0.2, Math.hypot(target.x - tower.x, target.z - tower.z));
+    state.projectiles.push(p);
+    emit('towerFired', { tower, projectile: p });
+  }
+
+  function updateProjectiles(dt) {
+    for (let i = state.projectiles.length - 1; i >= 0; i--) {
+      const p = state.projectiles[i];
+      const target = enemyById(p.targetId);
+      if (!target) { state.projectiles.splice(i, 1); emit('projectileFizzled', p); continue; }
+      const dx = target.x - p.x, dz = target.z - p.z;
+      const dist = Math.hypot(dx, dz);
+      const step = p.speed * dt;
+      p.total = Math.max(p.total, dist + step);
+      if (dist <= step + 0.12) {
+        state.projectiles.splice(i, 1);
+        impact(p, target);
+        continue;
+      }
+      p.x += (dx / dist) * step;
+      p.z += (dz / dist) * step;
+      p.t = Math.min(1, 1 - dist / Math.max(0.001, Math.hypot(target.x - p.sx, target.z - p.sz)));
+    }
+  }
+
+  function impact(p, target) {
+    const x = target.x, z = target.z;
+    emit('projectileHit', { projectile: p, x, z, flying: target.flying });
+    if (p.splash > 0) {
+      // splash hits everything the tower could target within the radius
+      for (const e of state.enemies.slice()) {
+        if (e.flying && !p.hitsFlying) continue;
+        const d = Math.hypot(e.x - x, e.z - z);
+        if (d > p.splash) continue;
+        const falloff = e === target ? 1 : 0.65;
+        applyEffect(e, p.effect);
+        damage(e, Math.max(1, Math.round(p.damage * falloff)), p);
+      }
+    } else {
+      applyEffect(target, p.effect);
+      damage(target, p.damage, p);
+    }
+  }
+
+  function applyEffect(e, effect) {
+    if (!effect) return;
+    if (effect.chill) { e.chillUntil = state.time + effect.chill; e.chillMul = effect.chillMul; emit('enemyChilled', e); }
+    if (effect.root && !e.flying) { e.rootUntil = state.time + effect.root; emit('enemyRooted', e); }
+  }
+
+  function damage(e, amount, source) {
+    const dealt = Math.max(1, amount - e.armor);
+    e.hp -= dealt;
+    emit('enemyHit', { enemy: e, amount: dealt, armored: dealt < amount, x: e.x, z: e.z, kind: source && source.kind });
+    if (e.hp <= 0) {
+      const i = state.enemies.indexOf(e);
+      if (i >= 0) state.enemies.splice(i, 1);
+      state.gold += e.bounty;
+      state.kills += 1;
+      emit('enemyKilled', e);
+      emit('goldChanged', state.gold);
+    }
+  }
+
+  // -------- waves --------
+  function startWave() {
+    if (state.waveActive || state.phase !== 'playing' || state.wave >= level.waves.length) return false;
+    state.wave += 1;
+    const def = level.waves[state.wave - 1];
+    const sched = [];
+    let t = 0.6;
+    for (const grp of def.groups) {
+      t += grp.delay;
+      for (let i = 0; i < grp.count; i++) { sched.push({ t, type: grp.type }); t += grp.gap; }
+    }
+    state.schedule = sched;
+    state.waveQueue = sched.map((e) => e.type);
+    state.waveTime = 0;
+    state.prep = 0;
+    state.hpScale = 1 + (state.wave - 1) * 0.05;   // a gentle stiffening on top of the roster
+    state.waveActive = true;
+    emit('waveStarted', state.wave);
+    return true;
+  }
+  // The player's Send button: during prep it starts early for a gold bonus.
+  function sendWave() {
+    if (state.waveActive || state.phase !== 'playing') return false;
+    const bonus = state.prep > 0 ? Math.round(state.prep * 1.5) : 0;
+    if (!startWave()) return false;
+    if (bonus > 0) { state.gold += bonus; emit('earlyBonus', bonus); emit('goldChanged', state.gold); }
+    return true;
+  }
+  function waveInfo(n) { return level.waves[n - 1] || null; }
+  function enemiesLeft() { return state.waveQueue.length + state.enemies.length; }
+
+  function update(dt) {
+    if (state.phase !== 'playing' || state.paused) return;
+    state.time += dt;
+    for (const t of state.towers) updateTower(t, dt);
+    updateProjectiles(dt);
+    if (state.waveActive) {
+      state.waveTime += dt;
+      while (state.schedule.length && state.schedule[0].t <= state.waveTime) {
+        spawnEnemy(state.schedule.shift().type);
+        state.waveQueue.shift();
+      }
+    } else if (state.prep > 0) {
+      const before = Math.ceil(state.prep);
+      state.prep -= dt;
+      const after = Math.ceil(state.prep);
+      if (after !== before && after >= 1 && after <= 3) emit('prepTick', after);
+      if (state.prep <= 0) { state.prep = 0; startWave(); }
+    }
+    for (let i = state.enemies.length - 1; i >= 0; i--) {
+      const e = state.enemies[i];
+      moveEnemy(e, dt);
+      if (e.dist >= pathLength) {
+        state.enemies.splice(i, 1);
+        leak(e);
+      }
+    }
+    if (state.waveActive && !state.schedule.length && !state.enemies.length) {
+      state.waveActive = false;
+      const bonus = 15 + state.wave * 5;
+      state.gold += bonus;
+      emit('waveEnded', { wave: state.wave, bonus });
+      emit('goldChanged', state.gold);
+      if (state.wave >= level.waves.length) {
+        if (state.phase === 'playing') { state.phase = 'won'; emit('gameWon'); }
+      } else {
+        state.prep = level.prepSeconds;
+      }
+    }
+  }
+
+  return {
+    get cols() { return cols; }, get rows() { return rows; },
+    get pathCells() { return pathCells; }, get gate() { return gate; },
+    TOWER_TYPES, TOWER_ORDER, TIERS, ENEMY_TYPES, towerStats, upgradeCost, sellValue, towerById, upgradeTower, sellTower,
+    pathPosAt,
+    state, on, emit, update, worldX, worldZ, startGame, pause, resume, setSpeed,
+    loadLevel, currentLevel, totalWaves,
+    selectTile, clearSelection, placeTower, canAfford, towerAt, startWave, sendWave, spawnEnemy, waveInfo, enemiesLeft, stars,
+    inGrid, isPath, isStream, isBridge, isBastion, isSpawn, isBuildable, isCobble,
+    cellKind, zoneFalloff, pathIndexOf,
+  };
+})();

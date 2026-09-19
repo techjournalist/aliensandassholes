@@ -39,6 +39,13 @@ const S = (page) => page.evaluate(() => ({
   enemies: GameState.state.enemies.length, waveActive: GameState.state.waveActive,
 }));
 const simulate = (page, seconds) => page.evaluate((sec) => { for (let i = 0; i < sec * 60; i++) GameState.update(1 / 60); }, seconds);
+// Title -> world map -> commit to a level, the real path a player now takes
+// since M0's engine split added the world-map screen between the two.
+async function enterLevel(page, levelId) {
+  await page.locator('#start-btn').click(); await page.waitForTimeout(250);
+  await page.locator(`.wm-node[data-level="${levelId}"]`).click(); await page.waitForTimeout(150);
+  await page.locator('#wm-play-btn').click(); await page.waitForTimeout(200);
+}
 
 (async () => {
   const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
@@ -53,8 +60,8 @@ const simulate = (page, seconds) => page.evaluate((sec) => { for (let i = 0; i <
   await page.screenshot({ path: `${OUT}/title.png` });
   check('title screen shows on load', await page.locator('#title').isVisible());
   check('game does not run behind the title', (await S(page)).wave === 0 && await page.evaluate(() => GameState.state.phase === 'title'));
-  await page.locator('#start-btn').click(); await page.waitForTimeout(300);
-  check('start button begins play', await page.evaluate(() => GameState.state.phase === 'playing'));
+  await enterLevel(page, 'shadow-hollow');
+  check('start button + world map begins play', await page.evaluate(() => GameState.state.phase === 'playing'));
   // sound: mute toggle persists, ticks fire in the last prep seconds
   const mb = await page.locator('#mute-btn').boundingBox();
   check('mute button is a 44px target', mb && mb.height >= 44 && mb.width >= 44);
@@ -314,15 +321,15 @@ const simulate = (page, seconds) => page.evaluate((sec) => { for (let i = 0; i <
   await page.waitForTimeout(2500);
 
   // Bastion damage state 2, staged for a screenshot, then restored
-  await page.evaluate(() => { GameState.state.lives = 5; GameState.state.bastionState = 2; GameState.emit('bastionStateChanged', 2); });
+  await page.evaluate(() => { GameState.state.lives = 5; GameState.state.endpointState = 2; GameState.emit('endpointStateChanged', 2); });
   await page.waitForTimeout(1200);
   await page.screenshot({ path: `${OUT}/bastion-damaged.png`, clip: { x: 820, y: 330, width: 360, height: 330 } });
-  await page.evaluate(() => { GameState.state.lives = 20; GameState.state.bastionState = 0; GameState.emit('bastionStateChanged', 0); });
+  await page.evaluate(() => { GameState.state.lives = 20; GameState.state.endpointState = 0; GameState.emit('endpointStateChanged', 0); });
   // ---- full play-through bots: a mixed builder, then one tower type only ----
   const runBot = (plan) => page.evaluate((plan) => {
     const S = GameState.state;
     S.enemies.length = 0; S.projectiles.length = 0; S.towers.length = 0;
-    S.gold = 150; S.lives = 20; S.wave = 0; S.prep = 0; S.waveActive = false; S.schedule = []; S.waveQueue = []; S.phase = 'playing'; S.bastionState = 0; S.kills = 0;
+    S.gold = 150; S.lives = 20; S.wave = 0; S.prep = 0; S.waveActive = false; S.schedule = []; S.waveQueue = []; S.phase = 'playing'; S.endpointState = 0; S.kills = 0;
     const flyersIn = (n) => { const w = GameState.waveInfo(n); return !!w && w.groups.some((g) => g.type === 'bat' || g.type === 'boss'); };
     const antiAir = () => S.towers.filter((t) => GameState.TOWER_TYPES[t.type].hitsFlying).length;
     const spots = [[7, 5], [6, 5], [9, 5], [7, 7], [10, 5], [12, 4], [13, 7], [15, 8], [5, 5], [3, 3], [13, 4], [15, 10], [5, 7], [12, 7], [3, 1], [15, 4]];
@@ -361,6 +368,23 @@ const simulate = (page, seconds) => page.evaluate((sec) => { for (let i = 0; i <
   await page.waitForTimeout(1500);
   check('win screen shows stars after a win', mixed.phase !== 'won' || (await page.locator('#end').isVisible() && await page.locator('#stars span.lit').count() === mixed.stars));
   await page.screenshot({ path: `${OUT}/win.png` });
+
+  // ---- progress persistence: the win must survive a reload, via localStorage ----
+  check('the win recorded stars to localStorage', await page.evaluate((expected) => {
+    try { const d = JSON.parse(localStorage.getItem('bb-progress')); return d && d.levels['shadow-hollow'] && d.levels['shadow-hollow'].stars >= expected; } catch (e) { return false; }
+  }, mixed.stars));
+  await page.reload();
+  await page.waitForTimeout(1000);
+  await page.locator('#start-btn').click(); await page.waitForTimeout(300);
+  const litStars = await page.locator('.wm-node[data-level="shadow-hollow"] .wm-star.lit').count();
+  check('world map reflects saved stars after reload', litStars === mixed.stars, `lit=${litStars} expected=${mixed.stars}`);
+  check('an unrecognized level id is never "unlocked"', await page.evaluate(() => Progress.isUnlocked('does-not-exist') === false));
+  try { await page.evaluate(() => sessionStorage.setItem('bb-active-level', 'does-not-exist')); } catch (e) { /* ignore */ }
+  await page.reload();
+  await page.waitForTimeout(1000);
+  check('an unknown active-level id falls back to the first level', await page.evaluate(() => GameState.currentLevel().id === 'shadow-hollow'));
+  await enterLevel(page, 'shadow-hollow');
+
   for (const type of ['slinger', 'warden', 'druid', 'golem', 'artillery']) {
     const r = await runBot([type]);
     const clean = r.leaks.filter((l) => l <= 1).length;
@@ -402,8 +426,14 @@ const simulate = (page, seconds) => page.evaluate((sec) => { for (let i = 0; i <
   await page.screenshot({ path: `${OUT}/mobile-title.png` });
   const sb = await page.locator('#start-btn').boundingBox();
   check('start button fits on a phone', sb && sb.y + sb.height <= 390 && sb.height >= 44, JSON.stringify(sb));
-  await page.touchscreen.tap(sb.x + sb.width / 2, sb.y + sb.height / 2); await page.waitForTimeout(300);
-  check('start by touch', await page.evaluate(() => GameState.state.phase === 'playing'));
+  await page.locator('#start-btn').click(); await page.waitForTimeout(250);
+  const wmNode = await page.locator('.wm-node[data-level="shadow-hollow"]').boundingBox();
+  check('world map node is a touch target', wmNode && wmNode.height >= 44);
+  await page.locator('.wm-node[data-level="shadow-hollow"]').click(); await page.waitForTimeout(150);
+  const wmPlay = await page.locator('#wm-play-btn').boundingBox();
+  check('world map play button fits on a phone', wmPlay && wmPlay.height >= 44);
+  await page.locator('#wm-play-btn').click(); await page.waitForTimeout(300);
+  check('start by touch through the world map', await page.evaluate(() => GameState.state.phase === 'playing'));
   [x, y] = await cellToScreen(page, 9, 5);
   await page.touchscreen.tap(x, y); await page.waitForTimeout(200);
   st = await S(page);

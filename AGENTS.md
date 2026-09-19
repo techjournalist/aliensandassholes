@@ -352,21 +352,84 @@ when to stop starting new work, not a fixed cut-list, the phase tags above
 already encode what to defer first.
 
 ## Phase 3 (post-plan, user-directed): additional levels/maps
-Explicitly out of scope for the plan above: Phase 1 and Phase 2 both
-deepen the single Briar & Bastion map, they never add a second one. The
-user has directed that once the M11 Phase 1 playability gate is done,
-work should continue toward multiple levels/maps, not stop at one. This
-is a real scope addition on top of the original plan, not implied by any
-milestone above, and needs its own design pass before implementation:
-at minimum, a level-select flow (title screen or a map/world screen
-after it), a second fixed path with its own buildable-tile layout and
-its own visually distinct staging (per the Visual style section's
-"environmental staging" principle, a second level cannot reuse the
-Shadow Hollow / Old Bridge / Bastion tile set unchanged, it needs its
-own identity), and a wave table for that level tuned independently
-rather than copy-pasted. Existing towers, upgrades, and abilities carry
-over across levels; new levels do not require new tower types unless
-that's separately decided. Sequence this after the M11 gate confirms
-the first level is genuinely done, and re-run the Gauntlet Loop
-(builder pass, critic pass, fix pass, regression check) per new level
-the same as any other milestone.
+Explicitly out of scope for the original plan above: Phase 1 and Phase 2
+both deepen the single Briar & Bastion map, they never add a second one.
+The user has directed that once the M11 Phase 1 playability gate is
+done, work continues toward multiple levels/maps rather than stopping
+at one, with a narrative arc of "pushing back into the Shadow Hollow"
+across four levels. M5 (tier-3 upgrade branches) is reordered to land
+after Level 3, before Level 4. Existing towers, upgrades, and abilities
+carry over across every level; levels do not get new tower types unless
+separately decided. Each milestone below re-runs the full Gauntlet Loop
+(builder pass, critic pass, fix pass, regression check) plus
+`tools/playtest.js`'s fixture-based checks before being called done,
+the same as any Phase 1/2 milestone.
+
+**P3-M0 — Engine/content split** *(done)*. `index.html` was split into a
+thin HTML/CSS shell plus `js/*.js` (plain `<script src>` tags, no build
+step, still opens via a plain `file://` double-click) once the single
+file reached 3,382 lines with Renderer alone at 57% of it — past the
+threshold this document's own Known Risks section names. `GameState`
+and `Renderer` were generalized to load one level's data/scene-building
+code at a time (`GameState.loadLevel(def)`, a `LEVELS` registry, each
+level a `js/level<N>-<slug>.js` file exporting its path/waves/theme and
+a `buildScene(kit)` using the same shared low-level primitives). A
+small world-map screen (`#worldmap`) sits between the title screen and
+gameplay, showing each level as a node with its lock state and star
+rating; picking a different level than the one already loaded uses
+`sessionStorage` + a reload, picking the currently-loaded one just
+starts play with no reload. Progress (unlocked levels, best stars) is
+saved to `localStorage` under `bb-progress`, alongside the existing
+`bb-muted` key. Zero new player-visible content; the gate was the
+existing test suite behaving identically afterward.
+
+- **P3-M1 — Level 2: The Millbrook Watch.** First ground reclaimed from
+  the Hollow. Endpoint: the Watch-Mill (built with the Bastion's proven
+  batched-props + damage-overlay technique, plus a continuously turning
+  mill wheel). Chokepoint: the Sluice Gate, a stone millrace lock
+  narrowed to a single plank causeway (distinct from Level 1's wooden
+  bridge). ~30% corrupted. 10 waves, same 5-enemy roster, no boss;
+  finale is a simultaneous Troll column + Bat swarm. Same 18x11 grid as
+  Level 1. Re-verify "waves 1-2 nearly unloseable" against this level's
+  own geometry by direct simulation (a lone recommended tower vs. wave
+  1 in isolation) before trusting a full playthrough — this is exactly
+  the class of bug Level 1's own M11 fix pass found.
+- **P3-M2 — Level 3: The Cairnwatch.** A genuinely contested border,
+  ~50% corrupted. Endpoint: the Cairnwatch Tower, already scarred
+  before the player arrives. Chokepoint: the Ravine Stair, a switchback
+  stone stairway with a rope-hauled cart over a fissure. 12 waves, no
+  boss; a denser non-staggered finale than Level 1's own penultimate
+  wave. Grid 20x12 (room for the switchback to read as real elevation
+  change; `fitCamera` is already generic to grid size, so this is a
+  camera-framing check, not new engineering).
+- **P3-M3 — M5: tier-3 upgrade branches**, reordered here per the
+  user's decision. Two permanent specializations per tower (all 5),
+  built to the Sprout Slinger worked example already in this document.
+  Touches shared tower data, not one level, so its regression check
+  spans Levels 1-3. Explicitly verify each branch is a genuine
+  trade-off rather than a power spike, per the "neither a strict
+  upgrade" framing below.
+- **P3-M4 — Level 4: The Elderroot Ward** (climax). Deep within the
+  Shadow Hollow itself, ~80% corrupted — only a small living foothold
+  around the endpoint. Endpoint: the Elderroot, a colossal still-living
+  tree stump ringed by a ward-circle. Chokepoint: the Rootfall Chasm, a
+  single ancient root spanning a fissure. 14 waves ending in a
+  Shadow-Crow Swarm reprise (the existing boss, unchanged stats — the
+  per-wave `hpScale` stiffening alone makes it harder than Level 1's
+  wave-12 fight). Grid 20x13 or 22x13. Highest tuning risk of the
+  three: longest path, busiest scene (check draw calls against the
+  established budget), and a boss whose difficulty now depends on
+  whichever tier-3 branches exist.
+
+**Recommended, not yet decided**: M6 (player abilities), M10 (hero,
+stretch), and the remaining M11 items (full palette consistency check,
+UI cleanup, mobile performance profiling) sit in a closing pass after
+P3-M4, since they should work across all four levels' geometry before
+being called done. Confirm this re-sequencing with the user once P3-M4
+is reached rather than treating it as locked today.
+
+**If budget runs out early**, cut order: P3-M4 (Level 4, largest scope)
+first, then P3-M3 (M5) is independently cuttable since flat-tier towers
+already clear every wave table by construction. Cut P3-M1/P3-M2 last —
+losing a level is a bigger change to what was promised than losing an
+upgrade layer.

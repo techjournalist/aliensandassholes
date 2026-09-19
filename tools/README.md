@@ -11,4 +11,19 @@ node tools/playtest.js
 ```
 
 `THREE_LOCAL=/path/to/three.min.js` overrides where the local three.js copy
-is read from. The game itself has no dependencies and no build step.
+is read from. The game itself has no dependencies and no build step, though
+as of P3-M0 it is no longer a single file: `index.html` is a thin HTML/CSS
+shell that loads its logic from `../js/*.js` via plain `<script src>` tags
+(classic scripts, not ES modules, so `file://` double-click still works with
+no server). Load order matters: each level's file (e.g.
+`js/level1-shadow-hollow.js`) defines its data and scene-building code, then
+`js/levels.js` collects them into the `LEVELS` registry, then
+`js/game-state.js`/`js/renderer.js` (the level-agnostic engine) come after,
+then `js/input.js`/`js/ui.js`/`js/audio.js`/`js/boot.js`.
+
+`tools/level-fixtures.js` holds the tile coordinates, gold amounts, and wave
+counts that are literal to one level's geometry, one entry per level id.
+`playtest.js` still drives Level 1 directly rather than looping this table
+(there is only one entry so far); once a second level exists, fold the
+Level-1-specific literals in `playtest.js` into a loop over this table
+instead of duplicating them per level.
