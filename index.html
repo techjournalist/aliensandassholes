@@ -49,6 +49,13 @@
   .iconbtn { pointer-events: auto; min-width: 44px; padding: 0 10px; justify-content: center; color: var(--cream); border-color: var(--cream); font: inherit; cursor: pointer; }
   .iconbtn:active { transform: translateY(2px); }
   .iconbtn.muted { opacity: 0.6; }
+  #speed-btn { font-weight: 900; font-size: 17px; }
+  #speed-btn.fast { color: var(--gold); border-color: var(--gold); }
+  .screen .row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .screen button.secondary { background: var(--panel); color: var(--cream); border-color: var(--cream); box-shadow: 0 5px 0 rgba(0,0,0,0.5); }
+  .screen .keys { margin: 14px 0 0; font-size: 13px; opacity: 0.6; }
+  @media (pointer: coarse) { .screen .keys { display: none; } }
+  @media (max-height: 460px) { .screen .keys { display: none; } }
   #toast {
     position: absolute; left: 50%; bottom: max(24px, env(safe-area-inset-bottom));
     transform: translate(-50%, 10px); opacity: 0;
@@ -268,6 +275,8 @@
     <div class="pill lives"><span class="icon">&#9829;</span><span id="hud-lives">0</span></div>
     <div class="pill wave"><span class="icon">&#9873;</span><span id="hud-wave">Wave</span></div>
     <button id="mute-btn" class="pill iconbtn" type="button" aria-label="Sound on" title="Sound"><span class="icon">&#128266;</span></button>
+    <button id="speed-btn" class="pill iconbtn" type="button" aria-label="Game speed" title="Speed">1&times;</button>
+    <button id="pause-btn" class="pill iconbtn" type="button" aria-label="Pause" title="Pause"><span class="icon">&#10074;&#10074;</span></button>
   </div>
   <button id="wave-btn" type="button">Send the first wave</button>
   <div id="boss-bar"><div class="boss-name">Shadow-Crow Swarm</div><div class="boss-track"><div class="boss-fill"></div></div></div>
@@ -291,6 +300,19 @@
       <li><span class="ico">&#9873;</span>Send the next wave when you're ready. Twelve waves. Twenty lives.</li>
     </ul>
     <button id="start-btn" type="button">Hold the Bastion</button>
+  </div>
+</div>
+
+<div id="pause" class="screen">
+  <div class="card">
+    <div class="eyebrow">The valley holds its breath</div>
+    <h1>Paused</h1>
+    <p class="stakes" id="pause-text"></p>
+    <div class="row">
+      <button id="resume-btn" type="button">Back to the wall</button>
+      <button id="pause-restart-btn" type="button" class="secondary">Start over</button>
+    </div>
+    <p class="keys">Desktop: P or Esc pauses. Space sends the next wave.</p>
   </div>
 </div>
 
@@ -556,8 +578,27 @@ const GameState = (() => {
     bastionState: 0,  // 0 pristine, 1 damaged, 2 heavily damaged
     projectiles: [],
     phase: 'title',   // title | playing | won | lost
+    paused: false,
+    speed: 1,         // 1 or 2, the player's fast-forward
     kills: 0,
   };
+  function pause() {
+    if (state.phase !== 'playing' || state.paused) return false;
+    state.paused = true;
+    emit('paused');
+    return true;
+  }
+  function resume() {
+    if (!state.paused) return false;
+    state.paused = false;
+    emit('resumed');
+    return true;
+  }
+  function setSpeed(x) {
+    state.speed = x === 2 ? 2 : 1;
+    emit('speedChanged', state.speed);
+    return state.speed;
+  }
   let nextId = 1;
 
   function startGame() {
@@ -873,7 +914,7 @@ const GameState = (() => {
   function enemiesLeft() { return state.waveQueue.length + state.enemies.length; }
 
   function update(dt) {
-    if (state.phase !== 'playing') return;
+    if (state.phase !== 'playing' || state.paused) return;
     state.time += dt;
     for (const t of state.towers) updateTower(t, dt);
     updateProjectiles(dt);
@@ -916,7 +957,7 @@ const GameState = (() => {
     cols, rows, SPAWN, STREAM_COL, BRIDGE_CELL, BASTION_CELLS, BASTION_GATE_CELL,
     TOWER_TYPES, TOWER_ORDER, TIERS, ENEMY_TYPES, towerStats, upgradeCost, sellValue, towerById, upgradeTower, sellTower,
     pathCells, pathWaypoints: PATH_WAYPOINTS, pathPoints, pathLength, pathPosAt, gate,
-    state, on, emit, update, worldX, worldZ, startGame,
+    state, on, emit, update, worldX, worldZ, startGame, pause, resume, setSpeed,
     selectTile, clearSelection, placeTower, canAfford, towerAt, startWave, sendWave, spawnEnemy, waveInfo, enemiesLeft, stars, WAVES, PREP_SECONDS,
     inGrid, isPath, isStream, isBridge, isBastion, isSpawn, isBuildable, isCobble,
     cellKind, hollowness, pathIndexOf,
@@ -2798,7 +2839,7 @@ const UI = (() => {
   const TIP_TILE = [7, 5];
   function tipState() {
     const s = GameState.state;
-    if (s.phase !== 'playing') return null;
+    if (s.phase !== 'playing' || s.paused) return null;
     if (s.towers.length === 0) return 'build';
     if (s.wave === 0) return 'wave';
     return null;
@@ -2893,6 +2934,37 @@ const UI = (() => {
     $('title').classList.add('show');
     $('start-btn').addEventListener('click', () => { Audio.unlock(); $('title').classList.remove('show'); GameState.startGame(); });
     $('restart-btn').addEventListener('click', () => location.reload());
+    $('pause-restart-btn').addEventListener('click', () => location.reload());
+    $('pause-btn').addEventListener('click', () => { Audio.unlock(); GameState.pause(); });
+    $('resume-btn').addEventListener('click', () => { Audio.unlock(); GameState.resume(); });
+    $('speed-btn').addEventListener('click', () => { Audio.unlock(); GameState.setSpeed(GameState.state.speed === 1 ? 2 : 1); });
+    GameState.on('paused', () => {
+      const s = GameState.state;
+      $('pause-text').textContent = s.waveActive
+        ? `Wave ${s.wave} is on the road with ${GameState.enemiesLeft()} still coming.`
+        : (s.wave === 0 ? 'The road is quiet. The first wave waits for you.' : `Wave ${s.wave} turned back. ${s.lives} lives left.`);
+      $('pause').classList.add('show');
+      updateTip();
+    });
+    GameState.on('resumed', () => $('pause').classList.remove('show'));
+    GameState.on('speedChanged', (x) => { $('speed-btn').textContent = x + '\u00d7'; $('speed-btn').classList.toggle('fast', x === 2); });
+    // the tab going away pauses the fight, so nobody comes back to an empty Bastion
+    document.addEventListener('visibilitychange', () => { if (document.hidden) GameState.pause(); });
+    window.addEventListener('blur', () => GameState.pause());
+    window.addEventListener('keydown', (e) => {
+      if (e.repeat) return;
+      const s = GameState.state;
+      if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') {
+        if (s.phase !== 'playing') return;
+        e.preventDefault();
+        if (s.paused) GameState.resume(); else GameState.pause();
+      } else if (e.key === ' ' || e.key === 'Enter') {
+        if (s.phase === 'title') { e.preventDefault(); $('start-btn').click(); }
+        else if (s.phase === 'playing' && !s.paused && !s.waveActive) { e.preventDefault(); Audio.unlock(); GameState.sendWave(); }
+      } else if (e.key === 'f' || e.key === 'F') {
+        if (s.phase === 'playing') GameState.setSpeed(s.speed === 1 ? 2 : 1);
+      }
+    });
     const syncMute = () => { const m = Audio.isMuted(); $('mute-btn').classList.toggle('muted', m); $('mute-btn').querySelector('.icon').innerHTML = m ? '&#128263;' : '&#128266;'; $('mute-btn').setAttribute('aria-label', m ? 'Sound off' : 'Sound on'); };
     $('mute-btn').addEventListener('click', () => { Audio.unlock(); Audio.setMuted(!Audio.isMuted()); syncMute(); });
     try { if (localStorage.getItem('bb-muted') === '1') { Audio.setMuted(true); } } catch (e) { /* ignore */ }
@@ -3270,6 +3342,9 @@ const Audio = (() => {
     GameState.on('bastionStateChanged', () => sfx.crumble());
     GameState.on('gameWon', () => sfx.win());
     GameState.on('gameLost', () => sfx.lose());
+    GameState.on('paused', () => { if (ctx && ctx.state === 'running') ctx.suspend(); });
+    GameState.on('resumed', () => { if (ctx && ctx.state === 'suspended') ctx.resume(); });
+    GameState.on('speedChanged', () => sfx.select());
   }
 
   return { init, unlock, update, sfx, setMuted, isMuted, renderBoard };
@@ -3293,8 +3368,9 @@ const Audio = (() => {
   function frame(now) {
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
-    GameState.update(dt);
-    Renderer.render(GameState.state.time, dt);
+    const gdt = dt * GameState.state.speed;
+    GameState.update(gdt);
+    Renderer.render(GameState.state.time, GameState.state.paused ? 0 : gdt);
     UI.frame(dt);
     Audio.update(dt);
     requestAnimationFrame(frame);

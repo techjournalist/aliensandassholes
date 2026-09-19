@@ -65,6 +65,25 @@ const simulate = (page, seconds) => page.evaluate((sec) => { for (let i = 0; i <
   const ticks = await page.evaluate(() => { const S = GameState.state; let n = 0; GameState.on('prepTick', () => n++); S.wave = 1; S.prep = 3.5; for (let i = 0; i < 60 * 4 && S.prep > 0; i++) GameState.update(1 / 60); const started = S.waveActive; S.waveActive = false; S.schedule = []; S.waveQueue = []; S.enemies.length = 0; S.wave = 0; S.prep = 0; return { n, started }; });
   check('prep countdown ticks 3, 2, 1 then auto-starts', ticks.n === 3 && ticks.started, JSON.stringify(ticks));
   await page.evaluate(() => { GameState.state.wave = 0; UI.updateHud(); });
+  // pause and speed
+  const pb = await page.locator('#pause-btn').boundingBox();
+  check('pause button is a 44px target', pb && pb.height >= 44 && pb.width >= 44);
+  await page.locator('#pause-btn').click(); await page.waitForTimeout(150);
+  check('pause shows the overlay and freezes time', await page.evaluate(() => { const t0 = GameState.state.time; for (let i = 0; i < 60; i++) GameState.update(1 / 60); return GameState.state.paused && GameState.state.time === t0 && document.getElementById('pause').classList.contains('show'); }));
+  check('tip hides while paused', await page.waitForFunction(() => !document.getElementById('tip').classList.contains('show'), null, { timeout: 4000 }).then(() => true).catch(() => false));
+  await page.locator('#resume-btn').click(); await page.waitForTimeout(150);
+  check('resume hides the overlay and time runs', await page.evaluate(() => { const t0 = GameState.state.time; for (let i = 0; i < 60; i++) GameState.update(1 / 60); return !GameState.state.paused && GameState.state.time > t0 && !document.getElementById('pause').classList.contains('show'); }));
+  await page.keyboard.press('p'); await page.waitForTimeout(100);
+  check('P key pauses', await page.evaluate(() => GameState.state.paused));
+  await page.keyboard.press('Escape'); await page.waitForTimeout(100);
+  check('Esc resumes', await page.evaluate(() => !GameState.state.paused));
+  await page.evaluate(() => { Object.defineProperty(document, 'hidden', { configurable: true, get: () => true }); document.dispatchEvent(new Event('visibilitychange')); });
+  check('hiding the tab auto-pauses', await page.evaluate(() => GameState.state.paused));
+  await page.evaluate(() => { Object.defineProperty(document, 'hidden', { configurable: true, get: () => false }); GameState.resume(); });
+  await page.locator('#speed-btn').click(); await page.waitForTimeout(100);
+  check('speed toggles to 2x and shows it', await page.evaluate(() => GameState.state.speed === 2 && document.getElementById('speed-btn').textContent.startsWith('2')));
+  await page.locator('#speed-btn').click(); await page.waitForTimeout(100);
+  check('speed toggles back to 1x', await page.evaluate(() => GameState.state.speed === 1));
   check('tip points at a tile before the first tower', await page.locator('#tip').isVisible() && (await page.locator('#tip').innerText()).includes('plant'));
   await page.screenshot({ path: `${OUT}/desktop.png` });
   console.log('DEBUG OVERLAY: ' + (await page.locator('#debug').innerText()).replace(/\n/g, ' | '));
