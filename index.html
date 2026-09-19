@@ -464,7 +464,7 @@ const GameState = (() => {
   // every `gap` seconds. Flavor lines teach the new threat in-world.
   const g = (type, count, gap, delay = 0) => ({ type, count, gap, delay });
   const WAVES = [
-    { name: 'Scouts',           flavor: 'A few grunts, bumbling down the road.',                          groups: [g('grunt', 5, 2.4)] },
+    { name: 'Scouts',           flavor: 'A few grunts, bumbling down the road.',                          groups: [g('grunt', 5, 3.4)] },
     { name: 'The Rabble',       flavor: 'More grunts. They travel in bunches.',                            groups: [g('grunt', 8, 1.4)] },
     { name: 'Tricksters',       flavor: 'Bog-Tricksters: fast, flimsy, and annoying. Slingers love them.', groups: [g('grunt', 5, 1.2), g('trickster', 7, 0.65, 2)] },
     { name: 'The Big One',      flavor: 'A Moss Troll. Thick hide shrugs off small hits. Hit it hard.',   groups: [g('grunt', 8, 1.0), g('troll', 1, 1, 3)] },
