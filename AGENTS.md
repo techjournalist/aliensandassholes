@@ -350,3 +350,23 @@ was built, what the critic pass and regression check caught, and what's
 next. Use the checkpoint gates in the Production plan section to decide
 when to stop starting new work, not a fixed cut-list, the phase tags above
 already encode what to defer first.
+
+## Phase 3 (post-plan, user-directed): additional levels/maps
+Explicitly out of scope for the plan above: Phase 1 and Phase 2 both
+deepen the single Briar & Bastion map, they never add a second one. The
+user has directed that once the M11 Phase 1 playability gate is done,
+work should continue toward multiple levels/maps, not stop at one. This
+is a real scope addition on top of the original plan, not implied by any
+milestone above, and needs its own design pass before implementation:
+at minimum, a level-select flow (title screen or a map/world screen
+after it), a second fixed path with its own buildable-tile layout and
+its own visually distinct staging (per the Visual style section's
+"environmental staging" principle, a second level cannot reuse the
+Shadow Hollow / Old Bridge / Bastion tile set unchanged, it needs its
+own identity), and a wave table for that level tuned independently
+rather than copy-pasted. Existing towers, upgrades, and abilities carry
+over across levels; new levels do not require new tower types unless
+that's separately decided. Sequence this after the M11 gate confirms
+the first level is genuinely done, and re-run the Gauntlet Loop
+(builder pass, critic pass, fix pass, regression check) per new level
+the same as any other milestone.
