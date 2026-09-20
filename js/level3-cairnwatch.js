@@ -314,6 +314,24 @@ const LEVEL_3 = (() => {
       });
     }
 
+    // A trail-marker cairn, unique to this level's exposed-border dressing.
+    function cairnParts(rng) {
+      const s = 0.14 + rng() * 0.06;
+      const parts = [];
+      let y = 0;
+      const layers = 3 + (rng() < 0.5 ? 1 : 0);
+      for (let i = 0; i < layers; i++) {
+        const ls = s * (1 - i * 0.22);
+        y += ls * 0.7;
+        parts.push(P(GEO.rock, i % 2 ? PALETTE.stone : PALETTE.stoneDark,
+          M((rng() - 0.5) * s * 0.3, y, (rng() - 0.5) * s * 0.3, { sx: ls * 1.3, sy: ls, sz: ls * 1.1, ry: rng() * 3 })));
+        y += ls * 0.55;
+      }
+      parts.push(P(GEO.cyl, PALETTE.wood, M(0, y, 0, { sx: 0.012, sy: 0.22, sz: 0.012 }), false));
+      parts.push(P(GEO.box, PALETTE.troll, M(0.02, y + 0.1, 0, { sx: 0.09, sy: 0.07, sz: 0.01 }), false));
+      return { parts, radius: s * 1.2 };
+    }
+
     function buildCountryside() {
       const rng = srand(3131);
       const swayTrees = [];
@@ -357,8 +375,11 @@ const LEVEL_3 = (() => {
           }
           return;
         }
+        // Exposed mountain border: far fewer trees/mushrooms/flowers than
+        // the lowland levels, rocks dominant, plus the cairn markers this
+        // level introduces.
         const hidesTower = GameState.isBuildable(c, r - 1) || GameState.isBuildable(c - 1, r - 1);
-        if (roll < 0.22 && !hidesTower) {
+        if (roll < 0.10 && !hidesTower) {
           const { parts, radius } = treeParts(rng);
           if (swayTrees.length < 8) {
             const gp = liveProp(parts, x, 0, z);
@@ -369,22 +390,26 @@ const LEVEL_3 = (() => {
             for (const p of parts) batchPart(p, M(x, 0, z));
             batchDecal(x, z, radius);
           }
-        } else if (roll < 0.36) {
+        } else if (roll < 0.14) {
           const { parts, radius } = mushroomParts(rng, rng() < 0.35);
           for (const p of parts) batchPart(p, M(x, 0, z));
           batchDecal(x, z, radius);
-        } else if (roll < 0.5) {
+        } else if (roll < 0.30) {
           const { parts } = tuftParts(rng);
           for (const p of parts) batchPart(p, M(x, 0, z));
-        } else if (roll < 0.62) {
+        } else if (roll < 0.40) {
           const { parts } = flowerParts(rng);
           for (const p of parts) batchPart(p, M(x, 0, z));
-        } else if (roll < 0.72) {
+        } else if (roll < 0.62) {
           const { parts, radius } = rockParts(rng, false);
           for (const p of parts) batchPart(p, M(x, 0, z));
           batchDecal(x, z, radius);
-        } else if (roll < 0.8) {
+        } else if (roll < 0.68) {
           const { parts, radius } = acornParts(rng);
+          for (const p of parts) batchPart(p, M(x, 0, z));
+          batchDecal(x, z, radius);
+        } else if (roll < 0.80) {
+          const { parts, radius } = cairnParts(rng);
           for (const p of parts) batchPart(p, M(x, 0, z));
           batchDecal(x, z, radius);
         }
@@ -458,7 +483,10 @@ const LEVEL_3 = (() => {
       cells: [[17, 3], [18, 3], [17, 4], [18, 4], [17, 5], [18, 5]], gateCell: [17, 5],
     },
     cobbleTailCells: 3,
-    theme: { center: [7, 5], radiusOut: { x: 9, z: 6.2 }, radiusIn: 1.6, falloffWidth: 0.7 },
+    theme: {
+      center: [7, 5], radiusOut: { x: 9, z: 6.2 }, radiusIn: 1.6, falloffWidth: 0.7,
+      backdrop: 0x384345, groundMeadow: 0x7a9a72, groundMeadowDark: 0x62825c, ambient: 0.34,
+    },
     spawnBlockedText: 'This ground has already been fought over once.',
     waves, prepSeconds: 14, startGold: 150, startLives: 20, starThresholds: [16, 8],
     tipTile: [2, 6],

@@ -156,6 +156,17 @@ const UI = (() => {
     $('end-text').textContent = text;
     $('stars').classList.toggle('show', won);
     $('stars').querySelectorAll('span').forEach((el, i) => el.classList.toggle('lit', i < stars));
+    // Right after a win, the next level is already unlocked: offer to
+    // continue straight to it instead of a generic "pick something" label.
+    const next = LEVELS.find((l) => l.index === level.index + 1);
+    const mapBtn = $('end-map-btn');
+    if (won && next) {
+      mapBtn.textContent = 'Continue';
+      mapBtn.dataset.nextLevel = next.id;
+    } else {
+      mapBtn.textContent = 'Choose another battle';
+      delete mapBtn.dataset.nextLevel;
+    }
     $('end').classList.add('show');
   }
   function waveBanner(n) {
@@ -207,8 +218,8 @@ const UI = (() => {
     $('wm-play-btn').disabled = !sel;
     $('wm-play-btn').textContent = sel && sel.id === GameState.currentLevel().id ? `Hold ${sel.name}` : sel ? `March to ${sel.name}` : 'Choose a battle';
   }
-  function enterWorldMap() {
-    mapSelected = GameState.currentLevel().id;
+  function enterWorldMap(preselectId) {
+    mapSelected = preselectId || GameState.currentLevel().id;
     renderWorldMap();
     $('worldmap').classList.add('show');
   }
@@ -273,7 +284,11 @@ const UI = (() => {
     });
     $('wm-play-btn').addEventListener('click', () => { if (mapSelected) commitLevel(mapSelected); });
     $('restart-btn').addEventListener('click', () => location.reload());
-    $('end-map-btn').addEventListener('click', () => { try { sessionStorage.removeItem('bb-active-level'); } catch (e) { /* ignore */ } location.reload(); });
+    $('end-map-btn').addEventListener('click', () => {
+      const nextId = $('end-map-btn').dataset.nextLevel;
+      $('end').classList.remove('show');
+      enterWorldMap(nextId || undefined);
+    });
     $('pause-restart-btn').addEventListener('click', () => location.reload());
     $('pause-btn').addEventListener('click', () => { Audio.unlock(); GameState.pause(); });
     $('resume-btn').addEventListener('click', () => { Audio.unlock(); GameState.resume(); });

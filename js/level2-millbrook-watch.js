@@ -314,6 +314,22 @@ const LEVEL_2 = (() => {
       });
     }
 
+    // A haystack, unique to this level's cultivated-farmland dressing.
+    function haystackParts(rng) {
+      const s = 0.22 + rng() * 0.1;
+      const parts = [
+        P(GEO.cyl, PALETTE.woodLight, M(0, 0.05, 0, { sx: s * 0.5, sy: 0.1, sz: s * 0.5 })),
+        P(GEO.sphereLo, PALETTE.straw, M(0, s * 0.55, 0, { sx: s, sy: s * 0.8, sz: s })),
+        P(GEO.sphereLo, PALETTE.straw, M(s * 0.3, s * 0.85, s * 0.1, { sx: s * 0.6, sy: s * 0.5, sz: s * 0.6 })),
+      ];
+      for (let i = 0; i < 3; i++) {
+        const a = rng() * Math.PI * 2;
+        parts.push(P(GEO.box, PALETTE.wood, M(Math.cos(a) * s * 0.5, s * 0.9, Math.sin(a) * s * 0.5,
+          { sx: 0.02, sy: s * 0.5, sz: 0.02, rz: (rng() - 0.5) * 0.6, rx: (rng() - 0.5) * 0.6 }), false));
+      }
+      return { parts, radius: s * 0.9 };
+    }
+
     function buildCountryside() {
       const rng = srand(3031);
       const swayTrees = [];
@@ -357,8 +373,11 @@ const LEVEL_2 = (() => {
           }
           return;
         }
+        // Cultivated farmland near a mill: fewer trees/mushrooms than the
+        // Hollow's woodland, more open field, plus the haystack prop this
+        // level introduces.
         const hidesTower = GameState.isBuildable(c, r - 1) || GameState.isBuildable(c - 1, r - 1);
-        if (roll < 0.22 && !hidesTower) {
+        if (roll < 0.08 && !hidesTower) {
           const { parts, radius } = treeParts(rng);
           if (swayTrees.length < 8) {
             const gp = liveProp(parts, x, 0, z);
@@ -369,11 +388,11 @@ const LEVEL_2 = (() => {
             for (const p of parts) batchPart(p, M(x, 0, z));
             batchDecal(x, z, radius);
           }
-        } else if (roll < 0.36) {
+        } else if (roll < 0.14) {
           const { parts, radius } = mushroomParts(rng, rng() < 0.35);
           for (const p of parts) batchPart(p, M(x, 0, z));
           batchDecal(x, z, radius);
-        } else if (roll < 0.5) {
+        } else if (roll < 0.40) {
           const { parts } = tuftParts(rng);
           for (const p of parts) batchPart(p, M(x, 0, z));
         } else if (roll < 0.62) {
@@ -383,8 +402,12 @@ const LEVEL_2 = (() => {
           const { parts, radius } = rockParts(rng, false);
           for (const p of parts) batchPart(p, M(x, 0, z));
           batchDecal(x, z, radius);
-        } else if (roll < 0.8) {
+        } else if (roll < 0.80) {
           const { parts, radius } = acornParts(rng);
+          for (const p of parts) batchPart(p, M(x, 0, z));
+          batchDecal(x, z, radius);
+        } else if (roll < 0.90) {
+          const { parts, radius } = haystackParts(rng);
           for (const p of parts) batchPart(p, M(x, 0, z));
           batchDecal(x, z, radius);
         }
@@ -458,7 +481,10 @@ const LEVEL_2 = (() => {
       cells: [[16, 5], [17, 5], [16, 6], [17, 6], [16, 7], [17, 7]], gateCell: [16, 7],
     },
     cobbleTailCells: 3,
-    theme: { center: [0.5, 3.5], radiusOut: { x: 5.5, z: 4.2 }, radiusIn: 1.3, falloffWidth: 0.5 },
+    theme: {
+      center: [0.5, 3.5], radiusOut: { x: 5.5, z: 4.2 }, radiusIn: 1.3, falloffWidth: 0.5,
+      backdrop: 0x3a4a2f, groundMeadow: 0x8ab34a, groundMeadowDark: 0x749a3d, ambient: 0.40,
+    },
     spawnBlockedText: 'Nothing but trampled grass grows here.',
     waves, prepSeconds: 14, startGold: 150, startLives: 20, starThresholds: [16, 8],
     tipTile: [2, 4],

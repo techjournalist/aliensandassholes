@@ -427,6 +427,49 @@ script for this level; fixing the bot to rotate through all 5 tower
 types the way the other two levels' tests already did brought the
 margin back in line (9-13 lives across repeated runs) without touching
 the level's own wave numbers.
+
+**P3-M2b — Continue flow + per-level ground/prop variety** *(done)*. Two
+user-reported issues, both verified against the real code before fixing,
+not assumed. (1) The win screen's second button always said "Choose
+another battle," even right after a win that had just unlocked the next
+level, and its handler cleared the active level and did a full page
+reload — landing back on the *title* screen before the player could even
+see the map, the same "extra screen" bug P3-M1 had already fixed for the
+world-map's own level switch, just in a different spot. Fixed: the button
+now reads "Continue" whenever `LEVELS.find(l => l.index === level.index +
+1)` exists after a win, and its handler calls `enterWorldMap(nextId)`
+directly — a plain screen toggle, no reload, no `sessionStorage` write —
+landing on the map with the next level pre-selected. A loss, or winning
+the current final level (Cairnwatch, until Level 4 ships), keeps "Choose
+another battle" unchanged; this is data-driven off `LEVELS`, so it starts
+saying "Continue" automatically once P3-M4 exists. (2) `diff`ing Level 1
+and 2's `buildCountryside()` showed they were byte-for-byte identical in
+every prop-mix ratio, only renamed — the three levels varied their
+chokepoint and endpoint but shared one hardcoded ground palette
+(`buildGround()` read `PALETTE.meadow`/`meadowDark` directly, no per-level
+hook) and one hardcoded filler-prop mix. Fixed with a small opt-in engine
+hook: `Renderer.levelTheme()` reads four new optional keys off a level's
+existing `theme` object — `backdrop`, `groundMeadow`, `groundMeadowDark`,
+`ambient` — falling back to today's `PALETTE`/`0.38` values when absent,
+so Level 1 needed no edit and stays pixel-identical. Levels 2 and 3 now
+set distinct values (Millbrook: warmer, more yellow-green, brighter;
+Cairnwatch: cooler, grayer, dimmer) and retuned `buildCountryside` prop
+ratios (Millbrook: fewer trees/mushrooms, more open field, plus a new
+`haystackParts` signature prop; Cairnwatch: rocks dominant, far fewer
+trees/flowers, plus a new `cairnParts` trail-marker signature prop). The
+corruption blend itself still always targets the shared
+`PALETTE.hollowGround` on purpose — danger should read the same
+everywhere, only the healthy-ground end of that blend is level-specific.
+Values recorded now for Level 4 (deep in the Hollow, should read as
+overwhelmingly corrupted) to apply when P3-M4 is built, so it uses this
+as an established pattern rather than reinventing it. Touches no
+`pathWaypoints`/`chokepoint`/`endpoint`/`waves`/economy field on any
+level, so every existing balance/mixed-bot/stress-test number was
+provably unaffected and wasn't re-run — only a full regression pass (125
+checks, all passing, four of them new assertions on the Continue flow)
+and a fresh-screenshot visual check confirming the three levels now read
+as genuinely different ground, not the same meadow tile with a different
+building in the corner.
 - **P3-M3 — M5: tier-3 upgrade branches**, reordered here per the
   user's decision. Two permanent specializations per tower (all 5),
   built to the Sprout Slinger worked example already in this document.

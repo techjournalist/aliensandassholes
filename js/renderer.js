@@ -28,6 +28,19 @@ const Renderer = (() => {
   const { worldX, worldZ } = GameState;
   const lerpColor = (a, b, t) => new THREE.Color(a).lerp(new THREE.Color(b), t);
 
+  // A level's `theme` object can override the "healthy ground" palette and
+  // mood; the corruption blend itself always targets the shared
+  // PALETTE.hollowGround, so danger reads the same everywhere.
+  function levelTheme() {
+    const t = GameState.currentLevel().theme;
+    return {
+      backdrop: t.backdrop ?? PALETTE.backdrop,
+      meadow: t.groundMeadow ?? PALETTE.meadow,
+      meadowDark: t.groundMeadowDark ?? PALETTE.meadowDark,
+      ambient: t.ambient ?? 0.38,
+    };
+  }
+
   function toon(color, opts = {}) {
     const k = `t${color}${opts.side || ''}${opts.vc ? 'v' : ''}${opts.emissive || ''}`;
     if (materialCache.has(k)) return materialCache.get(k);
@@ -316,6 +329,7 @@ const Renderer = (() => {
   function buildGround() {
     const geos = [];
     const rng = srand(7);
+    const vt = levelTheme();
     const topColor = new THREE.Color(), sideColor = new THREE.Color();
     const rowsMin = -border, rowsMax = rows + border, colsMin = -border, colsMax = cols + border;
     for (let r = rowsMin; r < rowsMax; r++) {
@@ -337,7 +351,7 @@ const Renderer = (() => {
           topColor.copy(lerpColor(PALETTE.cobble, PALETTE.moss, 0.35));
           sideColor.set(PALETTE.earth);
         } else {
-          const base = rng() < 0.5 ? PALETTE.meadow : PALETTE.meadowDark;
+          const base = rng() < 0.5 ? vt.meadow : vt.meadowDark;
           topColor.copy(lerpColor(base, PALETTE.hollowGround, h));
           topColor.offsetHSL(0, 0, (rng() - 0.5) * 0.05 - (inGrid ? 0 : 0.03));
           sideColor.copy(lerpColor(PALETTE.earth, PALETTE.hollowEarth, h));
@@ -1253,7 +1267,7 @@ const Renderer = (() => {
   function init(canvasEl) {
     canvas = canvasEl;
     renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-    renderer.setClearColor(PALETTE.backdrop);
+    renderer.setClearColor(levelTheme().backdrop);
     scene = new THREE.Scene();
     camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 1, 100);
 
@@ -1265,7 +1279,7 @@ const Renderer = (() => {
     outlineMat = makeOutlineMaterial();
     buildPrimitives();
 
-    scene.add(new THREE.AmbientLight(0xffffff, 0.38));
+    scene.add(new THREE.AmbientLight(0xffffff, levelTheme().ambient));
     const sun = new THREE.DirectionalLight(0xfff0d8, 0.68);
     sun.position.set(-6, 10, 7);
     scene.add(sun);

@@ -369,6 +369,11 @@ async function enterLevel(page, levelId) {
   await page.waitForTimeout(1500);
   check('win screen shows stars after a win', mixed.phase !== 'won' || (await page.locator('#end').isVisible() && await page.locator('#stars span.lit').count() === mixed.stars));
   await page.screenshot({ path: `${OUT}/win.png` });
+  check('win screen offers Continue now that the next level is unlocked', (await page.locator('#end-map-btn').innerText()) === 'Continue');
+  await page.locator('#end-map-btn').click(); await page.waitForTimeout(250);
+  check('Continue jumps straight to the world map, no title-screen detour', await page.locator('#worldmap').isVisible() && !(await page.locator('#title').isVisible()));
+  check('Continue pre-selects the next level', await page.evaluate(() => document.querySelector('.wm-node.selected')?.dataset.level) === 'millbrook-watch');
+  await page.evaluate(() => { document.getElementById('worldmap').classList.remove('show'); });
 
   // ---- progress persistence: the win must survive a reload, via localStorage ----
   check('the win recorded stars to localStorage', await page.evaluate((expected) => {
@@ -517,6 +522,7 @@ async function enterLevel(page, levelId) {
   check('Level 3 win screen shows stars', mixed3.phase !== 'won' || (await page.locator('#end').isVisible() && await page.locator('#stars span.lit').count() === mixed3.stars));
   await page.screenshot({ path: `${OUT}/level3-win.png` });
   check('Level 3 win recorded progress', await page.evaluate(() => Progress.starsFor('cairnwatch') > 0));
+  check('Level 3 win screen keeps "Choose another battle" (no Level 4 yet)', (await page.locator('#end-map-btn').innerText()) === 'Choose another battle');
   await page.evaluate(() => { document.getElementById('end').classList.remove('show'); });
 
   for (const type of ['slinger', 'warden', 'druid', 'golem', 'artillery']) {
