@@ -375,7 +375,11 @@ async function enterLevel(page, levelId) {
   console.log('MIXED BOT: ' + JSON.stringify(mixed));
   check('a mixed defense can win all 12 waves', mixed.phase === 'won', `lives=${mixed.lives} leaks=${mixed.leaks}`);
   check('waves 1 and 2 are nearly unloseable', mixed.leaks[0] + mixed.leaks[1] <= 1, `leaks=${mixed.leaks.slice(0, 2)}`);
-  await page.waitForTimeout(1500);
+  // the bot simulates a whole level with no frames in between, so the first
+  // frame after it renders every queued death at once and can delay the
+  // UI's 900ms end-screen timer; wait for the screen instead of a fixed sleep
+  if (mixed.phase === 'won') await page.locator('#end.show').waitFor({ timeout: 10000 }).catch(() => {});
+  await page.waitForTimeout(300);
   check('win screen shows stars after a win', mixed.phase !== 'won' || (await page.locator('#end').isVisible() && await page.locator('#stars span.lit').count() === mixed.stars));
   await page.screenshot({ path: `${OUT}/win.png` });
   check('win screen offers Continue now that the next level is unlocked', (await page.locator('#end-map-btn').innerText()) === 'Continue');
@@ -486,7 +490,11 @@ async function enterLevel(page, levelId) {
   console.log('LEVEL 2 MIXED BOT: ' + JSON.stringify(mixed2));
   check('Level 2: a mixed defense can win all 10 waves', mixed2.phase === 'won', `lives=${mixed2.lives} leaks=${JSON.stringify(mixed2.leaks)}`);
   check('Level 2: waves 1 and 2 are nearly unloseable', mixed2.leaks[0] + mixed2.leaks[1] <= 1, `leaks=${JSON.stringify(mixed2.leaks.slice(0, 2))}`);
-  await page.waitForTimeout(1500);
+  // the bot simulates a whole level with no frames in between, so the first
+  // frame after it renders every queued death at once and can delay the
+  // UI's 900ms end-screen timer; wait for the screen instead of a fixed sleep
+  if (mixed2.phase === 'won') await page.locator('#end.show').waitFor({ timeout: 10000 }).catch(() => {});
+  await page.waitForTimeout(300);
   check('Level 2 win screen shows stars', mixed2.phase !== 'won' || (await page.locator('#end').isVisible() && await page.locator('#stars span.lit').count() === mixed2.stars));
   await page.screenshot({ path: `${OUT}/level2-win.png` });
   check('Level 2 win recorded progress', await page.evaluate(() => Progress.starsFor('millbrook-watch') > 0));
@@ -527,7 +535,11 @@ async function enterLevel(page, levelId) {
   console.log('LEVEL 3 MIXED BOT: ' + JSON.stringify(mixed3));
   check('Level 3: a mixed defense can win all 12 waves', mixed3.phase === 'won', `lives=${mixed3.lives} leaks=${JSON.stringify(mixed3.leaks)}`);
   check('Level 3: waves 1 and 2 are nearly unloseable', mixed3.leaks[0] + mixed3.leaks[1] <= 1, `leaks=${JSON.stringify(mixed3.leaks.slice(0, 2))}`);
-  await page.waitForTimeout(1500);
+  // the bot simulates a whole level with no frames in between, so the first
+  // frame after it renders every queued death at once and can delay the
+  // UI's 900ms end-screen timer; wait for the screen instead of a fixed sleep
+  if (mixed3.phase === 'won') await page.locator('#end.show').waitFor({ timeout: 10000 }).catch(() => {});
+  await page.waitForTimeout(300);
   check('Level 3 win screen shows stars', mixed3.phase !== 'won' || (await page.locator('#end').isVisible() && await page.locator('#stars span.lit').count() === mixed3.stars));
   await page.screenshot({ path: `${OUT}/level3-win.png` });
   check('Level 3 win recorded progress', await page.evaluate(() => Progress.starsFor('cairnwatch') > 0));

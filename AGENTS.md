@@ -524,6 +524,42 @@ calls dropped below the pre-V1 figure (131 vs 139-144). The harness gained
 a render-budget check (≤158 draw calls, ≤189k triangles on Level 1's title
 view) and a check that grass, water and motes exist.
 
+**P3-V2 — Model detail: props, towers, enemies, endpoints** *(done)*.
+The second half of the graphics pass. Prop recipes: trees gained root
+flares, three-lobe canopies with a lit top and the odd fruit or blossom;
+rocks a companion stone and a moss (or, in the Hollow, spore) cap;
+mushrooms gills, a skirt ring on big caps, more spots and a small sibling;
+flowers two leaves and a five-petal head (one flat `GEO.petals` shape, not
+five spheres); dead trees root flares and a glowing shelf fungus. Towers
+and enemies got secondary detail only, merged into each unit's existing
+mesh (no new draw calls) and never changing a silhouette: eyes with
+glints, belts and buckles, a rope belt and hood leaves on the Warden, a
+moss sash and pad frost on the Druid, gold seams and a head-flower on the
+Golem, wheel hubs, spokes and iron straps on the Artillery, a loincloth
+and club wrap on the Grunt, back spots and a pale belly on the Trickster,
+a brow ridge and a second toadstool on the Troll. Endpoints use new shared
+kit helpers in `renderer.js` so all three levels (and Levels 4-5 later)
+get the same treatment: `masonry()` (staggered proud block courses on a
+wall face, with holes kept clear for doors and windows), `towerCourses()`
+(the same around round towers), `roofCourses()` (shingle rings and a
+scalloped eave on dome and cone roofs), `windowDress()` (frame, sill,
+lintel, leading and a warm halo), `glow()`/`setGlow()` (every halo in one
+additive mesh, dimmed with the endpoint's worst damage state) and
+`bannerGeo()` (swallowtail cloth with trim, stripe and emblem painted in
+vertex color; `tattered` tears the fly end for Cairnwatch). The critic pass
+caught two real issues: the first draft nearly doubled triangles (232k vs
+136k on a Level 1 mid-wave frame) from sphere-heavy canopies and flowers,
+fixed with a 6x4 `GEO.bead` for tiny details and cheaper lobes (184k, 1.35x
+V1, inside the harness budget); and Level 3's south-face windows, gate
+leaf and crack overlays had always sat 4cm inside the wall and were never
+visible, now moved onto the face. The regression run also exposed a
+harness race, root-caused rather than re-run: the mixed bots simulate a
+whole level inside one `evaluate` with no frames, so the first frame
+afterwards renders every queued death animation at once (≈2,600 draw calls
+for ~0.55s on SwiftShader), which can push the UI's 900ms end-screen timer
+past the test's old fixed 1.5s sleep. The three win-screen checks now wait
+for `#end.show` instead. Real play never builds that backlog.
+
 - **P3-M3 — M5: tier-3 upgrade branches**, reordered here per the
   user's decision. Two permanent specializations per tower (all 5),
   built to the Sprout Slinger worked example already in this document.

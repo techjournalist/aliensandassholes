@@ -29,6 +29,7 @@ const LEVEL_1 = (() => {
     const { P, M, GEO, PALETTE, batchPart, batchDecal, liveProp, decal, toon, unlit,
       addOutline, srand, lerpColor, scene, animated, shakeCamera, puff,
       treeParts, deadTreeParts, rockParts, mushroomParts, tuftParts, flowerParts, acornParts,
+      masonry, towerCourses, roofCourses, windowDress, glow, setGlow, bannerGeo,
       worldX, worldZ, cols, rows, border, level } = kit;
 
     function buildStream() {
@@ -177,6 +178,8 @@ const LEVEL_1 = (() => {
         batchPart(P(GEO.cyl, stone, M(tx, th / 2, tz, { sx: 0.38, sy: th, sz: 0.38 })), wm);
         batchPart(P(GEO.cyl, dark, M(tx, th, tz, { sx: 0.45, sy: 0.1, sz: 0.45 })), wm);
         batchPart(P(GEO.dome, PALETTE.capBrown, M(tx, th + 0.03, tz, { sx: 0.56, sy: 0.46, sz: 0.56 })), wm);
+        towerCourses(wm, { x: tx, z: tz, r: 0.38, y0: 0.1, y1: th - 0.08, holes: tz > 0 ? [[0, 1.9, 0.36]] : [], seed: Math.round(tx * 10 + tz * 3) });
+        roofCourses(wm, { x: tx, y: th + 0.03, z: tz, r: 0.56, h: 0.46, color: PALETTE.capBrown });
         for (let i = 0; i < 3; i++) {
           const a = i * 2.1 + tx, d = 0.32;
           batchPart(P(GEO.sphereLo, PALETTE.cream, M(tx + Math.cos(a) * d, th + 0.36, tz + Math.sin(a) * d, { s: 0.08 }), false), wm);
@@ -187,6 +190,10 @@ const LEVEL_1 = (() => {
       batchPart(P(GEO.cyl, stone, M(kx, KT / 2, kz, { sx: 0.48, sy: KT, sz: 0.48 })), wm);
       batchPart(P(GEO.cyl, dark, M(kx, KT, kz, { sx: 0.56, sy: 0.1, sz: 0.56 })), wm);
       batchPart(P(GEO.dome, PALETTE.capRed, M(kx, KT + 0.03, kz, { sx: 0.7, sy: 0.6, sz: 0.7 })), wm);
+      towerCourses(wm, { x: kx, z: kz, r: 0.48, y0: H + 0.3, y1: KT - 0.08, holes: [[0, 2.6, 0.36]], seed: 9 });
+      roofCourses(wm, { x: kx, y: KT + 0.03, z: kz, r: 0.7, h: 0.6, color: PALETTE.capRed, rings: 4 });
+      // a gold finial crowning the banner pole
+      batchPart(P(GEO.sphereLo, PALETTE.gold, M(kx, KT + 1.52, kz, { s: 0.06 })), wm);
       for (let i = 0; i < 4; i++) {
         const a = i * 1.6, d = 0.4;
         batchPart(P(GEO.sphereLo, PALETTE.cream, M(kx + Math.cos(a) * d, KT + 0.45, kz + Math.sin(a) * d, { s: 0.09 }), false), wm);
@@ -213,7 +220,13 @@ const LEVEL_1 = (() => {
         l.userData.phase = lx * 7;
         scene.add(l);
         lanterns.push(l);
+        glow(cx + lx, 0.66, cz + gz + 0.3, { w: 0.5, h: 0.5 });
       }
+      // laid-stone courses on the faces the camera sees (south, and east
+      // since the camera yaws slightly that way)
+      masonry(wm, { face: 'z', at: 1.15, u0: -0.95, u1: 0.95, y0: 0.24, y1: H, seed: 11,
+        holes: [[gx, 0.55, 0.72, 1.2], [-0.5, 1.35, 0.3, 0.38], [0.4, 0.75, 0.3, 0.38], [0.4, 1.4, 0.3, 0.38]] });
+      masonry(wm, { face: 'x', at: 0.95, u0: -1.35, u1: 0.8, y0: 0.24, y1: H, seed: 12 });
       // warm lit windows, live so they can flicker
       const windows = [];
       const winSpots = [
@@ -228,20 +241,15 @@ const LEVEL_1 = (() => {
         w.userData.phase = wx * 3 + wz * 5;
         scene.add(w);
         windows.push(w);
+        windowDress(wm, wx, wy, wz, axis, { sign: axis === 'x' ? -1 : 1 });
       }
       // banner: pole + a waving cloth built from a segmented plane
       const pole = new THREE.Mesh(GEO.cyl, toon(PALETTE.wood));
       pole.position.set(cx + kx, KT + 0.9, cz + kz);
       pole.scale.set(0.035, 1.2, 0.035);
       scene.add(pole);
-      const bannerGeo = new THREE.PlaneGeometry(0.8, 0.46, 8, 3);
-      const bp = bannerGeo.attributes.position, bcols = new Float32Array(bp.count * 3);
-      const gold = new THREE.Color(PALETTE.gold), green = new THREE.Color(PALETTE.tunic);
-      for (let i = 0; i < bp.count; i++) {
-        const col = Math.abs(bp.getY(i)) < 0.08 ? green : gold;
-        bcols[i * 3] = col.r; bcols[i * 3 + 1] = col.g; bcols[i * 3 + 2] = col.b;
-      }
-      bannerGeo.setAttribute('color', new THREE.BufferAttribute(bcols, 3));
+      const bannerGeo = kit.bannerGeo(0.8, 0.46, { field: PALETTE.tunic, stripe: PALETTE.gold });
+      const bp = bannerGeo.attributes.position;
       const banner = new THREE.Mesh(bannerGeo, toon(0xffffff, { vc: true, side: THREE.DoubleSide }));
       banner.position.set(cx + kx + 0.4, KT + 1.2, cz + kz);
       scene.add(banner);
@@ -276,6 +284,7 @@ const LEVEL_1 = (() => {
         dmg.rubble.visible = st >= 2;
         dmg.fire.visible = st >= 2;
         dmg.scorch.visible = st >= 2;
+        setGlow(st >= 2 ? 0.35 : 1);
         shakeCamera(0.12, 0.4);
         puff(cx - 0.6, 0.6, cz + 1.2, { count: 16, color: PALETTE.stone, speed: 2, size: 0.12, up: 1.6, ttl: 0.8 });
       });

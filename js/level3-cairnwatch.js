@@ -26,6 +26,7 @@ const LEVEL_3 = (() => {
     const { P, M, GEO, PALETTE, batchPart, batchDecal, liveProp, decal, toon, unlit,
       addOutline, srand, lerpColor, scene, animated, shakeCamera, puff,
       treeParts, deadTreeParts, rockParts, mushroomParts, tuftParts, flowerParts, acornParts,
+      masonry, towerCourses, roofCourses, windowDress, glow, setGlow, bannerGeo,
       worldX, worldZ, cols, rows, border, level } = kit;
 
     // The fissure: a dark ravine crack instead of a river — no water, just
@@ -191,7 +192,7 @@ const LEVEL_3 = (() => {
       addOutline(towerRoof);
       scene.add(towerGroup);
       // the gate, an old iron-bound door
-      const gx = -0.3, gz = 0.96;
+      const gx = -0.3, gz = 1.0;
       batchPart(P(GEO.box, 0x2b211b, M(gx, 0.36, gz, { sx: 0.58, sy: 0.72, sz: 0.08 }), false), wm);
       batchPart(P(GEO.box, PALETTE.wood, M(gx, 0.32, gz + 0.02, { sx: 0.46, sy: 0.64, sz: 0.05 }), false), wm);
       batchPart(P(GEO.box, dark, M(gx, 0.05, gz + 0.18, { sx: 0.8, sy: 0.1, sz: 0.24 })), wm);
@@ -204,10 +205,16 @@ const LEVEL_3 = (() => {
         l.userData.phase = lx * 7;
         scene.add(l);
         lanterns.push(l);
+        glow(cx + lx, 0.54, cz + gz + 0.26, { w: 0.46, h: 0.46 });
       }
+      // laid-stone courses on the south and east faces, kept off the gate,
+      // the windows and the collapsed corner
+      masonry(wm, { face: 'z', at: 1.0, u0: -0.85, u1: 0.85, y0: 0.24, y1: H, seed: 31,
+        holes: [[gx, 0.42, 0.64, 0.9], [-0.5, 0.95, 0.3, 0.34], [0.4, 0.65, 0.3, 0.34], [0.72, 0.5, 0.5, 1.0]] });
+      masonry(wm, { face: 'x', at: 0.85, u0: -1.2, u1: 0.55, y0: 0.24, y1: H, seed: 32 });
       const windows = [];
       const winSpots = [
-        [-0.5, 0.95, 0.96, 'z'], [0.4, 0.65, 0.96, 'z'], [kx, 1.5, kz + 0.4, 'z'], [kx, 2.1, kz + 0.4, 'z'],
+        [-0.5, 0.95, 1.0, 'z'], [0.4, 0.65, 1.0, 'z'], [kx, 1.5, kz + 0.4, 'z'], [kx, 2.1, kz + 0.4, 'z'],
       ];
       for (const [wx, wy, wz, axis] of winSpots) {
         const w = new THREE.Mesh(GEO.box, new THREE.MeshBasicMaterial({ color: PALETTE.windowWarm }));
@@ -216,26 +223,22 @@ const LEVEL_3 = (() => {
         w.userData.phase = wx * 3 + wz * 5;
         scene.add(w);
         windows.push(w);
+        if (wx !== kx) windowDress(wm, wx, wy, wz, axis, { w: 0.15, h: 0.2 });
+        else glow(cx + wx, wy, cz + wz + 0.03, { w: 0.5, h: 0.5, axis: 'z' });
       }
       // a tattered banner, half its cloth already torn away
       const pole = new THREE.Mesh(GEO.cyl, toon(PALETTE.wood));
       pole.position.set(cx + kx, KT + 0.65, cz + kz);
       pole.scale.set(0.028, 0.85, 0.028);
       scene.add(pole);
-      const bannerGeo = new THREE.PlaneGeometry(0.5, 0.3, 5, 3);
-      const bp = bannerGeo.attributes.position, bcols = new Float32Array(bp.count * 3);
-      const gold = new THREE.Color(PALETTE.gold), troll = new THREE.Color(PALETTE.troll);
-      for (let i = 0; i < bp.count; i++) {
-        const col = Math.abs(bp.getY(i)) < 0.05 ? troll : gold;
-        bcols[i * 3] = col.r; bcols[i * 3 + 1] = col.g; bcols[i * 3 + 2] = col.b;
-      }
-      bannerGeo.setAttribute('color', new THREE.BufferAttribute(bcols, 3));
+      const bannerGeo = kit.bannerGeo(0.5, 0.3, { field: PALETTE.troll, stripe: PALETTE.gold, tattered: 0.7 });
+      const bp = bannerGeo.attributes.position;
       const banner = new THREE.Mesh(bannerGeo, toon(0xffffff, { vc: true, side: THREE.DoubleSide }));
       banner.position.set(cx + kx + 0.28, KT + 0.8, cz + kz);
       scene.add(banner);
       // live damage overlay: fresh cracks, rubble and fire on top of the old scars
       const dmg = { cracks: new THREE.Group(), rubble: new THREE.Group(), smokeTimer: 0, state: 0 };
-      const crackSpots = [[-0.35, 0.4, 0.96, 0.2, 0.55], [0.45, 0.8, 0.96, 0.14, 0.4], [-0.8, 0.7, 0.3, 0.16, 0.45]];
+      const crackSpots = [[-0.35, 0.4, 1.02, 0.2, 0.55], [0.45, 0.8, 1.02, 0.14, 0.4], [-0.8, 0.7, 0.3, 0.16, 0.45]];
       crackSpots.forEach(([wx, wy, wz, ww, wh], i) => {
         const c = new THREE.Mesh(GEO.box, unlit(0x2b211b));
         c.position.set(cx + wx, wy, cz + wz);
@@ -263,6 +266,7 @@ const LEVEL_3 = (() => {
         dmg.rubble.visible = st >= 2;
         dmg.fire.visible = st >= 2;
         dmg.scorch.visible = st >= 2;
+        setGlow(st >= 2 ? 0.35 : 1);
         shakeCamera(0.12, 0.4);
         puff(cx - 0.4, 0.5, cz + 1.0, { count: 16, color: PALETTE.stone, speed: 2, size: 0.12, up: 1.6, ttl: 0.8 });
       });

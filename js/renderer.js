@@ -113,6 +113,15 @@ const Renderer = (() => {
     GEO.cylTaper = new THREE.CylinderGeometry(0.6, 1, 1, 9);
     GEO.rock = new THREE.DodecahedronGeometry(1, 0);
     GEO.torus = new THREE.TorusGeometry(1, 0.16, 6, 12);
+    GEO.ring = new THREE.TorusGeometry(1, 0.045, 4, 20);
+    GEO.bead = new THREE.SphereGeometry(1, 6, 4);   // tiny details: eyes, spots, fruit, scallops
+    const petal = new THREE.Shape();
+    for (let i = 0; i <= 40; i++) {
+      const a = (i / 40) * Math.PI * 2, rr = 0.55 + 0.45 * Math.abs(Math.cos(a * 2.5));
+      if (i === 0) petal.moveTo(Math.cos(a) * rr, Math.sin(a) * rr); else petal.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
+    }
+    GEO.petals = new THREE.ShapeGeometry(petal);
+    GEO.petals.rotateX(-Math.PI / 2);
     GEO.circle = new THREE.CircleGeometry(1, 18);
     for (const k in GEO) { if (GEO[k].index) GEO[k] = GEO[k].toNonIndexed(); }
     // circle should lie flat on the ground
@@ -312,17 +321,184 @@ const Renderer = (() => {
     return d;
   }
 
+  // -------- architectural detail (shared by every level's endpoint) --------
+  // All of it goes through batchPart, so a building gains texture without
+  // gaining draw calls; the glow halos share one additive mesh.
+  const shade = (c, k) => lerpColor(c, PALETTE.outline, k).getHex();
+
+  // Masonry: staggered, slightly proud blocks across a flat wall face so it
+  // reads as laid courses, not one smooth box. `face` is 'z' (u runs along x)
+  // or 'x' (u runs along z); `at` is the face's coordinate, `sign` its normal.
+  // `holes` ([u, y, w, h]) keeps blocks off windows and doors.
+  function masonry(wm, { face, at, sign = 1, u0, u1, y0, y1, holes = [], seed = 1 }) {
+    const rng = srand(seed), course = 0.2;
+    let row = 0;
+    for (let y = y0 + course / 2; y < y1 - course * 0.3; y += course, row++) {
+      let u = u0 + (row % 2 ? 0.13 : 0.02);
+      for (;;) {
+        const w = 0.2 + rng() * 0.16, uc = u + w / 2;
+        u += w + 0.03;
+        if (uc + w / 2 > u1) break;
+        if (rng() < 0.42) continue;
+        if (holes.some(([hu, hy, hw, hh]) => Math.abs(uc - hu) < (hw + w) / 2 + 0.03 && Math.abs(y - hy) < (hh + course) / 2 + 0.02)) continue;
+        const col = rng() < 0.55 ? PALETTE.cobble : PALETTE.stoneDark;
+        const off = at + sign * 0.006, h = course - 0.045;
+        const m = face === 'z' ? M(uc, y, off, { sx: w, sy: h, sz: 0.025 }) : M(off, y, uc, { sx: 0.025, sy: h, sz: w });
+        batchPart(P(GEO.box, col, m, false), wm);
+      }
+    }
+  }
+  // The same idea wrapped around a round tower, on the half facing the camera.
+  function towerCourses(wm, { x, z, r, y0, y1, holes = [], seed = 1 }) {
+    const rng = srand(seed), course = 0.2;
+    let row = 0;
+    for (let y = y0 + course / 2; y < y1 - course * 0.3; y += course, row++) {
+      for (let a = -1.7 + (row % 2) * 0.25; a < 1.7; a += 0.5) {
+        if (rng() < 0.45) continue;
+        if (holes.some(([ha, hy, hh]) => Math.abs(a - ha) < 0.55 && Math.abs(y - hy) < hh / 2 + course * 0.6)) continue;
+        const col = rng() < 0.55 ? PALETTE.cobble : PALETTE.stoneDark;
+        const rr = r * 0.985;
+        batchPart(P(GEO.box, col, M(x + Math.sin(a) * rr, y, z + Math.cos(a) * rr, { sx: r * 0.42, sy: course - 0.045, sz: 0.04, ry: a }), false), wm);
+      }
+    }
+  }
+  // Shingle courses on a dome or cone roof: darker rings stepping down the
+  // roof, plus a scalloped eave. `y` is the roof's base, `h` its height.
+  function roofCourses(wm, { x, y, z, r, h, color, kind = 'dome', rings = 3, ez = 1 }) {
+    const ring = shade(color, 0.2), eave = shade(color, 0.1);
+    for (let i = 1; i <= rings; i++) {
+      const k = i / (rings + 1);
+      let rad, ry;
+      if (kind === 'dome') { const phi = k * Math.PI / 2; rad = r * Math.sin(phi); ry = y + h * Math.cos(phi); }
+      else { rad = r * k; ry = y + h * (1 - k); }
+      batchPart(P(GEO.ring, ring, M(x, ry, z, { sx: rad * 1.015, sy: rad * 1.015 * ez, sz: rad * 1.015, rx: Math.PI / 2 }), false), wm);
+    }
+    const n = Math.max(8, Math.round(r * 22 * (1 + ez) / 2)), sc = Math.min(r * 0.2, 0.11);
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      batchPart(P(GEO.bead, eave, M(x + Math.cos(a) * r * 0.97, y + 0.01, z + Math.sin(a) * r * 0.97 * ez, { sx: sc, sy: 0.045, sz: sc }), false), wm);
+    }
+  }
+  // Window dressing: a wooden frame, stone sill and lintel, a cross of
+  // leading, and a warm halo spilling onto the wall. `axis` is the wall's
+  // normal axis ('z' or 'x'), `sign` its direction.
+  const glowGeos = [];
+  let glowMat = null, glowK = 1;
+  function glow(x, y, z, { w = 0.5, h = 0.5, axis = 'cam', sign = 1 } = {}) {
+    const g = new THREE.PlaneGeometry(w, h).toNonIndexed();
+    if (axis === 'cam') g.applyMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(camera.quaternion));
+    else if (axis === 'x') g.rotateY(sign * Math.PI / 2);
+    else if (sign < 0) g.rotateY(Math.PI);
+    g.translate(x, y, z);
+    glowGeos.push(g);
+  }
+  function windowDress(wm, x, y, z, axis, { w = 0.16, h = 0.24, sign = 1, halo = true } = {}) {
+    const d = (n) => (axis === 'z' ? [0, 0, n * sign] : [n * sign, 0, 0]);
+    const at = (du, dy, dn, sx, sy, sn) => {
+      const [ox, , oz] = d(dn);
+      return axis === 'z'
+        ? M(x + du + ox, y + dy, z + oz, { sx, sy, sz: sn })
+        : M(x + ox, y + dy, z + du + oz, { sx: sn, sy, sz: sx });
+    };
+    const fw = 0.035;
+    batchPart(P(GEO.box, PALETTE.wood, at(-(w + fw) / 2, 0, 0.02, fw, h + fw * 2, 0.04), false), wm);
+    batchPart(P(GEO.box, PALETTE.wood, at((w + fw) / 2, 0, 0.02, fw, h + fw * 2, 0.04), false), wm);
+    batchPart(P(GEO.box, PALETTE.stoneDark, at(0, h / 2 + fw, 0.025, w + fw * 3.4, fw * 1.4, 0.05)), wm);
+    batchPart(P(GEO.box, PALETTE.cobble, at(0, -h / 2 - fw * 0.8, 0.04, w + fw * 3, fw, 0.08)), wm);
+    batchPart(P(GEO.box, PALETTE.outline, at(0, 0, 0.03, 0.014, h, 0.012), false), wm);
+    batchPart(P(GEO.box, PALETTE.outline, at(0, h * 0.08, 0.03, w, 0.014, 0.012), false), wm);
+    if (halo) {
+      const p = new THREE.Vector3(...d(0.02)).add(new THREE.Vector3(x, y, z)).applyMatrix4(wm);
+      glow(p.x, p.y, p.z, { w: w * 3.6, h: h * 2.6, axis, sign });
+    }
+  }
+  function setGlow(k) { glowK = k; }
+  function flushGlow() {
+    if (!glowGeos.length) return;
+    const c = document.createElement('canvas');
+    c.width = c.height = 64;
+    const ctx = c.getContext('2d');
+    const grd = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+    grd.addColorStop(0, 'rgba(255,255,255,0.9)');
+    grd.addColorStop(0.3, 'rgba(255,255,255,0.4)');
+    grd.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = grd; ctx.fillRect(0, 0, 64, 64);
+    glowMat = new THREE.MeshBasicMaterial({
+      color: PALETTE.windowWarm, map: new THREE.CanvasTexture(c), transparent: true,
+      blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.5,
+    });
+    const mesh = new THREE.Mesh(mergeGeoms(glowGeos), glowMat);
+    mesh.name = 'glow';
+    mesh.renderOrder = 2;
+    mesh.matrixAutoUpdate = false;
+    scene.add(mesh);
+    animated.push({ update(t) { glowMat.opacity = glowK * (0.44 + 0.06 * Math.sin(t * 7.3) * Math.sin(t * 2.9)); } });
+  }
+  // Banner cloth: a swallowtailed field with a trim border, a stripe and a
+  // round emblem, painted in vertex color. Centered on its origin, `w` wide,
+  // so a level's existing wave animation keeps working unchanged. `tattered`
+  // tears ragged holes out of the fly end.
+  function bannerGeo(w, h, { field, stripe, trim = PALETTE.gold, emblem = PALETTE.cream, tattered = 0, seed = 3 }) {
+    const g = new THREE.PlaneGeometry(w, h, 20, 10);
+    const p = g.attributes.position, cols = new Float32Array(p.count * 3), c = new THREE.Color();
+    const notch = w * 0.16;
+    for (let i = 0; i < p.count; i++) {
+      const x = p.getX(i), y = p.getY(i), u = (x + w / 2) / w, v = Math.abs(y) / (h / 2);
+      let hex = field;
+      if (v < 0.2) hex = stripe;
+      const ex = (u - 0.38) * w, er = Math.hypot(ex, y) / (h * 0.3);
+      if (er < 1) hex = er < 0.55 ? stripe : emblem;
+      if (u < 0.07 || v > 0.84) hex = trim;
+      c.setHex(hex);
+      cols[i * 3] = c.r; cols[i * 3 + 1] = c.g; cols[i * 3 + 2] = c.b;
+      p.setX(i, x - notch * u ** 4 * (1 - v));
+    }
+    g.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+    if (tattered) {
+      const rng = srand(seed), idx = g.index.array, keep = [];
+      for (let f = 0; f < idx.length; f += 3) {
+        const u = (p.getX(idx[f]) + w / 2) / w;
+        if (u > 0.5 && rng() < tattered * (u - 0.5) * 2) continue;
+        keep.push(idx[f], idx[f + 1], idx[f + 2]);
+      }
+      g.setIndex(keep);
+    }
+    return g;
+  }
+
   // -------- prop recipes (each returns a parts list in local space) --------
   const P = (geo, color, m, outline = true, extra = {}) => ({ geo, color, m, outline, ...extra });
 
   function treeParts(rng) {
     const h = 0.7 + rng() * 0.5, r = 0.42 + rng() * 0.28;
+    const top = h * 0.62;
     const parts = [
-      P(GEO.cyl, PALETTE.wood, M(0, h * 0.35, 0, { sx: 0.13, sy: h * 0.7, sz: 0.13 })),
-      P(GEO.sphereMid, PALETTE.meadowDark, M(0, h * 0.62 + r * 0.7, 0, { sx: r, sy: r * 0.9, sz: r })),
-      P(GEO.sphereMid, PALETTE.meadow, M(r * 0.45, h * 0.62 + r * 1.15, r * 0.2, { s: r * 0.72 })),
-      P(GEO.sphereMid, PALETTE.meadowLight, M(-r * 0.4, h * 0.62 + r * 1.25, -r * 0.1, { s: r * 0.6 })),
+      P(GEO.cylTaper, PALETTE.wood, M(0, h * 0.35, 0, { sx: 0.11, sy: h * 0.7, sz: 0.11 })),
     ];
+    // root flares splay out where the trunk meets the ground
+    const roots = 3 + Math.floor(rng() * 2), ra = rng() * 6;
+    for (let i = 0; i < roots; i++) {
+      const a = ra + i * (Math.PI * 2 / roots);
+      parts.push(P(GEO.cone, PALETTE.wood, M(Math.cos(a) * 0.1, 0.05, Math.sin(a) * 0.1,
+        { sx: 0.06, sy: 0.22, sz: 0.05, rz: -Math.cos(a) * 1.25, rx: Math.sin(a) * 1.25 }), false));
+    }
+    // canopy: a dark core, then lighter lobes toward the sun (upper left)
+    parts.push(P(GEO.sphereMid, PALETTE.meadowDark, M(0, top + r * 0.7, 0, { sx: r, sy: r * 0.9, sz: r })));
+    const lobes = 3, la = rng() * 6;
+    for (let i = 0; i < lobes; i++) {
+      const a = la + i * (Math.PI * 2 / lobes), d = r * (0.55 + rng() * 0.15);
+      parts.push(P(GEO.sphereLo, PALETTE.meadowDark, M(Math.cos(a) * d, top + r * (0.5 + rng() * 0.3), Math.sin(a) * d, { s: r * (0.48 + rng() * 0.12) })));
+    }
+    parts.push(P(GEO.sphereLo, PALETTE.meadow, M(r * 0.4, top + r * 1.15, r * 0.2, { s: r * 0.7 })));
+    parts.push(P(GEO.sphereLo, PALETTE.meadowLight, M(-r * 0.38, top + r * 1.28, -r * 0.05, { s: r * 0.58 })));
+    // the odd fruit or blossom, so a grove isn't a wall of identical green
+    if (rng() < 0.45) {
+      const fc = rng() < 0.5 ? PALETTE.capRed : PALETTE.flowerYellow;
+      for (let i = 0; i < 3; i++) {
+        const a = rng() * 6.28, d = r * 0.9;
+        parts.push(P(GEO.bead, fc, M(Math.cos(a) * d, top + r * (0.6 + rng() * 0.6), Math.sin(a) * d, { s: 0.045 }), false));
+      }
+    }
     return { parts, radius: r * 0.9 };
   }
   function deadTreeParts(rng) {
@@ -330,6 +506,11 @@ const Renderer = (() => {
     const parts = [
       P(GEO.cylTaper, PALETTE.hollowWood, M(0, h / 2, 0, { sx: 0.12, sy: h, sz: 0.12, rz: lean })),
     ];
+    for (let i = 0; i < 3; i++) {
+      const a = i * 2.1 + rng();
+      parts.push(P(GEO.cone, PALETTE.hollowWood, M(Math.cos(a) * 0.11, 0.05, Math.sin(a) * 0.11,
+        { sx: 0.06, sy: 0.24, sz: 0.05, rz: -Math.cos(a) * 1.3, rx: Math.sin(a) * 1.3 }), false));
+    }
     const n = 2 + Math.floor(rng() * 2);
     for (let i = 0; i < n; i++) {
       const y = h * (0.45 + rng() * 0.45), a = rng() * Math.PI * 2, len = 0.3 + rng() * 0.35;
@@ -341,43 +522,66 @@ const Renderer = (() => {
         .multiply(new THREE.Matrix4().makeScale(0.05, len, 0.05));
       parts.push(P(GEO.cylTaper, PALETTE.hollowWood, m));
     }
+    // a shelf fungus glowing faintly on the trunk
+    if (rng() < 0.6) parts.push(P(GEO.dome, PALETTE.spore, M(Math.sin(lean) * -h * 0.15, h * 0.3, 0.1, { sx: 0.1, sy: 0.04, sz: 0.08 }), false));
     return { parts, radius: 0.25 };
   }
   function mushroomParts(rng, big) {
     const s = big ? 0.55 + rng() * 0.25 : 0.22 + rng() * 0.12;
     const tilt = (rng() - 0.5) * 0.25;
     const parts = [
-      P(GEO.cyl, PALETTE.cream, M(0, s * 0.45, 0, { sx: s * 0.3, sy: s * 0.9, sz: s * 0.3, rz: tilt })),
+      P(GEO.cylTaper, PALETTE.cream, M(0, s * 0.45, 0, { sx: s * 0.3, sy: s * 0.9, sz: s * 0.3, rz: tilt })),
+      // gills: a pale disc tucked under the cap
+      P(GEO.cyl, PALETTE.skin, M(0, s * 0.79, 0, { sx: s * 0.7, sy: s * 0.04, sz: s * 0.7, rz: tilt }), false),
       P(GEO.dome, PALETTE.capRed, M(0, s * 0.8, 0, { sx: s * 0.75, sy: s * 0.55, sz: s * 0.75, rz: tilt })),
     ];
-    const spots = 2 + Math.floor(rng() * 2);
+    // a skirt ring on the bigger ones
+    if (big) parts.push(P(GEO.torus, PALETTE.cream, M(0, s * 0.6, 0, { sx: s * 0.3, sy: s * 0.3, sz: s * 0.5, rx: Math.PI / 2 }), false));
+    const spots = big ? 4 + Math.floor(rng() * 3) : 2 + Math.floor(rng() * 2);
     for (let i = 0; i < spots; i++) {
-      const a = rng() * Math.PI * 2, d = s * (0.25 + rng() * 0.3);
-      parts.push(P(GEO.sphereLo, PALETTE.cream, M(Math.cos(a) * d, s * 0.8 + s * 0.42, Math.sin(a) * d, { s: s * 0.11 }), false));
+      const a = rng() * Math.PI * 2, d = s * (0.2 + rng() * 0.4);
+      const lift = Math.sqrt(Math.max(0, 1 - (d / (s * 0.75)) ** 2));
+      parts.push(P(GEO.bead, PALETTE.cream, M(Math.cos(a) * d, s * 0.8 + s * 0.52 * lift, Math.sin(a) * d, { sx: s * 0.11, sy: s * 0.06, sz: s * 0.11 }), false));
+    }
+    // a tiny sibling at the foot
+    if (rng() < 0.5) {
+      const a = rng() * 6.28, ss = s * 0.35;
+      parts.push(P(GEO.cyl, PALETTE.cream, M(Math.cos(a) * s * 0.4, ss * 0.4, Math.sin(a) * s * 0.4, { sx: ss * 0.3, sy: ss * 0.8, sz: ss * 0.3 }), false));
+      parts.push(P(GEO.dome, PALETTE.capRed, M(Math.cos(a) * s * 0.4, ss * 0.75, Math.sin(a) * s * 0.4, { sx: ss * 0.7, sy: ss * 0.5, sz: ss * 0.7 })));
     }
     return { parts, radius: s * 0.75 };
   }
   function tuftParts(rng) {
     const s = 0.12 + rng() * 0.12;
-    return { parts: [P(GEO.sphereLo, PALETTE.meadowLight, M(0, s * 0.35, 0, { sx: s * 1.4, sy: s * 0.6, sz: s * 1.2 }), false)], radius: 0 };
+    const parts = [P(GEO.sphereLo, PALETTE.meadowLight, M(0, s * 0.35, 0, { sx: s * 1.4, sy: s * 0.6, sz: s * 1.2 }), false)];
+    parts.push(P(GEO.sphereLo, PALETTE.meadow, M(s * 0.7, s * 0.25, s * 0.3, { sx: s * 0.8, sy: s * 0.45, sz: s * 0.7 }), false));
+    if (rng() < 0.4) parts.push(P(GEO.bead, PALETTE.cream, M(-s * 0.3, s * 0.62, 0, { s: 0.035 }), false));
+    return { parts, radius: 0 };
   }
   function rockParts(rng, hollow) {
-    const s = 0.16 + rng() * 0.22;
+    const s = 0.16 + rng() * 0.22, ry = rng() * 3;
     const color = hollow ? PALETTE.hollowRock : PALETTE.stone;
-    return {
-      parts: [P(GEO.rock, color, M(0, s * 0.55, 0, { sx: s * 1.3, sy: s * 0.8, sz: s, ry: rng() * 3 }))],
-      radius: s * 1.2,
-    };
+    const parts = [P(GEO.rock, color, M(0, s * 0.55, 0, { sx: s * 1.3, sy: s * 0.8, sz: s, ry }))];
+    // a smaller companion stone, and a cap of moss (or blight) on top
+    if (rng() < 0.6) {
+      const a = rng() * 6.28;
+      parts.push(P(GEO.rock, hollow ? PALETTE.hollowEarth : PALETTE.stoneDark, M(Math.cos(a) * s * 1.2, s * 0.25, Math.sin(a) * s * 1.1, { sx: s * 0.5, sy: s * 0.38, sz: s * 0.45, ry: a })));
+    }
+    parts.push(P(GEO.sphereLo, hollow ? PALETTE.spore : PALETTE.moss, M(-s * 0.15, s * 1.12, 0, { sx: s * 0.85, sy: s * 0.22, sz: s * 0.7, ry }), false));
+    return { parts, radius: s * 1.2 };
   }
   function flowerParts(rng) {
     const h = 0.18 + rng() * 0.12;
     const color = rng() < 0.5 ? PALETTE.flowerPink : PALETTE.flowerYellow;
-    return {
-      parts: [
-        P(GEO.cyl, PALETTE.meadowDark, M(0, h / 2, 0, { sx: 0.02, sy: h, sz: 0.02 }), false),
-        P(GEO.sphereLo, color, M(0, h + 0.04, 0, { s: 0.07 })),
-      ], radius: 0,
-    };
+    const parts = [
+      P(GEO.cyl, PALETTE.meadowDark, M(0, h / 2, 0, { sx: 0.02, sy: h, sz: 0.02 }), false),
+      P(GEO.bead, PALETTE.meadowDark, M(0.05, h * 0.3, 0, { sx: 0.06, sy: 0.015, sz: 0.03, rz: 0.4 }), false),
+      P(GEO.bead, PALETTE.meadowDark, M(-0.05, h * 0.5, 0.01, { sx: 0.06, sy: 0.015, sz: 0.03, rz: -0.4 }), false),
+    ];
+    // a five-petal head (one flat shape, cheap) tilted toward the camera, around a gold eye
+    parts.push(P(GEO.petals, color, M(0, h + 0.03, 0, { s: 0.1, rx: 0.5, ry: rng() * 6 }), false));
+    parts.push(P(GEO.bead, color === PALETTE.flowerYellow ? PALETTE.acorn : PALETTE.flowerYellow, M(0, h + 0.045, 0.01, { s: 0.028 }), false));
+    return { parts, radius: 0 };
   }
   function acornParts(rng) {
     const s = 0.14 + rng() * 0.1, tilt = (rng() - 0.5) * 0.6;
@@ -644,6 +848,20 @@ const Renderer = (() => {
       P(GEO.cyl, PALETTE.wood, M(0.48, 1.0, 0.12, { sx: 0.035, sy: 0.34, sz: 0.035, rz: -0.6 }), true, { name: 'prongR', live: true }),
       P(GEO.box, PALETTE.outline, M(0.36, 1.13, 0.12, { sx: 0.3, sy: 0.025, sz: 0.025 }), false, { name: 'band', live: true, unlit: true }),
       P(GEO.sphereLo, PALETTE.acorn, M(-0.2, 0.36, 0.14, { s: 0.07 }), true, { name: 'pouch' }),
+      // secondary detail: eyes with a glint, rosy cheeks, a buckled belt,
+      // a leaf tucked in the hat brim and a few stones set round the pad
+      P(GEO.bead, PALETTE.outline, M(0.075, 0.77, 0.195, { s: 0.03 }), false),
+      P(GEO.bead, PALETTE.outline, M(-0.075, 0.77, 0.195, { s: 0.03 }), false),
+      P(GEO.bead, PALETTE.cream, M(0.083, 0.782, 0.218, { s: 0.011 }), false),
+      P(GEO.bead, PALETTE.cream, M(-0.067, 0.782, 0.218, { s: 0.011 }), false),
+      P(GEO.sphereLo, 0xf0a98a, M(0.13, 0.69, 0.15, { sx: 0.04, sy: 0.025, sz: 0.02 }), false),
+      P(GEO.sphereLo, 0xf0a98a, M(-0.13, 0.69, 0.15, { sx: 0.04, sy: 0.025, sz: 0.02 }), false),
+      P(GEO.cyl, PALETTE.acornCap, M(0, 0.33, 0, { sx: 0.245, sy: 0.045, sz: 0.225 }), false),
+      P(GEO.box, PALETTE.gold, M(0, 0.33, 0.225, { sx: 0.07, sy: 0.06, sz: 0.02 }), false),
+      P(GEO.sphereLo, PALETTE.meadowLight, M(-0.2, 0.9, 0.08, { sx: 0.09, sy: 0.02, sz: 0.04, ry: 0.5, rz: 0.3 }), false),
+      P(GEO.rock, PALETTE.cobble, M(0.3, 0.12, -0.18, { s: 0.06 }), false),
+      P(GEO.rock, PALETTE.stone, M(-0.34, 0.12, 0.06, { s: 0.05 }), false),
+      P(GEO.rock, PALETTE.cobble, M(0.06, 0.12, 0.35, { s: 0.045 }), false),
     ];
   }
 
@@ -661,14 +879,21 @@ const Renderer = (() => {
       P(GEO.cone, g, pivotMatrix(-0.2, 0.56, 0, 0, 0, 1.2, 0, 0.13, 0, 0.07, 0.26, 0.05), true, { name: 'earR', live: true }),
       P(GEO.sphereLo, PALETTE.cream, M(0.09, 0.54, 0.2, { s: 0.055 }), false, { unlit: true }),
       P(GEO.sphereLo, PALETTE.cream, M(-0.09, 0.54, 0.2, { s: 0.055 }), false, { unlit: true }),
-      P(GEO.sphereLo, PALETTE.outline, M(0.1, 0.54, 0.245, { s: 0.025 }), false, { unlit: true }),
-      P(GEO.sphereLo, PALETTE.outline, M(-0.08, 0.54, 0.245, { s: 0.025 }), false, { unlit: true }),
+      P(GEO.bead, PALETTE.outline, M(0.1, 0.54, 0.245, { s: 0.025 }), false, { unlit: true }),
+      P(GEO.bead, PALETTE.outline, M(-0.08, 0.54, 0.245, { s: 0.025 }), false, { unlit: true }),
       P(GEO.cone, gd, M(0, 0.47, 0.3, { sx: 0.05, sy: 0.18, sz: 0.05, rx: Math.PI / 2 }), true, { name: 'nose' }),
       P(GEO.box, PALETTE.cream, M(0.05, 0.4, 0.21, { sx: 0.04, sy: 0.05, sz: 0.02 }), false, { unlit: true }),
       P(GEO.sphereLo, g, M(0.2, 0.26, 0.06, { s: 0.06 }), true, { name: 'armL' }),
       P(GEO.sphereLo, g, M(-0.2, 0.26, 0.06, { s: 0.06 }), true, { name: 'armR' }),
       P(GEO.cyl, PALETTE.wood, pivotMatrix(-0.22, 0.26, 0.06, 0.5, 0, 0.35, 0, 0.14, 0, 0.03, 0.3, 0.03), true, { name: 'club' }),
       P(GEO.sphereLo, PALETTE.woodLight, pivotMatrix(-0.22, 0.26, 0.06, 0.5, 0, 0.35, 0, 0.3, 0, 0.06, 0.06, 0.06), true, { name: 'clubHead' }),
+      // eye glints, a buckle and loincloth, a leather wrap on the club grip
+      P(GEO.bead, PALETTE.cream, M(0.108, 0.556, 0.262, { s: 0.009 }), false, { unlit: true }),
+      P(GEO.bead, PALETTE.cream, M(-0.072, 0.556, 0.262, { s: 0.009 }), false, { unlit: true }),
+      P(GEO.box, PALETTE.gold, M(0, 0.16, 0.195, { sx: 0.06, sy: 0.05, sz: 0.02 }), false),
+      P(GEO.box, PALETTE.capBrown, M(0.02, 0.1, 0.17, { sx: 0.12, sy: 0.09, sz: 0.02, rz: 0.08 }), false),
+      P(GEO.cyl, PALETTE.capBrown, pivotMatrix(-0.22, 0.26, 0.06, 0.5, 0, 0.35, 0, 0.08, 0, 0.038, 0.06, 0.038), false),
+      P(GEO.cone, PALETTE.cream, pivotMatrix(-0.22, 0.26, 0.06, 0.5, 0, 0.35, 0.05, 0.33, 0, 0.018, 0.05, 0.018), false),
     ];
   }
 
@@ -688,6 +913,17 @@ const Renderer = (() => {
       P(GEO.sphereLo, 0xf0a98a, M(0, 0.79, 0.22, { s: 0.045 }), false),
       P(GEO.cone, hood, M(0, 1.02, -0.02, { sx: 0.27, sy: 0.62, sz: 0.27, rx: 0.12 }), true, { name: 'hood' }),
       P(GEO.sphereLo, hood, M(0, 0.86, 0.04, { sx: 0.26, sy: 0.14, sz: 0.26 }), true, { name: 'hoodRim' }),
+      // eyes glinting under the hood, a rope belt, leaves on the hood rim
+      P(GEO.bead, PALETTE.outline, M(0.06, 0.82, 0.2, { s: 0.024 }), false),
+      P(GEO.bead, PALETTE.outline, M(-0.06, 0.82, 0.2, { s: 0.024 }), false),
+      P(GEO.bead, PALETTE.cream, M(0.066, 0.83, 0.219, { s: 0.009 }), false),
+      P(GEO.bead, PALETTE.cream, M(-0.054, 0.83, 0.219, { s: 0.009 }), false),
+      P(GEO.ring, PALETTE.woodLight, M(0, 0.42, 0, { sx: 0.19, sy: 0.18, sz: 0.19, rx: Math.PI / 2 }), false),
+      P(GEO.bead, PALETTE.woodLight, M(0.06, 0.4, 0.17, { s: 0.03 }), false),
+      P(GEO.cyl, PALETTE.woodLight, M(0.07, 0.33, 0.17, { sx: 0.012, sy: 0.12, sz: 0.012, rz: 0.2 }), false),
+      P(GEO.sphereLo, PALETTE.meadowLight, M(0.2, 0.9, 0.1, { sx: 0.07, sy: 0.02, sz: 0.04, ry: -0.6 }), false),
+      P(GEO.sphereLo, PALETTE.meadow, M(-0.19, 0.92, 0.1, { sx: 0.06, sy: 0.02, sz: 0.035, ry: 0.6 }), false),
+      P(GEO.sphereLo, PALETTE.meadowLight, M(-0.05, 0.93, 0.21, { sx: 0.05, sy: 0.018, sz: 0.03 }), false),
       P(GEO.cyl, PALETTE.wood, M(0.3, 0.55, 0.16, { sx: 0.035, sy: 0.95, sz: 0.035, rz: -0.1 }), true, { name: 'staff', live: true }),
       P(GEO.sphereLo, PALETTE.magic, M(0.34, 1.06, 0.16, { s: 0.11 }), true, { name: 'thornBall', live: true }),
       P(GEO.cone, PALETTE.magic, M(0.34, 1.2, 0.16, { sx: 0.03, sy: 0.1, sz: 0.03 }), false, { name: 'thorn1', live: true }),
@@ -706,6 +942,19 @@ const Renderer = (() => {
       P(GEO.sphereLo, PALETTE.moss, M(0, 0.92, -0.02, { sx: 0.2, sy: 0.1, sz: 0.2 }), true, { name: 'mossHair' }),
       P(GEO.sphereLo, PALETTE.cream, M(0, 0.66, 0.15, { sx: 0.11, sy: 0.16, sz: 0.08 }), true, { name: 'beard' }),
       P(GEO.sphereLo, 0xf0a98a, M(0, 0.79, 0.21, { s: 0.045 }), false),
+      // antlers
+      P(GEO.bead, PALETTE.outline, M(0.06, 0.82, 0.19, { s: 0.024 }), false),
+      P(GEO.bead, PALETTE.outline, M(-0.06, 0.82, 0.19, { s: 0.024 }), false),
+      P(GEO.bead, PALETTE.cream, M(0.066, 0.83, 0.209, { s: 0.009 }), false),
+      P(GEO.bead, PALETTE.cream, M(-0.054, 0.83, 0.209, { s: 0.009 }), false),
+      // a moss sash, leaves in the moss hair, frost crystals on the pad
+      P(GEO.ring, PALETTE.moss, M(0, 0.4, 0, { sx: 0.18, sy: 0.17, sz: 0.18, rx: Math.PI / 2 }), false),
+      P(GEO.sphereLo, PALETTE.moss, M(-0.08, 0.38, 0.15, { sx: 0.04, sy: 0.06, sz: 0.02 }), false),
+      P(GEO.sphereLo, PALETTE.meadowLight, M(0.12, 0.95, 0.04, { sx: 0.06, sy: 0.018, sz: 0.035, ry: -0.5 }), false),
+      P(GEO.bead, PALETTE.flowerPink, M(-0.1, 0.96, 0.08, { s: 0.028 }), false),
+      P(GEO.cone, PALETTE.frost, M(-0.26, 0.2, 0.14, { sx: 0.035, sy: 0.12, sz: 0.035, rz: 0.3 }), false),
+      P(GEO.cone, PALETTE.frost, M(-0.2, 0.18, 0.22, { sx: 0.025, sy: 0.08, sz: 0.025, rx: 0.4 }), false),
+      P(GEO.cone, PALETTE.frost, M(0.18, 0.18, -0.24, { sx: 0.03, sy: 0.1, sz: 0.03, rx: -0.3 }), false),
       // antlers: two forked twigs
       P(GEO.cyl, PALETTE.wood, M(0.12, 1.08, -0.02, { sx: 0.025, sy: 0.3, sz: 0.025, rz: -0.35 }), true, { name: 'antlerL' }),
       P(GEO.cyl, PALETTE.wood, M(0.2, 1.2, -0.02, { sx: 0.02, sy: 0.16, sz: 0.02, rz: -1.1 }), true),
@@ -727,13 +976,21 @@ const Renderer = (() => {
       P(GEO.sphereLo, PALETTE.moss, M(-0.2, 0.74, -0.04, { sx: 0.16, sy: 0.07, sz: 0.14 }), false),
       P(GEO.sphereLo, PALETTE.moss, M(0.16, 0.73, 0.08, { sx: 0.12, sy: 0.06, sz: 0.12 }), false),
       P(GEO.box, stone, M(0, 0.82, 0.06, { sx: 0.18, sy: 0.16, sz: 0.16 }), true, { name: 'head' }),
-      P(GEO.sphereLo, PALETTE.gold, M(0.05, 0.84, 0.15, { s: 0.03 }), false, { unlit: true }),
-      P(GEO.sphereLo, PALETTE.gold, M(-0.05, 0.84, 0.15, { s: 0.03 }), false, { unlit: true }),
+      P(GEO.bead, PALETTE.gold, M(0.05, 0.84, 0.15, { s: 0.03 }), false, { unlit: true }),
+      P(GEO.bead, PALETTE.gold, M(-0.05, 0.84, 0.15, { s: 0.03 }), false, { unlit: true }),
       P(GEO.cyl, bark, M(0.34, 0.5, 0.08, { sx: 0.08, sy: 0.4, sz: 0.08, rz: -0.35 }), true, { name: 'armL', live: true }),
       P(GEO.cyl, bark, M(-0.34, 0.5, 0.08, { sx: 0.08, sy: 0.4, sz: 0.08, rz: 0.35 }), true, { name: 'armR', live: true }),
       P(GEO.rock, stone, M(0.42, 0.22, 0.14, { s: 0.17 }), true, { name: 'fistL', live: true }),
       P(GEO.rock, stone, M(-0.42, 0.22, 0.14, { s: 0.17 }), true, { name: 'fistR', live: true }),
       P(GEO.cone, PALETTE.meadowLight, M(0.1, 0.78, -0.12, { sx: 0.04, sy: 0.14, sz: 0.04, rz: -0.3 }), false),
+      // gold seams in the stone, more moss, and a small flower growing on its head
+      P(GEO.box, PALETTE.gold, M(0.1, 0.38, 0.27, { sx: 0.1, sy: 0.018, sz: 0.02, rz: 0.5 }), false),
+      P(GEO.box, PALETTE.gold, M(-0.12, 0.3, 0.26, { sx: 0.08, sy: 0.018, sz: 0.02, rz: -0.4 }), false),
+      P(GEO.sphereLo, PALETTE.moss, M(-0.18, 0.5, 0.18, { sx: 0.1, sy: 0.05, sz: 0.08 }), false),
+      P(GEO.sphereLo, PALETTE.meadowLight, M(0.2, 0.22, 0.2, { sx: 0.08, sy: 0.04, sz: 0.06 }), false),
+      P(GEO.cyl, PALETTE.meadowDark, M(-0.04, 0.95, 0.06, { sx: 0.012, sy: 0.08, sz: 0.012 }), false),
+      P(GEO.sphereLo, PALETTE.flowerYellow, M(-0.04, 1.0, 0.06, { sx: 0.035, sy: 0.02, sz: 0.035 }), false),
+      P(GEO.box, PALETTE.stoneDark, M(0, 0.84, 0.148, { sx: 0.13, sy: 0.02, sz: 0.01 }), false),
     ];
   }
 
@@ -753,6 +1010,19 @@ const Renderer = (() => {
       P(GEO.sphereLo, PALETTE.acorn, M(-0.3, 0.3, 0.22, { sx: 0.09, sy: 0.11, sz: 0.09 }), true),
       P(GEO.sphereLo, PALETTE.acorn, M(-0.2, 0.3, 0.3, { sx: 0.09, sy: 0.11, sz: 0.09 }), true),
       P(GEO.sphereLo, PALETTE.acorn, M(-0.25, 0.44, 0.26, { sx: 0.09, sy: 0.11, sz: 0.09 }), true),
+      // wheel hubs and spokes, iron straps and rivets on the frame
+      P(GEO.cyl, PALETTE.stoneDark, M(0.34, 0.16, 0, { sx: 0.05, sy: 0.04, sz: 0.05, rz: Math.PI / 2 }), false),
+      P(GEO.cyl, PALETTE.stoneDark, M(-0.34, 0.16, 0, { sx: 0.05, sy: 0.04, sz: 0.05, rz: Math.PI / 2 }), false),
+      P(GEO.box, PALETTE.wood, M(0.335, 0.16, 0, { sx: 0.01, sy: 0.3, sz: 0.03 }), false),
+      P(GEO.box, PALETTE.wood, M(0.335, 0.16, 0, { sx: 0.01, sy: 0.03, sz: 0.3 }), false),
+      P(GEO.box, PALETTE.wood, M(-0.335, 0.16, 0, { sx: 0.01, sy: 0.3, sz: 0.03 }), false),
+      P(GEO.box, PALETTE.wood, M(-0.335, 0.16, 0, { sx: 0.01, sy: 0.03, sz: 0.3 }), false),
+      P(GEO.box, PALETTE.stoneDark, M(0, 0.165, 0.18, { sx: 0.52, sy: 0.11, sz: 0.04 }), false),
+      P(GEO.box, PALETTE.stoneDark, M(0, 0.165, -0.18, { sx: 0.52, sy: 0.11, sz: 0.04 }), false),
+      P(GEO.bead, PALETTE.gold, M(0.2, 0.17, 0.205, { s: 0.018 }), false),
+      P(GEO.bead, PALETTE.gold, M(-0.2, 0.17, 0.205, { s: 0.018 }), false),
+      P(GEO.bead, PALETTE.gold, M(0, 0.17, 0.205, { s: 0.018 }), false),
+      P(GEO.dome, PALETTE.acornCap, M(-0.25, 0.51, 0.26, { sx: 0.09, sy: 0.05, sz: 0.09 }), false),
     ];
   }
 
@@ -784,9 +1054,12 @@ const Renderer = (() => {
       P(GEO.cone, dark, M(-0.08, 0.12, -0.02, { sx: 0.05, sy: 0.14, sz: 0.04, rz: 0.4 }), true),
       P(GEO.cone, PALETTE.magic, M(0, 0.1, -0.08, { sx: 0.03, sy: 0.1, sz: 0.03, rx: -0.6 }), false),
       P(GEO.cone, PALETTE.magic, M(0.05, 0.09, -0.12, { sx: 0.03, sy: 0.08, sz: 0.03, rx: -0.8 }), false),
-      P(GEO.sphereLo, PALETTE.gold, M(0.06, 0.03, 0.17, { s: 0.035 }), false, { unlit: true }),
-      P(GEO.sphereLo, PALETTE.gold, M(-0.06, 0.03, 0.17, { s: 0.035 }), false, { unlit: true }),
+      P(GEO.bead, PALETTE.gold, M(0.06, 0.03, 0.17, { s: 0.035 }), false, { unlit: true }),
+      P(GEO.bead, PALETTE.gold, M(-0.06, 0.03, 0.17, { s: 0.035 }), false, { unlit: true }),
       P(GEO.box, PALETTE.cream, M(0.03, -0.05, 0.18, { sx: 0.03, sy: 0.05, sz: 0.02 }), false, { unlit: true }),
+      P(GEO.sphereLo, PALETTE.bat, M(0, -0.06, 0.08, { sx: 0.1, sy: 0.08, sz: 0.1 }), false),
+      P(GEO.bead, PALETTE.outline, M(0.065, 0.035, 0.195, { s: 0.015 }), false, { unlit: true }),
+      P(GEO.bead, PALETTE.outline, M(-0.055, 0.035, 0.195, { s: 0.015 }), false, { unlit: true }),
       P(GEO.box, dark, pivotMatrix(0.12, 0.02, 0, 0, 0, 0, 0.26, 0, 0, 0.52, 0.02, 0.3), true, { name: 'wingL', live: true }),
       P(GEO.box, dark, pivotMatrix(-0.12, 0.02, 0, 0, 0, 0, -0.26, 0, 0, 0.52, 0.02, 0.3), true, { name: 'wingR', live: true }),
     ];
@@ -807,11 +1080,18 @@ const Renderer = (() => {
       P(GEO.cone, g, pivotMatrix(-0.13, 0.62, 0, 0, 0, 1.4, 0, 0.12, 0, 0.05, 0.24, 0.04), true, { name: 'earR', live: true }),
       P(GEO.sphereLo, PALETTE.cream, M(0.07, 0.6, 0.13, { s: 0.045 }), false, { unlit: true }),
       P(GEO.sphereLo, PALETTE.cream, M(-0.07, 0.6, 0.13, { s: 0.045 }), false, { unlit: true }),
-      P(GEO.sphereLo, PALETTE.outline, M(0.08, 0.6, 0.17, { s: 0.02 }), false, { unlit: true }),
-      P(GEO.sphereLo, PALETTE.outline, M(-0.06, 0.6, 0.17, { s: 0.02 }), false, { unlit: true }),
+      P(GEO.bead, PALETTE.outline, M(0.08, 0.6, 0.17, { s: 0.02 }), false, { unlit: true }),
+      P(GEO.bead, PALETTE.outline, M(-0.06, 0.6, 0.17, { s: 0.02 }), false, { unlit: true }),
       P(GEO.cone, gd, M(0, 0.54, 0.3, { sx: 0.035, sy: 0.3, sz: 0.035, rx: Math.PI / 2 }), true, { name: 'nose' }),
       P(GEO.sphereLo, PALETTE.meadowLight, M(0.04, 0.78, -0.04, { sx: 0.16, sy: 0.05, sz: 0.24, rz: -0.3, ry: 0.4 }), true, { name: 'leaf', live: true }),
       P(GEO.cyl, PALETTE.meadowDark, M(0, 0.74, 0, { sx: 0.02, sy: 0.1, sz: 0.02 }), false),
+      // eye glints, freckle spots on its back, a pale belly
+      P(GEO.bead, PALETTE.cream, M(0.086, 0.605, 0.184, { s: 0.008 }), false, { unlit: true }),
+      P(GEO.bead, PALETTE.cream, M(-0.054, 0.605, 0.184, { s: 0.008 }), false, { unlit: true }),
+      P(GEO.sphereLo, gd, M(0.06, 0.34, -0.1, { sx: 0.035, sy: 0.035, sz: 0.015 }), false),
+      P(GEO.sphereLo, gd, M(-0.05, 0.26, -0.1, { sx: 0.03, sy: 0.03, sz: 0.015 }), false),
+      P(GEO.sphereLo, gd, M(0.02, 0.2, -0.1, { sx: 0.025, sy: 0.025, sz: 0.012 }), false),
+      P(GEO.sphereLo, PALETTE.meadowLight, M(0, 0.26, 0.065, { sx: 0.075, sy: 0.12, sz: 0.05 }), false),
     ];
   }
 
@@ -830,14 +1110,23 @@ const Renderer = (() => {
       P(GEO.cone, PALETTE.cream, M(-0.09, 0.42, 0.44, { sx: 0.03, sy: 0.1, sz: 0.03 }), false, { unlit: true }),
       P(GEO.sphereLo, PALETTE.cream, M(0.08, 0.56, 0.46, { s: 0.04 }), false, { unlit: true }),
       P(GEO.sphereLo, PALETTE.cream, M(-0.08, 0.56, 0.46, { s: 0.04 }), false, { unlit: true }),
-      P(GEO.sphereLo, PALETTE.outline, M(0.08, 0.56, 0.49, { s: 0.02 }), false, { unlit: true }),
-      P(GEO.sphereLo, PALETTE.outline, M(-0.08, 0.56, 0.49, { s: 0.02 }), false, { unlit: true }),
+      P(GEO.bead, PALETTE.outline, M(0.08, 0.56, 0.49, { s: 0.02 }), false, { unlit: true }),
+      P(GEO.bead, PALETTE.outline, M(-0.08, 0.56, 0.49, { s: 0.02 }), false, { unlit: true }),
       P(GEO.cyl, t, M(0.36, 0.3, 0.14, { sx: 0.1, sy: 0.4, sz: 0.1, rz: -0.25 }), true, { name: 'armL', live: true }),
       P(GEO.cyl, t, M(-0.36, 0.3, 0.14, { sx: 0.1, sy: 0.4, sz: 0.1, rz: 0.25 }), true, { name: 'armR', live: true }),
       P(GEO.sphereLo, td, M(0.42, 0.08, 0.2, { sx: 0.14, sy: 0.09, sz: 0.14 }), true, { name: 'fistL', live: true }),
       P(GEO.sphereLo, td, M(-0.42, 0.08, 0.2, { sx: 0.14, sy: 0.09, sz: 0.14 }), true, { name: 'fistR', live: true }),
       P(GEO.sphereLo, td, M(0.14, 0.06, -0.02, { sx: 0.13, sy: 0.07, sz: 0.16 }), true, { name: 'footL', live: true }),
       P(GEO.sphereLo, td, M(-0.14, 0.06, -0.02, { sx: 0.13, sy: 0.07, sz: 0.16 }), true, { name: 'footR', live: true }),
+      // eye glints, a lichen-crusted rock and a second toadstool on its back, brow ridge
+      P(GEO.bead, PALETTE.cream, M(0.088, 0.568, 0.505, { s: 0.009 }), false, { unlit: true }),
+      P(GEO.bead, PALETTE.cream, M(-0.072, 0.568, 0.505, { s: 0.009 }), false, { unlit: true }),
+      P(GEO.box, td, M(0, 0.62, 0.44, { sx: 0.24, sy: 0.04, sz: 0.06, rx: 0.2 }), false),
+      P(GEO.rock, PALETTE.stone, M(0.18, 0.72, -0.2, { s: 0.08 }), false),
+      P(GEO.sphereLo, PALETTE.flowerYellow, M(0.18, 0.79, -0.2, { sx: 0.05, sy: 0.02, sz: 0.05 }), false),
+      P(GEO.cyl, PALETTE.cream, M(-0.2, 0.78, -0.02, { sx: 0.02, sy: 0.08, sz: 0.02 }), false),
+      P(GEO.dome, PALETTE.capRed, M(-0.2, 0.82, -0.02, { sx: 0.06, sy: 0.045, sz: 0.06 }), false),
+      P(GEO.bead, PALETTE.cream, M(-0.21, 0.86, 0.0, { s: 0.012 }), false),
     ];
   }
 
@@ -1498,7 +1787,7 @@ const Renderer = (() => {
       P, M, GEO, PALETTE, batchPart, batchDecal, liveProp, decal, colored,
       toon, unlit, addOutline, srand, lerpColor, shakeCamera, puff,
       treeParts, deadTreeParts, rockParts, mushroomParts, tuftParts, flowerParts, acornParts,
-      water,
+      water, masonry, towerCourses, roofCourses, windowDress, glow, setGlow, bannerGeo, shade,
       worldX, worldZ, cols, rows, border,
       scene, animated,
       level: GameState.currentLevel(),
@@ -1546,6 +1835,7 @@ const Renderer = (() => {
     buildParticles();
     buildSelection();
     flushBatch();
+    flushGlow();
 
     resize();
     window.addEventListener('resize', resize);

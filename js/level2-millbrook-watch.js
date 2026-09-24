@@ -25,6 +25,7 @@ const LEVEL_2 = (() => {
     const { P, M, GEO, PALETTE, batchPart, batchDecal, liveProp, decal, toon, unlit,
       addOutline, srand, lerpColor, scene, animated, shakeCamera, puff,
       treeParts, deadTreeParts, rockParts, mushroomParts, tuftParts, flowerParts, acornParts,
+      masonry, towerCourses, roofCourses, windowDress, glow, setGlow, bannerGeo,
       worldX, worldZ, cols, rows, border, level } = kit;
 
     function buildStream() {
@@ -138,6 +139,10 @@ const LEVEL_2 = (() => {
       batchPart(P(GEO.cyl, stone, M(kx, KT / 2, kz, { sx: 0.46, sy: KT, sz: 0.46 })), wm);
       batchPart(P(GEO.cyl, dark, M(kx, KT, kz, { sx: 0.53, sy: 0.1, sz: 0.53 })), wm);
       batchPart(P(GEO.cone, PALETTE.capRed, M(kx, KT + 0.35, kz, { sx: 0.62, sy: 0.7, sz: 0.62 })), wm);
+      roofCourses(wm, { x: 0, y: H + 0.02, z: -0.1, r: 1.35, h: 0.7, color: PALETTE.capBrown, rings: 4, ez: 1.62 / 1.35 });
+      roofCourses(wm, { x: kx, y: KT, z: kz, r: 0.62, h: 0.7, color: PALETTE.capRed, kind: 'cone' });
+      towerCourses(wm, { x: kx, z: kz, r: 0.46, y0: H + 0.2, y1: KT - 0.08, holes: [[0, 1.8, 0.34]], seed: 21 });
+      batchPart(P(GEO.sphereLo, PALETTE.gold, M(kx, KT + 1.17, kz, { s: 0.05 })), wm);
       // the mill wheel, mounted on the east flank, turning continuously
       const wheelX = cx + 1.05, wheelY = 0.62, wheelZ = cz + 0.2;
       const wheelGroup = new THREE.Group();
@@ -185,7 +190,12 @@ const LEVEL_2 = (() => {
         l.userData.phase = lx * 7;
         scene.add(l);
         lanterns.push(l);
+        glow(cx + lx, 0.6, cz + gz + 0.28, { w: 0.5, h: 0.5 });
       }
+      // laid-stone courses on the south and east faces
+      masonry(wm, { face: 'z', at: 1.05, u0: -0.9, u1: 0.9, y0: 0.24, y1: H, seed: 22,
+        holes: [[gx, 0.5, 0.68, 1.12], [-0.55, 1.05, 0.3, 0.36], [0.35, 0.7, 0.3, 0.36], [0.35, 1.15, 0.3, 0.36]] });
+      masonry(wm, { face: 'x', at: 0.9, u0: -1.25, u1: 1.0, y0: 0.24, y1: H, seed: 23 });
       // warm lit windows
       const windows = [];
       const winSpots = [
@@ -199,20 +209,15 @@ const LEVEL_2 = (() => {
         w.userData.phase = wx * 3 + wz * 5;
         scene.add(w);
         windows.push(w);
+        windowDress(wm, wx, wy, wz, axis, { h: 0.22, sign: axis === 'x' ? -1 : 1 });
       }
       // a small pennant on the grain tower
       const pole = new THREE.Mesh(GEO.cyl, toon(PALETTE.wood));
       pole.position.set(cx + kx, KT + 0.7, cz + kz);
       pole.scale.set(0.03, 0.9, 0.03);
       scene.add(pole);
-      const bannerGeo = new THREE.PlaneGeometry(0.6, 0.36, 6, 3);
-      const bp = bannerGeo.attributes.position, bcols = new Float32Array(bp.count * 3);
-      const gold = new THREE.Color(PALETTE.gold), teal = new THREE.Color(PALETTE.trickster);
-      for (let i = 0; i < bp.count; i++) {
-        const col = Math.abs(bp.getY(i)) < 0.06 ? teal : gold;
-        bcols[i * 3] = col.r; bcols[i * 3 + 1] = col.g; bcols[i * 3 + 2] = col.b;
-      }
-      bannerGeo.setAttribute('color', new THREE.BufferAttribute(bcols, 3));
+      const bannerGeo = kit.bannerGeo(0.6, 0.36, { field: PALETTE.trickster, stripe: PALETTE.gold });
+      const bp = bannerGeo.attributes.position;
       const banner = new THREE.Mesh(bannerGeo, toon(0xffffff, { vc: true, side: THREE.DoubleSide }));
       banner.position.set(cx + kx + 0.32, KT + 0.9, cz + kz);
       scene.add(banner);
@@ -246,6 +251,7 @@ const LEVEL_2 = (() => {
         dmg.rubble.visible = st >= 2;
         dmg.fire.visible = st >= 2;
         dmg.scorch.visible = st >= 2;
+        setGlow(st >= 2 ? 0.35 : 1);
         shakeCamera(0.12, 0.4);
         puff(cx - 0.5, 0.5, cz + 1.1, { count: 16, color: PALETTE.stone, speed: 2, size: 0.12, up: 1.6, ttl: 0.8 });
       });
