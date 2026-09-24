@@ -386,6 +386,22 @@ async function enterLevel(page, levelId) {
   await page.locator('#end-map-btn').click(); await page.waitForTimeout(250);
   check('Continue jumps straight to the world map, no title-screen detour', await page.locator('#worldmap').isVisible() && !(await page.locator('#title').isVisible()));
   check('Continue pre-selects the next level', await page.evaluate(() => document.querySelector('.wm-node.selected')?.dataset.level) === 'millbrook-watch');
+  // ---- P3-M3a overworld: positions from level data, blight recedes, roads show progress ----
+  check('world-map nodes sit where each level\'s map data puts them', await page.evaluate(() => LEVELS.every((lv) => {
+    const n = document.querySelector(`.wm-node[data-level="${lv.id}"]`);
+    return n && lv.map && n.getAttribute('transform') === `translate(${lv.map.x}, ${lv.map.y})`;
+  })));
+  const wm1 = await page.evaluate(() => ({
+    cut: !!document.querySelector('#wm-cuts .wm-cut[data-level="shadow-hollow"]'),
+    otherCuts: document.querySelectorAll('#wm-cuts .wm-cut:not([data-level="shadow-hollow"])').length,
+    seg: document.querySelector('.wm-seg[data-from="shadow-hollow"][data-to="millbrook-watch"]')?.getAttribute('class'),
+    next: document.querySelector('.wm-node.next')?.dataset.level,
+  }));
+  check('winning Level 1 cuts its ground out of the blight, and only its ground', wm1.cut && wm1.otherCuts === 0, JSON.stringify(wm1));
+  check('the road to the next battle is open and that node is marked next', /\bopen\b/.test(wm1.seg || '') && wm1.next === 'millbrook-watch', JSON.stringify(wm1));
+  await page.waitForTimeout(1400);
+  const cutR = await page.evaluate(() => ({ r: +document.querySelector('#wm-cuts .wm-cut[data-level="shadow-hollow"]').getAttribute('r'), full: LEVELS.find((l) => l.id === 'shadow-hollow').map.reclaim }));
+  check('the blight finishes receding to the level\'s reclaim radius', Math.abs(cutR.r - cutR.full) < 0.5, JSON.stringify(cutR));
   await page.evaluate(() => { document.getElementById('worldmap').classList.remove('show'); });
 
   // ---- progress persistence: the win must survive a reload, via localStorage ----
@@ -498,6 +514,12 @@ async function enterLevel(page, levelId) {
   check('Level 2 win screen shows stars', mixed2.phase !== 'won' || (await page.locator('#end').isVisible() && await page.locator('#stars span.lit').count() === mixed2.stars));
   await page.screenshot({ path: `${OUT}/level2-win.png` });
   check('Level 2 win recorded progress', await page.evaluate(() => Progress.starsFor('millbrook-watch') > 0));
+  if (mixed2.phase === 'won') {
+    await page.locator('#end-map-btn').click(); await page.waitForTimeout(250);
+    const seg12 = await page.evaluate(() => document.querySelector('.wm-seg[data-from="shadow-hollow"][data-to="millbrook-watch"]')?.getAttribute('class'));
+    check('with both ends won, the Level 1 to Level 2 road is claimed', /\bclaimed\b/.test(seg12 || ''), seg12);
+    await page.evaluate(() => { document.getElementById('worldmap').classList.remove('show'); });
+  }
   await page.evaluate(() => { document.getElementById('end').classList.remove('show'); });
 
   for (const type of ['slinger', 'warden', 'druid', 'golem', 'artillery']) {

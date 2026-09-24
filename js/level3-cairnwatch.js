@@ -470,6 +470,9 @@ const LEVEL_3 = (() => {
     index: 3,
     name: 'The Cairnwatch',
     subtitle: 'A border half lost. Hold the Cairnwatch Tower.',
+    // overworld node: position in the world map's 800x320 viewBox, and how
+    // much blight a win here clears around it
+    map: { x: 322, y: 150, reclaim: 100, icon: 'tower' },
     grid: { cols: 20, rows: 12 },
     spawn: [0, 5],
     pathWaypoints: [[0, 5], [3, 5], [3, 2], [7, 2], [7, 9], [12, 9], [12, 3], [16, 3], [16, 6], [17, 6]],

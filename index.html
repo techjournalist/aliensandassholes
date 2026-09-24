@@ -14,6 +14,22 @@
     --bark: #8b5a2b;
     --magic: #c861e0;
     --panel: rgba(27, 20, 16, 0.82);
+    /* world-map art, all straight from PALETTE in js/palette-config.js */
+    --meadow-dark: #5c9a3d;
+    --meadow-light: #86c25c;
+    --path: #c9a46a;
+    --path-edge: #b08a52;
+    --stone: #8e8f86;
+    --stone-dark: #6d6e66;
+    --water: #4fa3c9;
+    --foam: #d8f3fb;
+    --straw: #d4a94a;
+    --cap-red: #d9503f;
+    --cap-brown: #b8473a;
+    --hollow: #5a5062;
+    --hollow-earth: #3f3848;
+    --hollow-wood: #4a3f44;
+    --spore: #8a5fc4;
   }
   * { box-sizing: border-box; }
   html, body {
@@ -181,6 +197,7 @@
     .howto { margin-bottom: 10px; font-size: 14px; }
     .howto li { margin: 4px 0; }
     .screen button { min-height: 46px; font-size: 17px; }
+    #worldmap h1 { font-size: 30px; }
   }
   #wave-btn .sub { display: block; font-size: 12px; font-weight: 700; opacity: 0.8; line-height: 1.1; }
   #boss-bar {
@@ -274,7 +291,48 @@
   #load-error h1 { color: var(--gold); margin: 0 0 10px; }
   /* -------- world map -------- */
   #wm-svg { width: 100%; height: auto; max-height: 46vh; margin: 4px 0 8px; overflow: visible; }
-  #wm-road { fill: none; stroke: var(--bark); stroke-width: 6; stroke-linecap: round; stroke-dasharray: 2 14; opacity: 0.7; }
+  .wm-land { fill: var(--moss); stroke: var(--ink); stroke-width: 3; }
+  .wm-coast { fill: none; stroke: var(--meadow-dark); stroke-width: 10; opacity: 0.8; }
+  .wm-patch { fill: var(--meadow-light); opacity: 0.45; }
+  .wm-river { fill: none; stroke: var(--water); stroke-width: 8; stroke-linecap: round; }
+  .wm-river-foam { fill: none; stroke: var(--foam); stroke-width: 2; stroke-linecap: round; stroke-dasharray: 6 16; opacity: 0.8; animation: wm-flow 2.4s linear infinite; }
+  .wm-tree { fill: var(--meadow-dark); stroke: var(--ink); stroke-width: 1.5; }
+  .wm-tree-lit { fill: var(--meadow-light); }
+  .wm-field { fill: var(--straw); stroke: var(--ink); stroke-width: 1.2; }
+  .wm-field-row { stroke: var(--bark); stroke-width: 1; opacity: 0.5; }
+  .wm-mtn { fill: var(--stone); stroke: var(--ink); stroke-width: 1.5; stroke-linejoin: round; }
+  .wm-mtn-shade { fill: var(--stone-dark); }
+  .wm-snow { fill: var(--cream); }
+  .wm-blight { fill: url(#wm-blight-grad); }
+  .wm-crack { fill: none; stroke: var(--spore); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; animation: wm-pulse 3.2s ease-in-out infinite; }
+  .wm-deadtree { stroke: var(--hollow-wood); stroke-width: 2.5; stroke-linecap: round; fill: none; }
+  .wm-heart-stump { fill: var(--hollow-wood); stroke: var(--ink); stroke-width: 2; }
+  .wm-heart-glow { fill: var(--magic); animation: wm-pulse 2.2s ease-in-out infinite; }
+  .wm-heart-label { fill: var(--cream); font-size: 12px; font-style: italic; opacity: 0.85; }
+  .wm-seg { fill: none; stroke-linecap: round; }
+  .wm-seg-edge { stroke: var(--path-edge); stroke-width: 11; }
+  .wm-seg.claimed { stroke: var(--path); stroke-width: 7; }
+  .wm-seg.open { stroke: var(--gold); stroke-width: 4; stroke-dasharray: 2 11; animation: wm-march 1.1s linear infinite; }
+  .wm-seg.locked { stroke: var(--bark); stroke-width: 4; stroke-dasharray: 2 11; opacity: 0.55; }
+  .wm-glyph { pointer-events: none; }
+  .wm-glyph .st { fill: var(--stone); stroke: var(--ink); stroke-width: 1.4; }
+  .wm-glyph .rf { fill: var(--cap-red); stroke: var(--ink); stroke-width: 1.4; }
+  .wm-glyph .rb { fill: var(--cap-brown); stroke: var(--ink); stroke-width: 1.4; }
+  .wm-glyph .wd { fill: none; stroke: var(--bark); stroke-width: 2; }
+  .wm-glyph .wn { fill: var(--gold); }
+  .wm-pennant-pole { stroke: var(--bark); stroke-width: 2; }
+  .wm-pennant { fill: var(--gold); stroke: var(--ink); stroke-width: 1; animation: wm-wave 1.6s ease-in-out infinite; transform-box: fill-box; transform-origin: left center; }
+  .wm-next-ring { fill: none; stroke: var(--gold); stroke-width: 3; transform-box: fill-box; transform-origin: center; animation: wm-ping 1.6s ease-out infinite; pointer-events: none; }
+  .wm-puff { fill: var(--spore); transform-box: fill-box; transform-origin: center; animation: wm-puff 1s ease-out forwards; pointer-events: none; }
+  @keyframes wm-flow { to { stroke-dashoffset: -44; } }
+  @keyframes wm-march { to { stroke-dashoffset: -26; } }
+  @keyframes wm-pulse { 0%, 100% { opacity: 0.45; } 50% { opacity: 0.95; } }
+  @keyframes wm-ping { 0% { transform: scale(0.8); opacity: 0.9; } 100% { transform: scale(1.45); opacity: 0; } }
+  @keyframes wm-wave { 0%, 100% { transform: skewY(0deg); } 50% { transform: skewY(-12deg); } }
+  @keyframes wm-puff { 0% { transform: scale(0.3); opacity: 0.9; } 100% { transform: scale(1.8) translateY(-6px); opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) {
+    .wm-river-foam, .wm-crack, .wm-heart-glow, .wm-seg.open, .wm-pennant, .wm-next-ring { animation: none; }
+  }
   .wm-node { cursor: pointer; }
   .wm-node .wm-node-hit { fill: transparent; }
   .wm-node .wm-node-badge { fill: var(--panel); stroke: var(--moss); stroke-width: 3; transition: stroke 0.15s ease, fill 0.15s ease; }
@@ -285,6 +343,7 @@
   .wm-node.locked { opacity: 0.45; cursor: default; }
   .wm-node.locked .wm-node-badge { stroke: #6d6e66; }
   #wm-blurb { min-height: 44px; }
+  #wm-blurb .wm-name { display: block; color: var(--gold); font-weight: 800; }
 </style>
 </head>
 <body>
@@ -330,7 +389,61 @@
     <div class="eyebrow">The Kingdom of Briar</div>
     <h1>Choose your ground</h1>
     <svg id="wm-svg" viewBox="0 0 800 320" role="img" aria-label="Map of the Briar kingdom and its battle sites">
-      <path id="wm-road" d="M 40 240 Q 250 100 400 200 T 760 160"></path>
+      <defs>
+        <radialGradient id="wm-soft">
+          <stop offset="0" stop-color="#000" stop-opacity="1"></stop>
+          <stop offset="0.6" stop-color="#000" stop-opacity="1"></stop>
+          <stop offset="1" stop-color="#000" stop-opacity="0"></stop>
+        </radialGradient>
+        <linearGradient id="wm-blight-grad" x1="0" y1="0" x2="1" y2="0.6">
+          <stop offset="0" stop-color="#3f3848" stop-opacity="0.96"></stop>
+          <stop offset="0.7" stop-color="#5a5062" stop-opacity="0.86"></stop>
+          <stop offset="1" stop-color="#5a5062" stop-opacity="0.7"></stop>
+        </linearGradient>
+        <clipPath id="wm-land-clip"><path d="M 60 40 C 150 10, 300 22, 420 18 C 540 14, 660 30, 740 52 C 790 70, 786 140, 772 200 C 760 260, 730 300, 640 304 C 520 310, 380 300, 260 304 C 150 308, 60 296, 34 250 C 12 200, 20 120, 30 80 C 36 58, 44 46, 60 40 Z"></path></clipPath>
+        <mask id="wm-reclaim" maskUnits="userSpaceOnUse" x="-20" y="-20" width="840" height="360">
+          <rect x="-20" y="-20" width="840" height="360" fill="#fff"></rect>
+          <g id="wm-cuts"></g>
+        </mask>
+      </defs>
+      <!-- the kingdom: home in the south-east, the Hollow's heart in the far north-west -->
+      <path class="wm-coast" d="M 60 40 C 150 10, 300 22, 420 18 C 540 14, 660 30, 740 52 C 790 70, 786 140, 772 200 C 760 260, 730 300, 640 304 C 520 310, 380 300, 260 304 C 150 308, 60 296, 34 250 C 12 200, 20 120, 30 80 C 36 58, 44 46, 60 40 Z"></path>
+      <path class="wm-land" d="M 60 40 C 150 10, 300 22, 420 18 C 540 14, 660 30, 740 52 C 790 70, 786 140, 772 200 C 760 260, 730 300, 640 304 C 520 310, 380 300, 260 304 C 150 308, 60 296, 34 250 C 12 200, 20 120, 30 80 C 36 58, 44 46, 60 40 Z"></path>
+      <ellipse class="wm-patch" cx="690" cy="150" rx="60" ry="34"></ellipse>
+      <ellipse class="wm-patch" cx="420" cy="258" rx="70" ry="26"></ellipse>
+      <ellipse class="wm-patch" cx="200" cy="120" rx="80" ry="30"></ellipse>
+      <path class="wm-river" d="M 598 20 C 575 70, 612 118, 572 168 C 542 206, 586 250, 560 306"></path>
+      <path class="wm-river-foam" d="M 598 20 C 575 70, 612 118, 572 168 C 542 206, 586 250, 560 306"></path>
+      <!-- fields around the mill -->
+      <g transform="translate(398 244) rotate(-12)"><rect class="wm-field" x="-30" y="-12" width="60" height="24" rx="3"></rect><path class="wm-field-row" d="M -26 -5 H 26 M -26 2 H 26 M -26 9 H 26"></path></g>
+      <g transform="translate(520 112) rotate(8)"><rect class="wm-field" x="-24" y="-10" width="48" height="20" rx="3"></rect><path class="wm-field-row" d="M -20 -3 H 20 M -20 4 H 20"></path></g>
+      <!-- the mountains of the border, around the Cairnwatch -->
+      <g>
+        <path class="wm-mtn" d="M 236 118 L 266 64 L 298 118 Z"></path><path class="wm-mtn-shade" d="M 266 64 L 298 118 L 272 118 Z"></path><path class="wm-snow" d="M 266 64 L 257 80 L 266 76 L 275 80 Z"></path>
+        <path class="wm-mtn" d="M 280 112 L 318 50 L 358 112 Z"></path><path class="wm-mtn-shade" d="M 318 50 L 358 112 L 326 112 Z"></path><path class="wm-snow" d="M 318 50 L 307 68 L 318 63 L 329 68 Z"></path>
+        <path class="wm-mtn" d="M 350 104 L 376 66 L 402 104 Z"></path><path class="wm-mtn-shade" d="M 376 66 L 402 104 L 382 104 Z"></path><path class="wm-snow" d="M 376 66 L 369 77 L 376 74 L 383 77 Z"></path>
+        <path class="wm-mtn" d="M 150 250 L 172 216 L 196 250 Z"></path><path class="wm-mtn-shade" d="M 172 216 L 196 250 L 178 250 Z"></path>
+      </g>
+      <!-- woods -->
+      <g id="wm-trees"></g>
+      <!-- the blight: masked away wherever a battle has been won -->
+      <g clip-path="url(#wm-land-clip)"><g mask="url(#wm-reclaim)">
+        <path class="wm-blight" d="M 22 60 C 60 20, 200 14, 330 20 C 420 24, 500 16, 560 30 C 600 60, 572 110, 610 150 C 650 190, 700 200, 712 240 C 722 280, 690 306, 640 306 C 520 312, 330 304, 200 306 C 90 308, 40 296, 26 250 C 12 190, 16 110, 22 60 Z"></path>
+        <path class="wm-crack" d="M 60 70 L 110 96 L 150 90 L 210 132 L 262 150 L 330 176 L 380 170 L 440 214 L 500 222 L 560 250 L 610 262"></path>
+        <path class="wm-crack" d="M 110 96 L 120 150 L 96 200 L 130 250"></path>
+        <path class="wm-crack" d="M 262 150 L 240 200 L 280 260"></path>
+        <path class="wm-crack" d="M 440 214 L 452 170 L 500 140 L 530 90"></path>
+        <g id="wm-deadwood"></g>
+      </g></g>
+      <!-- the Heart of the Hollow: where all this comes from -->
+      <g transform="translate(58 58)">
+        <circle class="wm-heart-glow" r="22" opacity="0.5"></circle>
+        <path class="wm-heart-stump" d="M -16 12 L -12 -8 L -6 -2 L -2 -14 L 4 -4 L 10 -12 L 14 10 Z"></path>
+        <path class="wm-crack" d="M -4 10 L 0 -2 L 4 6"></path>
+        <text class="wm-heart-label" x="26" y="-10">the Heart of the Hollow</text>
+      </g>
+      <g id="wm-roads"></g>
+      <g id="wm-fx"></g>
     </svg>
     <p id="wm-blurb" class="stakes">Pick a battle on the map.</p>
     <button id="wm-play-btn" type="button" disabled>Choose a battle</button>

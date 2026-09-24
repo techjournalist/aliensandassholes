@@ -186,42 +186,137 @@ const UI = (() => {
   }
 
   // -------- world map: pick a level, see stars/locks, commit --------
-  let mapSelected = null;
+  // Static art (land, river, mountains, the blight and the Hollow's heart)
+  // lives in index.html. This draws what depends on progress: roads, the
+  // ground each won battle has reclaimed from the blight, and the nodes.
+  const SVGNS = 'http://www.w3.org/2000/svg';
+  const svgEl = (tag, attrs = {}, cls) => {
+    const el = document.createElementNS(SVGNS, tag);
+    for (const k in attrs) el.setAttribute(k, attrs[k]);
+    if (cls) el.setAttribute('class', cls);
+    return el;
+  };
+  const reducedMotion = () => window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // where a level sits on the map; levels without hand-placed data fall back to a spread
+  function mapPos(lv, i) {
+    if (lv.map) return lv.map;
+    return { x: 90 + i * (620 / Math.max(1, LEVELS.length - 1)), y: 210 + Math.sin(i * 1.3) * 60, reclaim: 90 };
+  }
+  // tiny landmarks matching each level's real endpoint
+  const GLYPHS = {
+    keep: '<rect class="st" x="-9" y="-6" width="18" height="12"></rect><rect class="st" x="-12" y="-12" width="7" height="18"></rect><rect class="st" x="5" y="-12" width="7" height="18"></rect>'
+      + '<path class="rf" d="M -13 -12 A 4.5 4.5 0 0 1 -4 -12 Z"></path><path class="rf" d="M 4 -12 A 4.5 4.5 0 0 1 13 -12 Z"></path><rect class="wn" x="-2" y="-2" width="4" height="5"></rect>',
+    mill: '<rect class="st" x="-10" y="-5" width="15" height="11"></rect><path class="rb" d="M -12 -5 L -2.5 -13 L 7 -5 Z"></path>'
+      + '<circle class="wd" cx="9" cy="2" r="6"></circle><path class="wd" d="M 3 2 H 15 M 9 -4 V 8"></path>',
+    tower: '<rect class="st" x="-5" y="-10" width="10" height="17"></rect><path class="rb" d="M -7 -10 L 0 -20 L 7 -10 Z"></path><rect class="wn" x="-1.5" y="-5" width="3" height="4"></rect>',
+  };
+  const HOME_TREES = [[720, 108], [742, 160], [700, 88], [738, 226], [714, 268], [668, 68], [750, 118], [690, 290]];
+  const DEADWOOD = [[150, 160], [92, 228], [204, 268], [380, 282], [462, 118], [250, 212], [520, 272], [176, 70], [412, 60]];
+  let artDrawn = false;
+  function drawMapArt() {
+    if (artDrawn) return;
+    artDrawn = true;
+    const trees = $('wm-trees');
+    for (const [x, y] of HOME_TREES) {
+      trees.appendChild(svgEl('circle', { cx: x, cy: y, r: 11 }, 'wm-tree'));
+      trees.appendChild(svgEl('circle', { cx: x - 3, cy: y - 4, r: 5 }, 'wm-tree-lit'));
+    }
+    const dead = $('wm-deadwood');
+    for (const [x, y] of DEADWOOD) {
+      dead.appendChild(svgEl('path', { d: `M ${x} ${y + 8} L ${x} ${y - 8} M ${x} ${y - 2} L ${x - 6} ${y - 9} M ${x} ${y - 5} L ${x + 5} ${y - 11}` }, 'wm-deadtree'));
+    }
+  }
+  let mapSelected = null, firstWin = null;
   function renderWorldMap() {
+    drawMapArt();
     const svg = $('wm-svg');
     svg.querySelectorAll('.wm-node').forEach((n) => n.remove());
-    const n = LEVELS.length;
-    LEVELS.forEach((lv, i) => {
+    const cuts = $('wm-cuts'), roads = $('wm-roads');
+    cuts.innerHTML = ''; roads.innerHTML = '';
+    const won = (lv) => Progress.starsFor(lv.id) > 0;
+    const ordered = LEVELS.slice().sort((a, b) => a.index - b.index);
+    // the next battle to fight: the first unlocked level not yet won
+    const next = ordered.find((lv) => Progress.isUnlocked(lv.id) && !won(lv));
+    // reclaimed ground: a soft hole in the blight around every won battle
+    ordered.forEach((lv, i) => {
+      if (!won(lv)) return;
+      const p = mapPos(lv, i);
+      cuts.appendChild(svgEl('circle', { cx: p.x, cy: p.y, r: p.reclaim, fill: 'url(#wm-soft)', 'data-level': lv.id }, 'wm-cut'));
+    });
+    // roads between consecutive battles: claimed, open (the way forward) or locked
+    for (let i = 0; i < ordered.length - 1; i++) {
+      const a = mapPos(ordered[i], i), b = mapPos(ordered[i + 1], i + 1);
+      const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2, len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+      const bend = (i % 2 ? -1 : 1) * 16;
+      const d = `M ${a.x} ${a.y} Q ${mx - (b.y - a.y) / len * bend} ${my + (b.x - a.x) / len * bend} ${b.x} ${b.y}`;
+      const state = won(ordered[i]) && won(ordered[i + 1]) ? 'claimed'
+        : Progress.isUnlocked(ordered[i + 1].id) ? 'open' : 'locked';
+      if (state === 'claimed') roads.appendChild(svgEl('path', { d }, 'wm-seg wm-seg-edge'));
+      roads.appendChild(svgEl('path', { d, 'data-from': ordered[i].id, 'data-to': ordered[i + 1].id }, `wm-seg ${state}`));
+    }
+    ordered.forEach((lv, i) => {
       const unlocked = Progress.isUnlocked(lv.id);
       const stars = Progress.starsFor(lv.id);
-      const x = 90 + i * (620 / Math.max(1, n - 1 || 1));
-      const y = 210 + Math.sin(i * 1.3) * 60;
-      const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-      g.setAttribute('class', 'wm-node' + (unlocked ? '' : ' locked') + (lv.id === mapSelected ? ' selected' : ''));
-      g.setAttribute('data-level', lv.id);
-      g.setAttribute('transform', `translate(${x}, ${y})`);
-      g.setAttribute('tabindex', unlocked ? '0' : '-1');
-      g.setAttribute('role', 'button');
+      const { x, y } = mapPos(lv, i);
+      const cls = 'wm-node' + (unlocked ? '' : ' locked') + (lv.id === mapSelected ? ' selected' : '') + (next && lv.id === next.id ? ' next' : '');
+      const g = svgEl('g', { 'data-level': lv.id, transform: `translate(${x}, ${y})`, tabindex: unlocked ? '0' : '-1', role: 'button' }, cls);
       g.setAttribute('aria-label', unlocked ? `${lv.name}, ${stars} stars` : `${lv.name}, locked`);
       const starDots = unlocked
         ? [0, 1, 2].map((k) => `<circle class="wm-star ${k < stars ? 'lit' : ''}" cx="${(k - 1) * 11}" cy="34" r="4"></circle>`).join('')
         : '';
+      const glyph = lv.map && GLYPHS[lv.map.icon] ? `<g class="wm-glyph" transform="translate(-36 -16)">${GLYPHS[lv.map.icon]}</g>` : '';
+      const pennant = stars > 0 ? '<line class="wm-pennant-pole" x1="17" y1="-14" x2="17" y2="-40"></line><path class="wm-pennant" d="M 17 -40 L 33 -35 L 17 -30 Z"></path>' : '';
       g.innerHTML = `
         <circle class="wm-node-hit" r="46"></circle>
+        ${next && lv.id === next.id ? '<circle class="wm-next-ring" r="24"></circle>' : ''}
+        ${glyph}${pennant}
         <circle class="wm-node-badge" r="20"></circle>
         ${unlocked ? `<text class="wm-node-label" text-anchor="middle" dy="6">${lv.index}</text>` : `<text class="wm-lock-icon" text-anchor="middle" dy="6">&#128274;</text>`}
         ${starDots}`;
       svg.appendChild(g);
     });
     const sel = LEVELS.find((l) => l.id === mapSelected);
-    $('wm-blurb').textContent = sel ? sel.subtitle : 'Pick a battle on the map.';
+    const blurb = $('wm-blurb');
+    blurb.textContent = '';
+    if (sel) {
+      const name = document.createElement('span');
+      name.className = 'wm-name';
+      name.textContent = sel.name;
+      blurb.append(name, sel.subtitle);
+    } else blurb.textContent = 'Pick a battle on the map.';
     $('wm-play-btn').disabled = !sel;
     $('wm-play-btn').textContent = sel && sel.id === GameState.currentLevel().id ? `Hold ${sel.name}` : sel ? `March to ${sel.name}` : 'Choose a battle';
   }
-  function enterWorldMap(preselectId) {
+  // The payoff for a first win: the blight visibly pulls back from the
+  // battlefield, with a burst of spores and a chime.
+  function playReclaim(id) {
+    const cut = $('wm-cuts').querySelector(`[data-level="${id}"]`);
+    if (!cut || reducedMotion()) return;
+    const full = +cut.getAttribute('r'), cx = +cut.getAttribute('cx'), cy = +cut.getAttribute('cy');
+    const t0 = performance.now(), dur = 1100;
+    cut.setAttribute('r', 0);
+    const step = (now) => {
+      if (!cut.isConnected) return;
+      const k = Math.min(1, (now - t0) / dur), e = 1 - (1 - k) ** 3;
+      cut.setAttribute('r', (full * e).toFixed(1));
+      if (k < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+    const fx = $('wm-fx');
+    for (let i = 0; i < 10; i++) {
+      const a = (i / 10) * Math.PI * 2, d = full * (0.35 + 0.4 * Math.random());
+      const p = svgEl('circle', { cx: (cx + Math.cos(a) * d).toFixed(1), cy: (cy + Math.sin(a) * d * 0.8).toFixed(1), r: 3 + Math.random() * 3 }, 'wm-puff');
+      p.style.animationDelay = `${(i * 0.06).toFixed(2)}s`;
+      fx.appendChild(p);
+      setTimeout(() => p.remove(), 1800);
+    }
+    try { Audio.sfx.bonus(); } catch (e) { /* audio is optional */ }
+  }
+  function enterWorldMap(preselectId, reclaimedId) {
     mapSelected = preselectId || GameState.currentLevel().id;
     renderWorldMap();
     $('worldmap').classList.add('show');
+    if (reclaimedId) playReclaim(reclaimedId);
   }
   function commitLevel(id) {
     if (id === GameState.currentLevel().id) {
@@ -268,7 +363,7 @@ const UI = (() => {
     try { skipToPlay = sessionStorage.getItem('bb-enter-play') === '1'; sessionStorage.removeItem('bb-enter-play'); } catch (e) { /* ignore */ }
     if (skipToPlay) GameState.startGame(); else $('title').classList.add('show');
     $('start-btn').addEventListener('click', () => { Audio.unlock(); $('title').classList.remove('show'); enterWorldMap(); });
-    $('wm-svg').addEventListener('click', (e) => {
+    const pickNode = (e) => {
       const node = e.target.closest('.wm-node');
       if (!node) return;
       const id = node.dataset.level;
@@ -279,15 +374,25 @@ const UI = (() => {
         return;
       }
       Audio.unlock();
+      if (mapSelected !== id) Audio.sfx.select();
       mapSelected = id;
       renderWorldMap();
+      // keep keyboard focus on the node the player just picked
+      if (e.type === 'keydown') { const again = $('wm-svg').querySelector(`.wm-node[data-level="${id}"]`); if (again) again.focus(); }
+    };
+    $('wm-svg').addEventListener('click', pickNode);
+    $('wm-svg').addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      e.preventDefault();
+      pickNode(e);
     });
     $('wm-play-btn').addEventListener('click', () => { if (mapSelected) commitLevel(mapSelected); });
     $('restart-btn').addEventListener('click', () => location.reload());
     $('end-map-btn').addEventListener('click', () => {
       const nextId = $('end-map-btn').dataset.nextLevel;
       $('end').classList.remove('show');
-      enterWorldMap(nextId || undefined);
+      enterWorldMap(nextId || undefined, firstWin);
+      firstWin = null;
     });
     $('pause-restart-btn').addEventListener('click', () => location.reload());
     $('pause-btn').addEventListener('click', () => { Audio.unlock(); GameState.pause(); });
@@ -333,6 +438,7 @@ const UI = (() => {
     });
     GameState.on('enemyKilled', (e) => floater(e.x, 0.9, e.z, `+${e.bounty}`, 'gold'));
     GameState.on('gameWon', () => {
+      firstWin = Progress.starsFor(GameState.currentLevel().id) === 0 ? GameState.currentLevel().id : null;
       Progress.recordWin(GameState.currentLevel().id, GameState.stars(), GameState.state.lives);
       setTimeout(() => showEnd(true), 900);
     });

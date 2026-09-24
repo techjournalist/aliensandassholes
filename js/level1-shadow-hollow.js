@@ -467,6 +467,9 @@ const LEVEL_1 = (() => {
     index: 1,
     name: 'The Shadow Hollow',
     subtitle: 'The corruption has cracked open. Hold the Bastion.',
+    // overworld node: position in the world map's 800x320 viewBox, and how
+    // much blight a win here clears around it
+    map: { x: 640, y: 248, reclaim: 110, icon: 'keep' },
     grid: { cols: 18, rows: 11 },
     spawn: [0, 2],
     pathWaypoints: [[0, 2], [4, 2], [4, 6], [8, 6], [11, 6], [11, 3], [14, 3], [14, 9], [16, 9]],

@@ -560,6 +560,35 @@ for ~0.55s on SwiftShader), which can push the UI's 900ms end-screen timer
 past the test's old fixed 1.5s sleep. The three win-screen checks now wait
 for `#end.show` instead. Real play never builds that backlog.
 
+**P3-M3a — Overworld redesign** *(done)*. The world map was a P3-M0
+placeholder: nodes spaced by formula along a decorative dashed curve that
+had nothing to do with where they sat. It is now a hand-drawn kingdom in
+the same 800x320 SVG (so touch targets are unchanged): a landmass with the
+river Levels 1-2 cross, home woods in the south-east, the mill's fields,
+the border mountains around the Cairnwatch, and the Heart of the Hollow in
+the far north-west as the campaign's visible goal. Each level def gains
+`map: { x, y, reclaim, icon }` (Level 4 and 5 positions are reserved near
+(190, 200) and (92, 92) for when they're built); a level without `map`
+falls back to the old spread. The blight is one shape clipped to the land
+and masked by `#wm-reclaim`: every won level cuts a soft-edged hole of its
+`reclaim` radius, so corruption visibly recedes battle by battle, and the
+first win of a level plays that recession as a 1.1s animation with a spore
+burst and a chime when Continue lands on the map (skipped under
+`prefers-reduced-motion`). Roads are generated between consecutive levels
+in three states: `claimed` (both ends won, a solid road), `open` (gold
+dashes marching toward the next playable battle) and `locked`. Nodes gain
+a landmark glyph matching each level's real endpoint (keep, mill, tower),
+a gold pennant once won, and a pulsing ring on the next battle; the blurb
+names the level; Enter and Space now select a focused node. Every map
+color comes from PALETTE via new CSS custom properties. The critic pass
+caught the blight spilling past the coastline (now clipped to the land),
+home trees overhanging the coast, and the map's 50px heading pushing the
+card off the top of a 390px-tall phone (30px on short screens now). The
+harness gained checks that node positions come from level data, a Level 1
+win cuts only its own ground and recedes to its full radius, the road
+ahead is `open` with the next node marked, and the Level 1 to 2 road
+reads `claimed` once both are won.
+
 - **P3-M3 — M5: tier-3 upgrade branches**, reordered here per the
   user's decision. Two permanent specializations per tower (all 5),
   built to the Sprout Slinger worked example already in this document.

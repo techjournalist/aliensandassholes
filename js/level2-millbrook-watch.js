@@ -457,6 +457,9 @@ const LEVEL_2 = (() => {
     index: 2,
     name: 'The Millbrook Watch',
     subtitle: 'The first ground reclaimed. Hold the Watch-Mill.',
+    // overworld node: position in the world map's 800x320 viewBox, and how
+    // much blight a win here clears around it
+    map: { x: 478, y: 196, reclaim: 100, icon: 'mill' },
     grid: { cols: 18, rows: 11 },
     spawn: [0, 3],
     pathWaypoints: [[0, 3], [4, 3], [4, 8], [11, 8], [11, 4], [15, 4], [15, 8], [16, 8]],
