@@ -216,6 +216,18 @@ cooldown. Cut without hesitation if the clock runs short.
   values once decided and reuse everywhere, don't let assets invent
   their own palette. Exception: the Shadow Hollow is deliberately
   desaturated and cooler-toned, that contrast is intentional.
+- **Richer stylized, not photoreal** *(user decision, Phase 3)*: the user
+  asked for graphics "a bit more realistic and detailed." Chosen
+  direction: keep the illustrated toon + ink-outline identity above (and
+  Kingdom Rush's hand-painted feel), but add depth, light, texture and
+  motion — warm-key/cool-fill lighting over hemisphere bounce, a 5-step
+  toon ramp, painterly shader noise on the ground, animated water, wind-
+  blown instanced grass, ambient motes, soft contact shadows, baked vertex
+  AO, fog-to-backdrop depth and a CSS vignette. Photoreal/PBR, real shadow
+  maps and post-processing passes remain out, for the mobile frame-rate
+  target and the single-three.js-tag rule. Budget: draw calls within
+  ~1.5× and triangles within ~2× the pre-upgrade baseline, enforced by
+  the harness.
 
 ## Whimsy design language (apply to every asset, animation, and effect)
 - **Squash and stretch** on all movement.
@@ -470,6 +482,48 @@ checks, all passing, four of them new assertions on the Continue flow)
 and a fresh-screenshot visual check confirming the three levels now read
 as genuinely different ground, not the same meadow tile with a different
 building in the corner.
+**Campaign revision (user decision, after P3-M2b)**: the campaign grows
+to **five levels** — Levels 1-3 unchanged, **Level 4 = The Splintered
+Vale** (three lanes converging on one contested zone, modeled on Kingdom
+Rush's Icewind Pass; needs a multi-lane pathing engine change first) and
+**Level 5 = The Elderroot Ward** climax (a spiral path descending terraced
+ground to the Elderroot, Shadow-Crow boss reprise). This supersedes the
+P3-M4 entry below, whose content moves to Level 5. The overworld gets a
+real hand-placed landmass where corruption visibly recedes as levels are
+won. Deferred to a possible sequel: forked two-endpoint levels, a
+two-chokepoint level and a branching "pincer" overworld. Order: P3-V1,
+P3-V2 (graphics), overworld, M5, multi-lane engine, Level 4, Level 5.
+
+**P3-V1 — Renderer fidelity: light, ground, water, atmosphere** *(done)*.
+The first half of the "richer stylized" graphics pass (see Visual style).
+New `js/renderer-fx.js` (loaded before `renderer.js`) holds the shader
+factories: painterly two-octave noise patched into the ground's toon
+material, plus blight cracks that re-evaluate the level's corruption
+falloff per pixel (continuous, not per tile) and pulse a faint purple;
+one shared animated water shader (Levels 1-2's streams, and — slowed and
+recolored — Level 3's corrupted ooze, replacing three hand-rolled
+water/glow planes); instanced wind-blown grass (one draw call, skips road,
+build plots and deep corruption); GPU-animated ambient motes per level
+mood (`theme.motes`: fireflies, spores, leaves, dust, embers); a soft
+radial contact-shadow texture replacing the hard disc decals. In
+`renderer.js`: hemisphere + warm key + cool fill lighting (new optional
+`theme` keys `sky`/`bounce`/`sun`/`fill`/`fillIntensity`, defaulting so no
+level must opt in), a 5-step toon ramp, baked vertex AO on every batched
+and live prop (off for flyers), noise-coherent meadow patches instead of a
+per-tile checkerboard, rounded framed build plots, grass lips, pebbles and
+wheel ruts along the road, and fog matched to each level's backdrop
+(outlines included, so ink lines fade with the fill). Ambient set dressing
+now runs on wall-clock time so the world keeps moving on the title screen
+and while paused; units and gameplay stay on game time. The critic pass
+caught one real regression: dust puffs were 48 separate meshes, so how
+many draw calls a frame cost depended on how many puffs happened to be
+alive — the "draw calls back near baseline" check failed intermittently.
+Fixed at the cause: the whole puff pool (now 64) is one Points draw call
+with per-puff color/size/alpha, visually identical, and post-wave draw
+calls dropped below the pre-V1 figure (131 vs 139-144). The harness gained
+a render-budget check (≤158 draw calls, ≤189k triangles on Level 1's title
+view) and a check that grass, water and motes exist.
+
 - **P3-M3 — M5: tier-3 upgrade branches**, reordered here per the
   user's decision. Two permanent specializations per tower (all 5),
   built to the Sprout Slinger worked example already in this document.

@@ -259,6 +259,12 @@
   }
   #rotate h1 { margin: 0 0 8px; font-size: 24px; color: var(--gold); }
   #rotate p { margin: 0; font-size: 17px; line-height: 1.4; }
+  /* a painted vignette: darkens the corners toward the frame like an
+     illustration, no post-processing pass needed */
+  #vignette {
+    position: fixed; inset: 0; pointer-events: none;
+    background: radial-gradient(ellipse 75% 70% at 50% 48%, rgba(0,0,0,0) 58%, rgba(20,13,8,0.34) 100%);
+  }
   #load-error {
     position: fixed; inset: 0; display: none; z-index: 30; padding: 24px;
     background: #2f4a33; align-items: center; justify-content: center; text-align: center;
@@ -283,6 +289,7 @@
 </head>
 <body>
 <canvas id="game" aria-label="Briar and Bastion game view"></canvas>
+<div id="vignette" aria-hidden="true"></div>
 
 <div id="ui">
   <div id="hud">
@@ -378,6 +385,7 @@
 <script src="js/levels.js"></script>
 <script src="js/progress.js"></script>
 <script src="js/game-state.js"></script>
+<script src="js/renderer-fx.js"></script>
 <script src="js/renderer.js"></script>
 <script src="js/input.js"></script>
 <script src="js/ui.js"></script>

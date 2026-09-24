@@ -96,6 +96,15 @@ async function enterLevel(page, levelId) {
   await page.screenshot({ path: `${OUT}/desktop.png` });
   console.log('DEBUG OVERLAY: ' + (await page.locator('#debug').innerText()).replace(/\n/g, ' | '));
   const baselineCalls = await page.evaluate(() => Renderer.stats().calls);
+  // P3-V1 budget: the richer renderer must stay within 1.5x the draw calls
+  // and 2x the triangles of the pre-V1 Level 1 title view (105 / 94k)
+  const baseTris = await page.evaluate(() => Renderer.stats().triangles);
+  check('render budget: draw calls within 1.5x pre-V1 baseline', baselineCalls <= 158, `calls=${baselineCalls}`);
+  check('render budget: triangles within 2x pre-V1 baseline', baseTris <= 189000, `tris=${baseTris}`);
+  check('grass, water and ambient motes are in the scene', await page.evaluate(() => {
+    const names = new Set(); Renderer.debugScene().traverse((o) => names.add(o.name));
+    return names.has('grass') && names.has('water') && [...names].some((n) => n.startsWith('motes-'));
+  }));
 
   // M1 regression: tile rules, drag, resize
   let [x, y] = await cellToScreen(page, 6, 6);

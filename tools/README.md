@@ -18,7 +18,8 @@ shell that loads its logic from `../js/*.js` via plain `<script src>` tags
 no server). Load order matters: each level's file (e.g.
 `js/level1-shadow-hollow.js`) defines its data and scene-building code, then
 `js/levels.js` collects them into the `LEVELS` registry, then
-`js/game-state.js`/`js/renderer.js` (the level-agnostic engine) come after,
+`js/game-state.js`/`js/renderer-fx.js`/`js/renderer.js` (the level-agnostic
+engine; `renderer-fx.js` holds the shader factories) come after,
 then `js/input.js`/`js/ui.js`/`js/audio.js`/`js/boot.js`.
 
 `tools/level-fixtures.js` holds the tile coordinates, gold amounts, and wave

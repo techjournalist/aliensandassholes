@@ -34,22 +34,8 @@ const LEVEL_1 = (() => {
     function buildStream() {
       const x = worldX(level.chokepoint.streamCol);
       const length = rows + border * 2;
-      const water = new THREE.Mesh(new THREE.PlaneGeometry(0.98, length), unlit(PALETTE.water));
-      water.rotation.x = -Math.PI / 2;
-      water.position.set(x, -0.12, 0);
-      scene.add(water);
-      const waterColor = new THREE.Color(PALETTE.water), deep = new THREE.Color(PALETTE.waterDeep);
-      // Foam streaks drifting downstream (+z), looping.
-      const streaks = [];
+      kit.water({ x, length });
       const rng = srand(21);
-      for (let i = 0; i < 14; i++) {
-        const s = new THREE.Mesh(GEO.box, unlit(PALETTE.waterFoam, { opacity: 0.55, depthWrite: false }));
-        s.scale.set(0.05 + rng() * 0.04, 0.01, 0.25 + rng() * 0.3);
-        s.position.set(x + (rng() - 0.5) * 0.7, -0.11, -length / 2 + rng() * length);
-        s.userData.speed = 0.5 + rng() * 0.5;
-        scene.add(s);
-        streaks.push(s);
-      }
       // Bank stones along the water's edge.
       for (let i = 0; i < 16; i++) {
         const side = rng() < 0.5 ? -1 : 1;
@@ -58,15 +44,6 @@ const LEVEL_1 = (() => {
         const s = 0.06 + rng() * 0.07;
         batchPart(P(GEO.rock, PALETTE.stone, M(x + side * (0.5 + s * 0.6), -0.02, z, { sx: s * 1.4, sy: s, sz: s, ry: rng() * 3 }), false));
       }
-      animated.push({
-        update(t, dt) {
-          water.material.color.copy(waterColor).lerp(deep, 0.5 + Math.sin(t * 1.3) * 0.5);
-          for (const s of streaks) {
-            s.position.z += s.userData.speed * dt;
-            if (s.position.z > length / 2) s.position.z -= length;
-          }
-        },
-      });
     }
 
     function buildBridge() {

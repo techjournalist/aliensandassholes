@@ -33,12 +33,47 @@ const Renderer = (() => {
   // PALETTE.hollowGround, so danger reads the same everywhere.
   function levelTheme() {
     const t = GameState.currentLevel().theme;
+    const ambient = t.ambient ?? 0.38;
     return {
       backdrop: t.backdrop ?? PALETTE.backdrop,
       meadow: t.groundMeadow ?? PALETTE.meadow,
       meadowDark: t.groundMeadowDark ?? PALETTE.meadowDark,
-      ambient: t.ambient ?? 0.38,
+      ambient,
+      // warm sky over earthy bounce light, a warm key sun and a cool fill
+      // from the opposite side: shadows read cool, lit faces read warm
+      sky: t.sky ?? 0xfff4e2,
+      bounce: t.bounce ?? 0x6e5b3e,
+      hemi: ambient * 1.05,
+      sun: t.sun ?? 0.6,
+      fill: t.fill ?? 0x9db4dc,
+      fillIntensity: t.fillIntensity ?? 0.14,
+      motes: t.motes ?? {},
     };
+  }
+
+  // Lower-end touch devices get fewer grass blades and motes.
+  const QUALITY = (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) ? 0.55 : 1;
+  // Ambient effects (water, grass, motes) run on wall-clock time so the
+  // world keeps breathing on the title screen and while paused.
+  const fxTime = { value: 0 }, moteScale = { value: 1 };
+  let fxLast = 0, fxT = 0;
+
+  // Baked ambient occlusion: vertex shade darkens where geometry meets the
+  // ground, less so on upward faces (a plank lying flat isn't a crevice).
+  function aoAt(y, ny) {
+    const k = Math.min(1, Math.max(0, y / 0.42));
+    const ao = 0.7 + 0.3 * k * k * (3 - 2 * k);
+    const up = Math.max(0, ny);
+    return ao + (1 - ao) * up * up * 0.7;
+  }
+  function aoColors(g) {
+    const p = g.attributes.position, n = g.attributes.normal;
+    const arr = new Float32Array(p.count * 3);
+    for (let i = 0; i < p.count; i++) {
+      const a = aoAt(p.getY(i), n.getY(i));
+      arr[i * 3] = a; arr[i * 3 + 1] = a; arr[i * 3 + 2] = a;
+    }
+    return new THREE.BufferAttribute(arr, 3);
   }
 
   function toon(color, opts = {}) {
@@ -82,6 +117,16 @@ const Renderer = (() => {
     for (const k in GEO) { if (GEO[k].index) GEO[k] = GEO[k].toNonIndexed(); }
     // circle should lie flat on the ground
     GEO.circle.rotateX(-Math.PI / 2);
+    // soft contact shadow: wider than the old hard disc since its edge fades
+    GEO.shadowDisc = GEO.circle.clone();
+    GEO.shadowDisc.scale(1.35, 1, 1.35);
+  }
+
+  let _shadowMat = null;
+  function shadowMat() {
+    return _shadowMat || (_shadowMat = new THREE.MeshBasicMaterial({
+      color: 0x1b120a, map: RendererFX.shadowTexture(), transparent: true, opacity: 0.5, depthWrite: false,
+    }));
   }
 
   // Outline geometry: same shape, but with normals averaged across every
@@ -112,22 +157,29 @@ const Renderer = (() => {
 
   function makeOutlineMaterial() {
     return new THREE.ShaderMaterial({
-      uniforms: {
+      uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, {
         thickness: { value: 0.04 },
         color: { value: new THREE.Color(PALETTE.outline) },
-      },
+      }]),
       vertexShader: `
         uniform float thickness;
+        #include <fog_pars_vertex>
         void main() {
           vec3 n = normalize(normalMatrix * normal);
-          vec4 mv = modelViewMatrix * vec4(position, 1.0);
-          mv.xyz += n * thickness;   // view-space push: constant width under an ortho camera
-          gl_Position = projectionMatrix * mv;
+          vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+          mvPosition.xyz += n * thickness;   // view-space push: constant width under an ortho camera
+          gl_Position = projectionMatrix * mvPosition;
+          #include <fog_vertex>
         }`,
       fragmentShader: `
         uniform vec3 color;
-        void main() { gl_FragColor = vec4(color, 1.0); }`,
+        #include <fog_pars_fragment>
+        void main() {
+          gl_FragColor = vec4(color, 1.0);
+          #include <fog_fragment>
+        }`,
       side: THREE.BackSide,
+      fog: true,
     });
   }
 
@@ -143,19 +195,23 @@ const Renderer = (() => {
     let count = 0;
     geos.forEach((g) => { count += g.attributes.position.count; });
     const withColor = geos.length > 0 && geos.every((g) => g.attributes.color);
+    const withUv = geos.length > 0 && geos.every((g) => g.attributes.uv);
     const pos = new Float32Array(count * 3), nor = new Float32Array(count * 3);
     const col = withColor ? new Float32Array(count * 3) : null;
+    const uv = withUv ? new Float32Array(count * 2) : null;
     let off = 0;
     for (const g of geos) {
       pos.set(g.attributes.position.array, off * 3);
       nor.set(g.attributes.normal.array, off * 3);
       if (col) col.set(g.attributes.color.array, off * 3);
+      if (uv) uv.set(g.attributes.uv.array, off * 2);
       off += g.attributes.position.count;
     }
     const out = new THREE.BufferGeometry();
     out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     out.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
     if (col) out.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    if (uv) out.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
     return out;
   }
 
@@ -178,12 +234,13 @@ const Renderer = (() => {
     const g = part.geo.clone().applyMatrix4(m);
     const matKey = (part.unlit ? 'u' : 't') + part.color;
     let grp = batch.groups.get(matKey);
-    if (!grp) { grp = { mat: part.unlit ? unlit(part.color) : toon(part.color), geos: [] }; batch.groups.set(matKey, grp); }
+    if (!grp) { grp = { mat: part.unlit ? unlit(part.color) : toon(part.color, { vc: true }), geos: [], ao: !part.unlit }; batch.groups.set(matKey, grp); }
+    if (grp.ao) g.setAttribute('color', aoColors(g));
     grp.geos.push(g);
     if (part.outline) batch.outlines.push(smoothedForOutline(part.geo).clone().applyMatrix4(m));
   }
   function batchDecal(x, z, radius) {
-    batch.decals.push(GEO.circle.clone().applyMatrix4(M(x, 0.012, z, { s: radius })));
+    batch.decals.push(GEO.shadowDisc.clone().applyMatrix4(M(x, 0.012, z, { s: radius })));
   }
   function flushBatch() {
     for (const grp of batch.groups.values()) {
@@ -197,8 +254,9 @@ const Renderer = (() => {
       scene.add(mesh);
     }
     if (batch.decals.length) {
-      const mesh = new THREE.Mesh(mergeGeoms(batch.decals), unlit(PALETTE.shadow, { opacity: 0.22, depthWrite: false }));
+      const mesh = new THREE.Mesh(mergeGeoms(batch.decals), shadowMat());
       mesh.matrixAutoUpdate = false;
+      mesh.renderOrder = 1;
       scene.add(mesh);
     }
   }
@@ -214,9 +272,10 @@ const Renderer = (() => {
     geo.setAttribute('color', new THREE.BufferAttribute(arr, 3));
     return geo;
   }
-  function liveProp(parts, x, y, z) {
+  function liveProp(parts, x, y, z, opts = {}) {
     const g = new THREE.Group();
     g.position.set(x, y, z);
+    const ao = opts.ao !== false;
     const toonGeos = [], unlitGeos = [], outlineGeos = [];
     for (const p of parts) {
       if (p.live) {
@@ -228,7 +287,12 @@ const Renderer = (() => {
         g.add(mesh);
         continue;
       }
-      (p.unlit ? unlitGeos : toonGeos).push(colored(p.geo.clone().applyMatrix4(p.m), p.color));
+      const geo = colored(p.geo.clone().applyMatrix4(p.m), p.color);
+      if (ao && !p.unlit) {
+        const c = geo.attributes.color, a = aoColors(geo);
+        for (let i = 0; i < c.array.length; i++) c.array[i] *= a.array[i];
+      }
+      (p.unlit ? unlitGeos : toonGeos).push(geo);
       if (p.outline) outlineGeos.push(smoothedForOutline(p.geo).clone().applyMatrix4(p.m));
     }
     if (toonGeos.length) { const m = new THREE.Mesh(mergeGeoms(toonGeos), toon(0xffffff, { vc: true })); m.name = 'merged'; g.add(m); }
@@ -240,7 +304,8 @@ const Renderer = (() => {
   let _unlitVC = null;
   function unlitVC() { return _unlitVC || (_unlitVC = new THREE.MeshBasicMaterial({ vertexColors: true })); }
   function decal(x, z, radius, parent) {
-    const d = new THREE.Mesh(GEO.circle, unlit(PALETTE.shadow, { opacity: 0.22, depthWrite: false }));
+    const d = new THREE.Mesh(GEO.shadowDisc, shadowMat());
+    d.renderOrder = 1;
     d.position.set(x, 0.012, z);
     d.scale.setScalar(radius);
     (parent || scene).add(d);
@@ -351,9 +416,11 @@ const Renderer = (() => {
           topColor.copy(lerpColor(PALETTE.cobble, PALETTE.moss, 0.35));
           sideColor.set(PALETTE.earth);
         } else {
-          const base = rng() < 0.5 ? vt.meadow : vt.meadowDark;
-          topColor.copy(lerpColor(base, PALETTE.hollowGround, h));
-          topColor.offsetHSL(0, 0, (rng() - 0.5) * 0.05 - (inGrid ? 0 : 0.03));
+          // spatially coherent patches of light and dark meadow, not a
+          // salt-and-pepper checkerboard; the shader adds the fine brushwork
+          const patch = Math.min(1, Math.max(0, RendererFX.fbm(c * 0.31 + 3.1, r * 0.31 + 7.7) * 1.5 - 0.25));
+          topColor.copy(lerpColor(vt.meadow, vt.meadowDark, patch)).lerp(new THREE.Color(PALETTE.hollowGround), h);
+          topColor.offsetHSL(0, 0, (rng() - 0.5) * 0.022 - (inGrid ? 0 : 0.03));
           sideColor.copy(lerpColor(PALETTE.earth, PALETTE.hollowEarth, h));
         }
         top = topColor; side = sideColor;
@@ -367,37 +434,178 @@ const Renderer = (() => {
         geos.push(g);
       }
     }
-    const ground = new THREE.Mesh(mergeGeoms(geos), toon(0xffffff, { vc: true }));
+    const lv = GameState.currentLevel();
+    const groundMat = RendererFX.patchGround(new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap, vertexColors: true }),
+      { ...lv.theme, cols, rows }, fxTime);
+    const ground = new THREE.Mesh(mergeGeoms(geos), groundMat);
     ground.name = 'ground';
     ground.matrixAutoUpdate = false;
     scene.add(ground);
 
-    // A wide dark-green floor so the world never shows the void.
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(cols + border * 2 + 40, rows + border * 2 + 40), unlit(0x27402b));
+    // A wide floor so the world never shows the void, tinted to the level's
+    // own backdrop so the fog blends the edge into it.
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(cols + border * 2 + 40, rows + border * 2 + 40), unlit(lerpColor(vt.backdrop, 0x000000, 0.14).getHex()));
     floor.rotation.x = -Math.PI / 2;
     floor.position.y = -tileHeight - 0.02;
     scene.add(floor);
 
-    // Buildable tile markers: a soft lighter inset square on every cell
-    // that touches the road. One merged mesh, one draw call.
+    buildRoadEdges(vt);
+
+    // Buildable plots: a rounded, softly framed pad on every cell that
+    // touches the road, so tower spots read as places, not grid squares.
+    // One merged mesh, one draw call.
     const markers = [];
+    const plotRim = roundedRectGeo(0.86, 0.14), plotFill = roundedRectGeo(0.74, 0.11);
     for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
       if (!GameState.isBuildable(c, r)) continue;
       const h = GameState.zoneFalloff(c, r);
-      const g = new THREE.PlaneGeometry(0.8, 0.8).toNonIndexed();
-      g.rotateX(-Math.PI / 2);
-      g.applyMatrix4(M(worldX(c), 0.006, worldZ(r)));
-      const col = lerpColor(PALETTE.meadowLight, 0x8f86a3, h).offsetHSL(0, 0, 0.08);
-      const colors = new Float32Array(g.attributes.position.count * 3);
-      for (let i = 0; i < g.attributes.position.count; i++) { colors[i * 3] = col.r; colors[i * 3 + 1] = col.g; colors[i * 3 + 2] = col.b; }
-      g.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-      markers.push(g);
+      const fill = lerpColor(PALETTE.meadowLight, 0x8f86a3, h).offsetHSL(0, 0, 0.08);
+      const rim = fill.clone().offsetHSL(0, -0.08, -0.16);
+      for (const [shape, col, y] of [[plotRim, rim, 0.005], [plotFill, fill, 0.007]]) {
+        const g = shape.clone().applyMatrix4(M(worldX(c), y, worldZ(r)));
+        const colors = new Float32Array(g.attributes.position.count * 3);
+        for (let i = 0; i < g.attributes.position.count; i++) { colors[i * 3] = col.r; colors[i * 3 + 1] = col.g; colors[i * 3 + 2] = col.b; }
+        g.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        markers.push(g);
+      }
     }
     const markerMesh = new THREE.Mesh(mergeGeoms(markers), new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.5, depthWrite: false }));
     markerMesh.name = 'buildableMarkers';
     markerMesh.matrixAutoUpdate = false;
     scene.add(markerMesh);
     animated.push({ update(t) { markerMesh.material.opacity = 0.42 + Math.sin(t * 1.6) * 0.1; } });
+  }
+
+  function roundedRectGeo(w, rad) {
+    const h = w / 2, s = new THREE.Shape();
+    s.moveTo(-h + rad, -h); s.lineTo(h - rad, -h); s.quadraticCurveTo(h, -h, h, -h + rad);
+    s.lineTo(h, h - rad); s.quadraticCurveTo(h, h, h - rad, h);
+    s.lineTo(-h + rad, h); s.quadraticCurveTo(-h, h, -h, h - rad);
+    s.lineTo(-h, -h + rad); s.quadraticCurveTo(-h, -h, -h + rad, -h);
+    const g = new THREE.ShapeGeometry(s, 3).toNonIndexed();
+    g.rotateX(-Math.PI / 2);
+    return g;
+  }
+
+  // Road edges: a soft lip of darker grass where the road meets meadow, and
+  // pebbles kicked to the sides, so the road reads hand-painted rather than
+  // as a row of flat tiles. Colors are bucketed so it stays a few draw calls.
+  function buildRoadEdges(vt) {
+    const rng = srand(311);
+    const isGround = (c, r) => !GameState.inGrid(c, r) || GameState.cellKind(c, r) === 'ground';
+    const lipColor = (h) => lerpColor(vt.meadowDark, PALETTE.hollowGround, Math.round(h * 2) / 2).multiplyScalar(0.84).getHex();
+    const isRoad = (c, r) => GameState.inGrid(c, r) && ['path', 'bridge'].includes(GameState.cellKind(c, r));
+    const rutColor = [lerpColor(PALETTE.path, PALETTE.earth, 0.32).getHex(), lerpColor(PALETTE.hollowPath, PALETTE.hollowEarth, 0.4).getHex()];
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+      if (GameState.cellKind(c, r) !== 'path') continue;
+      const x = worldX(c), z = worldZ(r), h = GameState.zoneFalloff(c, r);
+      // twin wheel ruts worn along the direction of travel
+      if (!GameState.isCobble(c, r)) {
+        // half-strips toward each connected neighbour, so a corner reads as
+        // one turning pair of ruts instead of a cross-hatch
+        const rc = rutColor[h > 0.5 ? 1 : 0];
+        for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          if (!isRoad(c + dc, r + dr)) continue;
+          for (const off of [-0.17, 0.17]) {
+            if (dc) batchPart(P(GEO.box, rc, M(x + dc * 0.25, 0.003, z + off, { sx: 0.53, sy: 0.006, sz: 0.06 }), false));
+            else batchPart(P(GEO.box, rc, M(x + off, 0.003, z + dr * 0.25, { sx: 0.06, sy: 0.006, sz: 0.53 }), false));
+          }
+        }
+      }
+      for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        if (!isGround(c + dc, r + dr)) continue;
+        const along = dr !== 0;
+        const ex = x + dc * 0.47, ez = z + dr * 0.47;
+        batchPart(P(GEO.sphereLo, lipColor(h), M(ex, 0.008, ez, along
+          ? { sx: 0.56, sy: 0.035, sz: 0.07 } : { sx: 0.07, sy: 0.035, sz: 0.56 }), false));
+        if (rng() < 0.55) {
+          const t = (rng() - 0.5) * 0.8, s = 0.03 + rng() * 0.03;
+          const px = along ? x + t : ex - dc * 0.1, pz = along ? ez - dr * 0.1 : z + t;
+          batchPart(P(GEO.rock, h > 0.5 ? PALETTE.hollowRock : PALETTE.stone, M(px, s * 0.3, pz, { sx: s * 1.3, sy: s * 0.6, sz: s, ry: rng() * 3 }), false));
+        }
+      }
+    }
+  }
+
+  // Wind-blown grass on open meadow: one instanced draw call. Skips the
+  // road, build plots and deep corruption, thins out as corruption rises.
+  function buildGrass() {
+    const vt = levelTheme();
+    const rng = srand(4242);
+    const streamCol = GameState.currentLevel().chokepoint.streamCol;
+    const blades = [];
+    for (let r = -border; r < rows + border; r++) {
+      for (let c = -border; c < cols + border; c++) {
+        const inGrid = GameState.inGrid(c, r);
+        if (inGrid) {
+          if (GameState.cellKind(c, r) !== 'ground' || GameState.isBuildable(c, r) || GameState.isSpawn(c, r)) continue;
+        } else if (c === streamCol) continue;
+        const h = GameState.zoneFalloff(c, r);
+        if (h > 0.62) continue;
+        const tufts = Math.floor((inGrid ? 3.4 : 2.4) * (1 - h * 0.9) * QUALITY + rng());
+        for (let t = 0; t < tufts; t++) {
+          const cx = worldX(c) + (rng() - 0.5) * 0.84, cz = worldZ(r) + (rng() - 0.5) * 0.84;
+          const n = 5 + Math.floor(rng() * 5);
+          const tint = lerpColor(vt.meadow, PALETTE.meadowLight, 0.2 + rng() * 0.55).lerp(new THREE.Color(PALETTE.hollowGround), Math.min(1, h * 1.2));
+          const tall = 0.16 + rng() * 0.12;
+          for (let b = 0; b < n; b++) {
+            blades.push({ x: cx + (rng() - 0.5) * 0.2, z: cz + (rng() - 0.5) * 0.2, h: tall * (0.7 + rng() * 0.5) * (1 - h * 0.4), ry: rng() * Math.PI, lean: (rng() - 0.5) * 0.6, tint: tint.clone().offsetHSL(0, 0, (rng() - 0.5) * 0.07) });
+          }
+        }
+      }
+    }
+    if (!blades.length) return;
+    const mesh = new THREE.InstancedMesh(RendererFX.grassBladeGeometry(), RendererFX.grassMaterial(fxTime), blades.length);
+    const dummy = new THREE.Object3D();
+    blades.forEach((b, i) => {
+      dummy.position.set(b.x, 0, b.z);
+      dummy.rotation.set(b.lean * 0.4, b.ry, b.lean);
+      dummy.scale.set(1, b.h, 1);
+      dummy.updateMatrix();
+      mesh.setMatrixAt(i, dummy.matrix);
+      mesh.setColorAt(i, b.tint);
+    });
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    mesh.frustumCulled = false;
+    mesh.name = 'grass';
+    scene.add(mesh);
+  }
+
+  // Ambient motes per level mood: fireflies over healthy meadow, spores
+  // rising out of corruption, plus whatever the level's theme adds
+  // (leaves, dust, embers).
+  function buildMotes() {
+    const vt = levelTheme();
+    const rng = srand(77);
+    const counts = Object.assign({ fireflies: 26, spores: 28 }, vt.motes);
+    for (const kind of Object.keys(counts)) {
+      if (!RendererFX.MOTE_KINDS[kind]) continue;
+      const n = Math.round(counts[kind] * QUALITY);
+      const pos = [];
+      for (let guard = 0; pos.length < n * 3 && guard < n * 80; guard++) {
+        const c = -1 + rng() * (cols + 2), r = -1 + rng() * (rows + 2);
+        const h = GameState.zoneFalloff(Math.floor(c), Math.floor(r));
+        if ((kind === 'spores' || kind === 'embers') && h < 0.35) continue;
+        if (kind === 'fireflies' && h > 0.25) continue;
+        const y = kind === 'fireflies' ? 0.25 + rng() * 0.9 : kind === 'leaves' ? rng() * 2.6 : kind === 'dust' ? 0.3 + rng() * 1.2 : rng() * 2;
+        pos.push(c - cols / 2, y, r - rows / 2);
+      }
+      if (pos.length) scene.add(RendererFX.motes(kind, pos, moteScale, fxTime));
+    }
+  }
+
+  // Shared animated water for any level: a stream, a millrace, or (slowed and
+  // recolored) the Cairnwatch's corrupted ooze.
+  function water({ x, z = 0, width = 0.98, length, y = -0.12, shallow = PALETTE.water, deep = PALETTE.waterDeep, foam = PALETTE.waterFoam, speed, stripe, foamAmt }) {
+    const mat = RendererFX.waterMaterial({ shallow, deep, foam, speed, stripe, foamAmt });
+    mat.uniforms.uTime = fxTime;
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, length), mat);
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.set(x, y, z);
+    mesh.name = 'water';
+    scene.add(mesh);
+    return mesh;
   }
 
   // -------- characters --------
@@ -660,41 +868,73 @@ const Renderer = (() => {
   const ENEMY_RECIPES = { grunt: gruntParts, trickster: tricksterParts, troll: trollParts, bat: batParts, boss: bossParts };
 
   // -------- particles: a pooled dust puff --------
+  // The whole pool is one Points draw call: each puff is a flat round
+  // sprite (what an unlit sphere looked like anyway), however many are alive.
+  const PUFFS = 64;
   const particles = [];
+  let puffGeo = null;
   function buildParticles() {
-    for (let i = 0; i < 48; i++) {
-      const m = new THREE.Mesh(GEO.sphereLo, new THREE.MeshBasicMaterial({ color: PALETTE.cream, transparent: true, opacity: 0 }));
-      m.visible = false;
-      m.userData = { life: 0, ttl: 1, vx: 0, vy: 0, vz: 0, size: 0.1 };
-      scene.add(m);
-      particles.push(m);
-    }
+    for (let i = 0; i < PUFFS; i++) particles.push({ alive: false, life: 0, ttl: 1, x: 0, y: -99, z: 0, vx: 0, vy: 0, vz: 0, size: 0.1, color: new THREE.Color() });
+    puffGeo = new THREE.BufferGeometry();
+    puffGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(PUFFS * 3), 3));
+    puffGeo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(PUFFS * 3), 3));
+    puffGeo.setAttribute('pSize', new THREE.BufferAttribute(new Float32Array(PUFFS), 1));
+    puffGeo.setAttribute('pAlpha', new THREE.BufferAttribute(new Float32Array(PUFFS), 1));
+    const mat = new THREE.ShaderMaterial({
+      uniforms: { uScale: moteScale },
+      vertexShader: `
+        attribute vec3 color; attribute float pSize, pAlpha;
+        uniform float uScale;
+        varying vec3 vColor; varying float vAlpha;
+        void main() {
+          vColor = color; vAlpha = pAlpha;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          gl_PointSize = pAlpha > 0.0 ? pSize * 2.0 * uScale : 0.0;
+        }`,
+      fragmentShader: `
+        varying vec3 vColor; varying float vAlpha;
+        void main() {
+          float r = length(gl_PointCoord - 0.5);
+          if (r > 0.5) discard;
+          gl_FragColor = vec4(vColor * (1.0 - r * 0.35), vAlpha * (1.0 - smoothstep(0.42, 0.5, r)));
+        }`,
+      transparent: true, depthWrite: false,
+    });
+    const pts = new THREE.Points(puffGeo, mat);
+    pts.frustumCulled = false;
+    pts.name = 'puffs';
+    pts.renderOrder = 2;
+    scene.add(pts);
     animated.push({
       update(t, dt) {
-        for (const p of particles) {
-          const u = p.userData;
-          if (!p.visible) continue;
-          u.life += dt;
-          if (u.life >= u.ttl) { p.visible = false; continue; }
+        const pos = puffGeo.attributes.position.array, col = puffGeo.attributes.color.array;
+        const siz = puffGeo.attributes.pSize.array, alp = puffGeo.attributes.pAlpha.array;
+        particles.forEach((u, i) => {
+          if (u.alive) {
+            u.life += dt;
+            if (u.life >= u.ttl) u.alive = false;
+          }
+          if (!u.alive) { alp[i] = 0; return; }
           const k = u.life / u.ttl;
           u.vy -= 1.6 * dt;
-          p.position.x += u.vx * dt; p.position.y += u.vy * dt; p.position.z += u.vz * dt;
-          if (p.position.y < 0.03) { p.position.y = 0.03; u.vy = Math.abs(u.vy) * 0.3; }
-          p.scale.setScalar(u.size * (1 - k * 0.6));
-          p.material.opacity = 0.85 * (1 - k);
-        }
+          u.x += u.vx * dt; u.y += u.vy * dt; u.z += u.vz * dt;
+          if (u.y < 0.03) { u.y = 0.03; u.vy = Math.abs(u.vy) * 0.3; }
+          pos[i * 3] = u.x; pos[i * 3 + 1] = u.y; pos[i * 3 + 2] = u.z;
+          col[i * 3] = u.color.r; col[i * 3 + 1] = u.color.g; col[i * 3 + 2] = u.color.b;
+          siz[i] = u.size * (1 - k * 0.6);
+          alp[i] = 0.85 * (1 - k);
+        });
+        for (const k in puffGeo.attributes) puffGeo.attributes[k].needsUpdate = true;
       },
     });
   }
   function puff(x, y, z, { count = 8, color = PALETTE.cream, speed = 1.2, size = 0.1, up = 1.4, ttl = 0.6 } = {}) {
     let n = 0;
-    for (const p of particles) {
-      if (p.visible) continue;
+    for (const u of particles) {
+      if (u.alive) continue;
       const a = Math.random() * Math.PI * 2, s = speed * (0.5 + Math.random() * 0.5);
-      p.position.set(x, y, z);
-      p.userData = { life: 0, ttl: ttl * (0.7 + Math.random() * 0.5), vx: Math.cos(a) * s, vy: up * (0.4 + Math.random() * 0.6), vz: Math.sin(a) * s, size: size * (0.6 + Math.random() * 0.8) };
-      p.material.color.setHex(color);
-      p.visible = true;
+      Object.assign(u, { alive: true, life: 0, ttl: ttl * (0.7 + Math.random() * 0.5), x, y, z, vx: Math.cos(a) * s, vy: up * (0.4 + Math.random() * 0.6), vz: Math.sin(a) * s, size: size * (0.6 + Math.random() * 0.8) });
+      u.color.setHex(color);
       if (++n >= count) break;
     }
   }
@@ -902,7 +1142,7 @@ const Renderer = (() => {
   const dying = [];   // views playing an exit animation before removal
   const BAT_HEIGHT = 0.95, BOSS_HEIGHT = 1.25;
   function addEnemyView(e) {
-    const g = liveProp(ENEMY_RECIPES[e.type](), e.x, 0, e.z);
+    const g = liveProp(ENEMY_RECIPES[e.type](), e.x, 0, e.z, { ao: !e.flying });
     g.name = `enemy-${e.id}`;
     const v = { group: g, e, decal: decal(0, 0, e.type === 'troll' ? 0.45 : 0.3, g), pop: 0, live: {} };
     g.traverse((o) => { if (o.name && o !== g) v.live[o.name] = o; });
@@ -1222,6 +1462,7 @@ const Renderer = (() => {
     camera.updateProjectionMatrix();
     unitsPerPixel = (hw * 2) / cssW;
     outlineMat.uniforms.thickness.value = CONFIG.outlinePx * unitsPerPixel;
+    moteScale.value = renderer.getPixelRatio() / unitsPerPixel;
   }
 
   function resize() {
@@ -1257,6 +1498,7 @@ const Renderer = (() => {
       P, M, GEO, PALETTE, batchPart, batchDecal, liveProp, decal, colored,
       toon, unlit, addOutline, srand, lerpColor, shakeCamera, puff,
       treeParts, deadTreeParts, rockParts, mushroomParts, tuftParts, flowerParts, acornParts,
+      water,
       worldX, worldZ, cols, rows, border,
       scene, animated,
       level: GameState.currentLevel(),
@@ -1267,11 +1509,14 @@ const Renderer = (() => {
   function init(canvasEl) {
     canvas = canvasEl;
     renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-    renderer.setClearColor(levelTheme().backdrop);
+    const vt = levelTheme();
+    renderer.setClearColor(vt.backdrop);
     scene = new THREE.Scene();
     camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 1, 100);
 
-    gradientMap = new THREE.DataTexture(new Uint8Array([128, 199, 255]), 3, 1, THREE.LuminanceFormat);
+    // Five crisp light bands instead of three: still hand-inked steps, but
+    // enough of them to model a rounded form.
+    gradientMap = new THREE.DataTexture(new Uint8Array([124, 166, 204, 234, 255]), 5, 1, THREE.LuminanceFormat);
     gradientMap.minFilter = THREE.NearestFilter;
     gradientMap.magFilter = THREE.NearestFilter;
     gradientMap.generateMipmaps = false;
@@ -1279,15 +1524,25 @@ const Renderer = (() => {
     outlineMat = makeOutlineMaterial();
     buildPrimitives();
 
-    scene.add(new THREE.AmbientLight(0xffffff, levelTheme().ambient));
-    const sun = new THREE.DirectionalLight(0xfff0d8, 0.68);
+    scene.add(new THREE.HemisphereLight(vt.sky, vt.bounce, vt.hemi));
+    const sun = new THREE.DirectionalLight(0xfff0d8, vt.sun);
     sun.position.set(-6, 10, 7);
     scene.add(sun);
+    const fill = new THREE.DirectionalLight(vt.fill, vt.fillIntensity);
+    fill.position.set(7, 4, -6);
+    scene.add(fill);
 
     cols = GameState.cols; rows = GameState.rows;
+    // Atmospheric depth: the far rows of the map melt gently into the
+    // level's backdrop. Camera sits 40 units out; view depth grows ~0.63
+    // per unit of -z, so this starts just past the grid's top edge.
+    const fogNear = 40 + (rows / 2 - 0.5) * 0.63;
+    scene.fog = new THREE.Fog(vt.backdrop, fogNear, fogNear + 7);
     placeCamera();
     buildGround();
     GameState.currentLevel().buildScene(makeKit());
+    buildGrass();
+    buildMotes();
     buildParticles();
     buildSelection();
     flushBatch();
@@ -1298,7 +1553,13 @@ const Renderer = (() => {
   }
 
   function render(t, dt) {
-    for (const a of animated) a.update(t, dt);
+    // ambient set dressing runs on wall-clock time: banners, water, grass and
+    // motes keep moving on the title screen and through a pause
+    const now = performance.now() / 1000;
+    const fxDt = fxLast ? Math.min(0.05, now - fxLast) : 0;
+    fxLast = now; fxT += fxDt;
+    fxTime.value = fxT;
+    for (const a of animated) a.update(fxT, fxDt);
     updateTowerViews(t, dt);
     updateEnemyViews(t, dt);
     updateProjectileViews();

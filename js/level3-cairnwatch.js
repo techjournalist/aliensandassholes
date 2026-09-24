@@ -34,15 +34,10 @@ const LEVEL_3 = (() => {
     function buildFissure() {
       const x = worldX(level.chokepoint.streamCol);
       const length = rows + border * 2;
-      const chasm = new THREE.Mesh(new THREE.PlaneGeometry(1.05, length), unlit(0x140f14));
-      chasm.rotation.x = -Math.PI / 2;
-      chasm.position.set(x, -0.16, 0);
-      scene.add(chasm);
+      // the shared water shader, slowed and recolored into a sluggish,
+      // faintly glowing corrupted ooze at the bottom of the chasm
+      kit.water({ x, length, width: 1.05, y: -0.16, shallow: 0x3a2448, deep: 0x120c14, foam: PALETTE.magicGlow, speed: 0.22, stripe: 0.8, foamAmt: 0.4 });
       const rng = srand(331);
-      const glow = new THREE.Mesh(new THREE.PlaneGeometry(0.4, length), new THREE.MeshBasicMaterial({ color: PALETTE.magicGlow, transparent: true, opacity: 0.22, depthWrite: false }));
-      glow.rotation.x = -Math.PI / 2;
-      glow.position.set(x, -0.15, 0);
-      scene.add(glow);
       for (let i = 0; i < 18; i++) {
         const side = rng() < 0.5 ? -1 : 1;
         const z = -length / 2 + 0.3 + rng() * (length - 0.6);
@@ -50,9 +45,6 @@ const LEVEL_3 = (() => {
         const s = 0.07 + rng() * 0.09;
         batchPart(P(GEO.rock, PALETTE.hollowRock, M(x + side * (0.5 + s * 0.5), -0.02, z, { sx: s * 1.3, sy: s * 1.4, sz: s, ry: rng() * 3 })));
       }
-      animated.push({
-        update(t) { glow.material.opacity = 0.16 + 0.1 * Math.sin(t * 1.7); },
-      });
     }
 
     // The Ravine Stair: a narrow plank crossing with a rope-and-pulley cart
@@ -486,6 +478,7 @@ const LEVEL_3 = (() => {
     theme: {
       center: [7, 5], radiusOut: { x: 9, z: 6.2 }, radiusIn: 1.6, falloffWidth: 0.7,
       backdrop: 0x384345, groundMeadow: 0x7a9a72, groundMeadowDark: 0x62825c, ambient: 0.34,
+      motes: { dust: 26, fireflies: 10, spores: 36 },
     },
     spawnBlockedText: 'This ground has already been fought over once.',
     waves, prepSeconds: 14, startGold: 150, startLives: 20, starThresholds: [16, 8],

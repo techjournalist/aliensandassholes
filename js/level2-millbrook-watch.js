@@ -30,21 +30,9 @@ const LEVEL_2 = (() => {
     function buildStream() {
       const x = worldX(level.chokepoint.streamCol);
       const length = rows + border * 2;
-      const water = new THREE.Mesh(new THREE.PlaneGeometry(0.98, length), unlit(PALETTE.water));
-      water.rotation.x = -Math.PI / 2;
-      water.position.set(x, -0.12, 0);
-      scene.add(water);
-      const waterColor = new THREE.Color(PALETTE.water), deep = new THREE.Color(PALETTE.waterDeep);
-      const streaks = [];
+      // a millrace runs faster and choppier than Level 1's stream
+      kit.water({ x, length, speed: 1.1, stripe: 0.68 });
       const rng = srand(221);
-      for (let i = 0; i < 14; i++) {
-        const s = new THREE.Mesh(GEO.box, unlit(PALETTE.waterFoam, { opacity: 0.55, depthWrite: false }));
-        s.scale.set(0.05 + rng() * 0.04, 0.01, 0.25 + rng() * 0.3);
-        s.position.set(x + (rng() - 0.5) * 0.7, -0.11, -length / 2 + rng() * length);
-        s.userData.speed = 0.5 + rng() * 0.5;
-        scene.add(s);
-        streaks.push(s);
-      }
       for (let i = 0; i < 16; i++) {
         const side = rng() < 0.5 ? -1 : 1;
         const z = -length / 2 + 0.3 + rng() * (length - 0.6);
@@ -52,15 +40,6 @@ const LEVEL_2 = (() => {
         const s = 0.06 + rng() * 0.07;
         batchPart(P(GEO.rock, PALETTE.stone, M(x + side * (0.5 + s * 0.6), -0.02, z, { sx: s * 1.4, sy: s, sz: s, ry: rng() * 3 }), false));
       }
-      animated.push({
-        update(t, dt) {
-          water.material.color.copy(waterColor).lerp(deep, 0.5 + Math.sin(t * 1.3) * 0.5);
-          for (const s of streaks) {
-            s.position.z += s.userData.speed * dt;
-            if (s.position.z > length / 2) s.position.z -= length;
-          }
-        },
-      });
     }
 
     // The Sluice Gate: a stone millrace lock narrowed to a plank-and-iron
@@ -484,6 +463,7 @@ const LEVEL_2 = (() => {
     theme: {
       center: [0.5, 3.5], radiusOut: { x: 5.5, z: 4.2 }, radiusIn: 1.3, falloffWidth: 0.5,
       backdrop: 0x3a4a2f, groundMeadow: 0x8ab34a, groundMeadowDark: 0x749a3d, ambient: 0.40,
+      motes: { leaves: 20, fireflies: 18 },
     },
     spawnBlockedText: 'Nothing but trampled grass grows here.',
     waves, prepSeconds: 14, startGold: 150, startLives: 20, starThresholds: [16, 8],
