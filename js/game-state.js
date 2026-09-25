@@ -557,6 +557,12 @@ const GameState = (() => {
     return true;
   }
   function waveInfo(n) { return level.waves[n - 1] || null; }
+  // Which roads wave n comes down (route indexes), for the incoming-road markers.
+  function routesForWave(n) {
+    const w = level.waves[n - 1];
+    if (!w) return [];
+    return [...new Set(w.groups.map((grp) => routeOf(grp.route).index))].sort();
+  }
   function enemiesLeft() { return state.waveQueue.length + state.enemies.length; }
 
   function update(dt) {
@@ -607,7 +613,7 @@ const GameState = (() => {
     pathPosAt,
     state, on, emit, update, worldX, worldZ, startGame, pause, resume, setSpeed,
     loadLevel, currentLevel, totalWaves,
-    selectTile, clearSelection, placeTower, canAfford, towerAt, startWave, sendWave, spawnEnemy, waveInfo, enemiesLeft, stars,
+    selectTile, clearSelection, placeTower, canAfford, towerAt, startWave, sendWave, spawnEnemy, waveInfo, routesForWave, enemiesLeft, stars,
     inGrid, isPath, isStream, isBridge, isBastion, isSpawn, isBuildable, isCobble,
     cellKind, zoneFalloff, pathIndexOf,
   };

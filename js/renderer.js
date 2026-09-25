@@ -1870,6 +1870,67 @@ const Renderer = (() => {
     };
   }
 
+  // -------- incoming-road markers (multi-road levels only) --------
+  // A war-horn post at the head of every road the next wave will use: shown
+  // through prep and the first seconds of a wave, flashing when that road's
+  // first enemy appears. Single-road levels never build these.
+  function buildRouteMarkers() {
+    const markers = GameState.routes.map((rt) => {
+      const a = rt.points[0], b = rt.points[1];
+      const len = Math.hypot(b.x - a.x, b.z - a.z) || 1, dx = (b.x - a.x) / len, dz = (b.z - a.z) / len;
+      const x = a.x - dx * 0.9, z = a.z - dz * 0.9;   // just outside the road's mouth, facing in
+      const yaw = Math.atan2(dx, dz);
+      const g = liveProp([
+        P(GEO.cyl, PALETTE.wood, M(0, 0.6, 0, { sx: 0.05, sy: 1.2, sz: 0.05 })),
+        P(GEO.box, PALETTE.capRed, M(0.2, 1.02, 0, { sx: 0.36, sy: 0.24, sz: 0.03 }), true, { name: 'flag', live: true }),
+        P(GEO.cone, PALETTE.gold, M(0, 1.28, 0, { sx: 0.07, sy: 0.14, sz: 0.07 })),
+        // the war horn hanging from the post
+        P(GEO.cylTaper, PALETTE.cream, M(-0.13, 0.78, 0.03, { sx: 0.08, sy: 0.3, sz: 0.08, rz: 1.1 })),
+        P(GEO.ring, PALETTE.gold, M(0, 0.04, 0, { s: 0.5, rx: Math.PI / 2 }), false, { name: 'ring', live: true, unlit: true }),
+        P(GEO.cone, PALETTE.gold, M(0, 0.06, 0.7, { sx: 0.2, sy: 0.34, sz: 0.06, rx: Math.PI / 2 }), true, { name: 'arrow', live: true, unlit: true }),
+      ], x, 0, z, { ao: true });
+      g.rotation.y = yaw;
+      g.name = `route-marker-${rt.id}`;
+      g.visible = false;
+      const live = {};
+      g.traverse((o) => { if (o.name) live[o.name] = o; });
+      return { g, live, show: 0, flash: 0, pending: false, hideAt: 0, x, z, dx, dz };
+    });
+    // during a wave each marker stays up until its own road's first enemy
+    // appears (groups can start late), flashes, then fades two seconds later
+    GameState.on('waveStarted', (n) => {
+      const used = new Set(GameState.routesForWave(n));
+      markers.forEach((m, i) => { m.pending = used.has(i); m.hideAt = 0; });
+    });
+    GameState.on('enemySpawned', (e) => {
+      const m = markers[e.route];
+      if (!m || !m.pending) return;
+      m.pending = false; m.flash = 1; m.hideAt = GameState.state.waveTime + 2;
+      puff(m.x, 0.8, m.z, { count: 10, color: PALETTE.gold, speed: 1.4, size: 0.08, up: 1.8, ttl: 0.7 });
+    });
+    animated.push({
+      update(t, dt) {
+        const S = GameState.state;
+        const playing = S.phase === 'playing';
+        const next = new Set(GameState.routesForWave(S.wave + 1));
+        markers.forEach((m, i) => {
+          const on = playing && (S.waveActive ? (m.pending || S.waveTime < m.hideAt) : next.has(i));
+          m.show = Math.max(0, Math.min(1, m.show + (on ? dt * 4 : -dt * 3)));
+          m.flash = Math.max(0, m.flash - dt * 1.5);
+          m.g.visible = m.show > 0.01;
+          if (!m.g.visible) return;
+          // pop in with a little overshoot, then bob; the flash kicks it bigger
+          const k = m.show, pop = k < 1 ? Math.sin(k * Math.PI * 0.5) * (1 + 0.2 * Math.sin(k * Math.PI)) : 1;
+          const s = pop * (1 + 0.25 * m.flash);
+          m.g.scale.set(s * (1 - 0.03 * Math.sin(t * 4)), s * (1 + 0.05 * Math.sin(t * 4)), s);
+          m.live.flag.rotation.y = Math.sin(t * 6 + i) * 0.5;
+          m.live.ring.scale.setScalar(0.5 * (1 + 0.45 * ((t * 1.2 + i * 0.3) % 1)));
+          m.live.arrow.position.z = 0.7 + 0.15 * Math.sin(t * 5);
+        });
+      },
+    });
+  }
+
   // -------- init / frame --------
   function init(canvasEl) {
     canvas = canvasEl;
@@ -1906,6 +1967,7 @@ const Renderer = (() => {
     placeCamera();
     buildGround();
     GameState.currentLevel().buildScene(makeKit());
+    if (GameState.routes.length > 1) buildRouteMarkers();
     buildGrass();
     buildMotes();
     buildParticles();

@@ -31,4 +31,17 @@ module.exports = {
     botBuildSpots: [[2, 4], [2, 6], [4, 1], [5, 1], [8, 4], [8, 7], [6, 7], [10, 10], [11, 8], [13, 5], [13, 7], [14, 2], [15, 4], [15, 5], [16, 7], [18, 7]],
     waveCount: 12, hasBossOnWave: null,
   },
+  'splintered-vale': {
+    roadTile: [5, 6], streamTile: [13, 2], farTile: [19, 12],
+    firstSlingerTile: [3, 2],
+    // one lone Slinger per road, near that road's entry (per-road wave-1 check)
+    laneSlingerTiles: { shortcut: [3, 2], long: [5, 0], south: [3, 9] },
+    // the tip tile for wave 1, then the junction and shared trunk (every
+    // road passes there), then the lane entries. Entry-first lost at wave 9:
+    // covering three roads separately costs three times as much.
+    botBuildSpots: [[3, 2], [8, 5], [8, 7], [10, 5], [6, 7], [10, 7], [12, 5], [12, 7], [4, 4], [3, 9], [10, 3], [14, 5], [14, 7], [8, 2], [5, 2], [16, 7]],
+    // three Slingers first, one per lane's early threat
+    botPlan: ['slinger', 'slinger', 'slinger', 'warden', 'druid', 'artillery', 'golem', 'druid', 'warden', 'slinger', 'golem', 'artillery', 'warden', 'druid', 'slinger', 'golem'],
+    waveCount: 12, hasBossOnWave: null,
+  },
 };

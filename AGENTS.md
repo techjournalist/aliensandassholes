@@ -660,17 +660,55 @@ targeting rule back in) confirmed its targeting test really separates
 the two rules. The gate was strict: 15 seeded full-level bot runs across
 Levels 1-3 reproduced the pre-change lives, gold and kills exactly.
 
-- **P3-M4 — Level 4: The Elderroot Ward** (climax). Deep within the
-  Shadow Hollow itself, ~80% corrupted — only a small living foothold
+**P3-M4b — Level 4: The Splintered Vale** *(done)*. The campaign's first
+multi-road battle (`js/level4-splintered-vale.js`, 20x13, about 60%
+corrupted): a Shortcut and a Long Way from the north-west and a South
+Road, joining a shared row-6 trunk at (5,6), (7,6) and (9,6), then
+crossing **the Fallen Oak** (a colossal autumn oak hewn flat as a bridge,
+torn root plate on the north bank, its last leaves heaped south) to **the
+Forward Camp** (sharpened-log palisade, a command tent that sags and burns
+as lives fall, two small tents, a stilted watch platform, gate braziers,
+splintered stakes at damage state 1). Three blighted stumps mark the road
+mouths. Autumn look: new `autumn`/`autumnDark`/`canvas` palette entries,
+russet re-leafed trees, leaf piles, fallen logs, heavy leaf motes. 12
+waves use per-road groups and the new parallel `at` start; the finale
+(a Troll column on the Long Way, a Trickster rush on the Shortcut and a
+Bat swarm on the South Road, all at `at: 0`) is the campaign's first
+genuinely simultaneous one. Start gold is 170, since three roads need
+earlier coverage. New for readability, multi-road levels only: an
+**incoming-road marker** (a red-flag war-horn post with a gold pulse ring
+and an arrow) at the mouth of every road the next wave uses, shown
+through prep, kept up during a wave until that road's first enemy
+appears (groups can start late), then flashing and fading; data from the
+new pure `GameState.routesForWave(n)`. Overworld node at (204,196) with a
+new `camp` glyph. The critic pass found: the markers first read too small
+among the corner props (made bigger and brighter, with props cleared from
+every road mouth); the Fallen Oak's branch stubs stood up like fence posts
+(laid flat); the camp looked short next to the other endpoints (raised);
+and the mixed bot lost every seeded run at wave 6 or 9. Root cause: its
+spot order covered each road's entry separately, three times the cost,
+and its third build was an unaffordable Warden, so the South Road stayed
+empty. That's the Icewind lesson: the shared trunk is where towers cover
+every road. With three opening Slingers and trunk-first spots, 5 seeded
+runs won with 5, 7, 11, 7 and 11 lives (mean 8.2, in line with Levels
+2-3). Wave 1 and a per-road lone-Slinger check (each road's entry held
+by one tower) have no leaks; the single-type stress test over 5 types x 2
+branches shows none trivializing the level (best 6/12 clean, all lost).
+The harness bots now read `startGold` from the level (unchanged for
+Levels 1-3), Level 3's win screen now offers Continue, and a new check
+confirms single-road levels build no markers. 76 draw calls on Level 4's
+title view.
+
+- **P3-M5 — Level 5: The Elderroot Ward** (climax, next). Deep within the
+  Shadow Hollow itself, ~80% corrupted, with only a small living foothold
   around the endpoint. Endpoint: the Elderroot, a colossal still-living
-  tree stump ringed by a ward-circle. Chokepoint: the Rootfall Chasm, a
-  single ancient root spanning a fissure. 14 waves ending in a
-  Shadow-Crow Swarm reprise (the existing boss, unchanged stats — the
-  per-wave `hpScale` stiffening alone makes it harder than Level 1's
-  wave-12 fight). Grid 20x13 or 22x13. Highest tuning risk of the
-  three: longest path, busiest scene (check draw calls against the
-  established budget), and a boss whose difficulty now depends on
-  whichever tier-3 branches exist.
+  tree stump ringed by a ward-circle. A spiral path descending terraced
+  ground (render-only elevation), 14 waves ending in a Shadow-Crow Swarm
+  reprise (the existing boss, unchanged stats; the per-wave `hpScale`
+  stiffening alone makes it harder than Level 1's wave-12 fight).
+  Highest tuning risk: longest path, busiest scene (check draw calls
+  against the established budget), and a boss whose difficulty now
+  depends on which tier-3 branches the player took.
 
 **Recommended, not yet decided**: M6 (player abilities), M10 (hero,
 stretch), and the remaining M11 items (full palette consistency check,

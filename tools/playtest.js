@@ -414,7 +414,7 @@ async function enterLevel(page, levelId) {
       return keys[t.id % 2];
     };
     S.enemies.length = 0; S.projectiles.length = 0; S.towers.length = 0;
-    S.gold = 150; S.lives = 20; S.wave = 0; S.prep = 0; S.waveActive = false; S.schedule = []; S.waveQueue = []; S.phase = 'playing'; S.endpointState = 0; S.kills = 0;
+    S.gold = GameState.currentLevel().startGold; S.lives = 20; S.wave = 0; S.prep = 0; S.waveActive = false; S.schedule = []; S.waveQueue = []; S.phase = 'playing'; S.endpointState = 0; S.kills = 0;
     const flyersIn = (n) => { const w = GameState.waveInfo(n); return !!w && w.groups.some((g) => g.type === 'bat' || g.type === 'boss'); };
     const antiAir = () => S.towers.filter((t) => GameState.TOWER_TYPES[t.type].hitsFlying).length;
     const spots = [[7, 5], [6, 5], [9, 5], [7, 7], [10, 5], [12, 4], [13, 7], [15, 8], [5, 5], [3, 3], [13, 4], [15, 10], [5, 7], [12, 7], [3, 1], [15, 4]];
@@ -556,7 +556,7 @@ async function enterLevel(page, levelId) {
       return keys[t.id % 2];
     };
     S.enemies.length = 0; S.projectiles.length = 0; S.towers.length = 0;
-    S.gold = 150; S.lives = 20; S.wave = 0; S.prep = 0; S.waveActive = false; S.schedule = []; S.waveQueue = []; S.phase = 'playing'; S.endpointState = 0; S.kills = 0;
+    S.gold = GameState.currentLevel().startGold; S.lives = 20; S.wave = 0; S.prep = 0; S.waveActive = false; S.schedule = []; S.waveQueue = []; S.phase = 'playing'; S.endpointState = 0; S.kills = 0;
     const flyersIn = (n) => { const w = GameState.waveInfo(n); return !!w && w.groups.some((g) => g.type === 'bat' || g.type === 'boss'); };
     const antiAir = () => S.towers.filter((t) => GameState.TOWER_TYPES[t.type].hitsFlying).length;
     let next = 0;
@@ -625,6 +625,7 @@ async function enterLevel(page, levelId) {
   await page.waitForTimeout(1500);
   await page.screenshot({ path: `${OUT}/level3-title.png` });
   console.log('LEVEL 3 DEBUG OVERLAY: ' + (await page.locator('#debug').innerText()).replace(/\n/g, ' | '));
+  check('single-road levels build no incoming-road markers', await page.evaluate(() => { let n = 0; Renderer.debugScene().traverse((o) => { if (o.name && o.name.startsWith('route-marker-')) n++; }); return n === 0; }));
 
   const L3F = LEVEL_FIXTURES['cairnwatch'];
   const lone3 = await page.evaluate((tip) => {
@@ -651,7 +652,7 @@ async function enterLevel(page, levelId) {
   check('Level 3 win screen shows stars', mixed3.phase !== 'won' || (await page.locator('#end').isVisible() && await page.locator('#stars span.lit').count() === mixed3.stars));
   await page.screenshot({ path: `${OUT}/level3-win.png` });
   check('Level 3 win recorded progress', await page.evaluate(() => Progress.starsFor('cairnwatch') > 0));
-  check('Level 3 win screen keeps "Choose another battle" (no Level 4 yet)', (await page.locator('#end-map-btn').innerText()) === 'Choose another battle');
+  check('Level 3 win screen now offers Continue to Level 4', (await page.locator('#end-map-btn').innerText()) === 'Continue');
   await page.evaluate(() => { document.getElementById('end').classList.remove('show'); });
 
   for (const type of ['slinger', 'warden', 'druid', 'golem', 'artillery']) for (const pick of [0, 1]) {
@@ -660,6 +661,63 @@ async function enterLevel(page, levelId) {
     const clean = r.leaks.filter((l) => l <= 1).length;
     console.log(`LEVEL 3 ONLY ${type}/${br}: ` + JSON.stringify(r) + ` clean waves=${clean}/${L3F.waveCount}`);
     check(`Level 3: only ${type} (${br}) does not trivialize the level`, !(r.phase === 'won' && clean > Math.floor(L3F.waveCount * 0.6)), `phase=${r.phase} clean=${clean}`);
+  }
+  await page.waitForTimeout(1600);
+  await page.evaluate(() => { GameState.state.enemies.length = 0; document.getElementById('end').classList.remove('show'); });
+
+  // ---------------- Level 4: The Splintered Vale (three roads) ----------------
+  check('winning Level 3 unlocked Level 4', await page.evaluate(() => Progress.isUnlocked('splintered-vale')));
+  await page.reload(); await page.waitForTimeout(1000);
+  await enterLevel(page, 'splintered-vale');
+  check('Level 4 loads with three roads', await page.evaluate(() => GameState.currentLevel().id === 'splintered-vale' && GameState.routes.length === 3));
+  await page.waitForTimeout(1500);
+  await page.screenshot({ path: `${OUT}/level4-title.png` });
+  console.log('LEVEL 4 DEBUG OVERLAY: ' + (await page.locator('#debug').innerText()).replace(/\n/g, ' | '));
+  const markers = await page.evaluate(() => {
+    const sc = Renderer.debugScene(), vis = (id) => { const g = sc.getObjectByName(`route-marker-${id}`); return g ? g.visible : null; };
+    return { shortcut: vis('shortcut'), long: vis('long'), south: vis('south'), next: GameState.routesForWave(1) };
+  });
+  check('an incoming-road marker stands at the road wave 1 uses, and only there', markers.shortcut === true && markers.long === false && markers.south === false, JSON.stringify(markers));
+
+  const L4F = LEVEL_FIXTURES['splintered-vale'];
+  const lone4 = await page.evaluate(({ tip, lanes }) => {
+    const G = GameState, S = G.state, out = {};
+    const reset = () => { S.towers.length = 0; S.enemies.length = 0; S.projectiles.length = 0; S.gold = 170; S.lives = 20; S.wave = 0; S.prep = 0; S.waveActive = false; S.schedule = []; S.waveQueue = []; S.phase = 'playing'; };
+    reset(); S.selected = { kind: 'tile', c: tip[0], r: tip[1] }; G.placeTower('slinger');
+    G.startWave();
+    for (let i = 0; i < 60 * 90 && S.waveActive; i++) G.update(1 / 60);
+    out.wave1 = 20 - S.lives;
+    // every road on its own: a wave-1-sized group against one Slinger near its entry
+    for (const [route, [c, r]] of Object.entries(lanes)) {
+      reset(); S.selected = { kind: 'tile', c, r }; G.placeTower('slinger');
+      let t = 0, n = 0;
+      for (let i = 0; i < 60 * 90; i++) { if (n < 5 && t >= n * 3.2) { G.spawnEnemy('grunt', route); n++; } G.update(1 / 60); t += 1 / 60; if (n >= 5 && !S.enemies.length) break; }
+      out[route] = 20 - S.lives;
+    }
+    reset();
+    return out;
+  }, { tip: L4F.firstSlingerTile, lanes: L4F.laneSlingerTiles });
+  check('Level 4 wave 1 is winnable by a single lone tower (no leaks)', lone4.wave1 === 0, JSON.stringify(lone4));
+  check('Level 4: every road can be held early by one Slinger at its entry', lone4.shortcut === 0 && lone4.long === 0 && lone4.south === 0, JSON.stringify(lone4));
+
+  const mixed4 = await runBotOn(L4F.botPlan, L4F.botBuildSpots, L4F.waveCount);
+  console.log('LEVEL 4 MIXED BOT: ' + JSON.stringify(mixed4));
+  check('Level 4: a mixed defense can win all 12 waves', mixed4.phase === 'won', `lives=${mixed4.lives} leaks=${JSON.stringify(mixed4.leaks)}`);
+  check('Level 4: waves 1 and 2 are nearly unloseable', mixed4.leaks[0] + mixed4.leaks[1] <= 1, `leaks=${JSON.stringify(mixed4.leaks.slice(0, 2))}`);
+  if (mixed4.phase === 'won') await page.locator('#end.show').waitFor({ timeout: 10000 }).catch(() => {});
+  await page.waitForTimeout(300);
+  check('Level 4 win screen shows stars', mixed4.phase !== 'won' || (await page.locator('#end').isVisible() && await page.locator('#stars span.lit').count() === mixed4.stars));
+  await page.screenshot({ path: `${OUT}/level4-win.png` });
+  check('Level 4 win recorded progress', await page.evaluate(() => Progress.starsFor('splintered-vale') > 0));
+  check('Level 4 win screen keeps "Choose another battle" (no Level 5 yet)', (await page.locator('#end-map-btn').innerText()) === 'Choose another battle');
+  await page.evaluate(() => { document.getElementById('end').classList.remove('show'); });
+
+  for (const type of ['slinger', 'warden', 'druid', 'golem', 'artillery']) for (const pick of [0, 1]) {
+    const br = Object.keys(BRANCH_KEYS[type])[pick];
+    const r = await runBotOn([type], L4F.botBuildSpots, L4F.waveCount, pick);
+    const clean = r.leaks.filter((l) => l <= 1).length;
+    console.log(`LEVEL 4 ONLY ${type}/${br}: ` + JSON.stringify(r) + ` clean waves=${clean}/${L4F.waveCount}`);
+    check(`Level 4: only ${type} (${br}) does not trivialize the level`, !(r.phase === 'won' && clean > Math.floor(L4F.waveCount * 0.6)), `phase=${r.phase} clean=${clean}`);
   }
   await page.waitForTimeout(1600);
   await page.evaluate(() => { GameState.state.enemies.length = 0; document.getElementById('end').classList.remove('show'); });

@@ -229,6 +229,8 @@ const UI = (() => {
       + '<path class="rf" d="M -13 -12 A 4.5 4.5 0 0 1 -4 -12 Z"></path><path class="rf" d="M 4 -12 A 4.5 4.5 0 0 1 13 -12 Z"></path><rect class="wn" x="-2" y="-2" width="4" height="5"></rect>',
     mill: '<rect class="st" x="-10" y="-5" width="15" height="11"></rect><path class="rb" d="M -12 -5 L -2.5 -13 L 7 -5 Z"></path>'
       + '<circle class="wd" cx="9" cy="2" r="6"></circle><path class="wd" d="M 3 2 H 15 M 9 -4 V 8"></path>',
+    camp: '<path class="st" d="M -13 7 L -13 -3 M -9 7 L -9 -4 M 9 7 L 9 -4 M 13 7 L 13 -3" style="fill:none;stroke:var(--bark);stroke-width:2.2"></path>'
+      + '<path class="tn" d="M -7 6 L 0 -10 L 7 6 Z"></path><path class="wd" d="M 0 -10 V -15"></path><path class="rf" d="M 0 -15 L 6 -13 L 0 -11 Z"></path><rect class="wn" x="-1.5" y="1" width="3" height="5"></rect>',
     tower: '<rect class="st" x="-5" y="-10" width="10" height="17"></rect><path class="rb" d="M -7 -10 L 0 -20 L 7 -10 Z"></path><rect class="wn" x="-1.5" y="-5" width="3" height="4"></rect>',
   };
   const HOME_TREES = [[720, 108], [742, 160], [700, 88], [738, 226], [714, 268], [668, 68], [750, 118], [690, 290]];

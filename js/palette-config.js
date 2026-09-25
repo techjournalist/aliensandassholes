@@ -56,6 +56,9 @@ const PALETTE = {
   windowWarm:   0xffd36b,
   shadow:       0x000000,
   straw:        0xd4a94a,
+  autumn:       0xd9822b,
+  autumnDark:   0xa8561f,
+  canvas:       0xe9dcc0,
 };
 
 const CONFIG = {
