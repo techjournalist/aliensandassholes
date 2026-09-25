@@ -5,7 +5,9 @@
 // Level 1, a new map and a lighter touch of corruption.
 // ===================================================================
 const LEVEL_2 = (() => {
-  const g = (type, count, gap, delay = 0) => ({ type, count, gap, delay });
+  // route/at are optional: which road the group takes, and an absolute start
+  // time for groups that come at once (see GameState.startWave)
+  const g = (type, count, gap, delay = 0, route, at) => ({ type, count, gap, delay, route, at });
 
   const waves = [
     { name: 'First Watch',      flavor: 'A handful of grunts, testing the new line.',                     groups: [g('grunt', 5, 3.6)] },

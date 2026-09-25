@@ -633,6 +633,33 @@ reading "Kills flyers" would) and alternate the rest. A 5-seed Level 2
 comparison put blind branch picks at 7.4 mean lives vs 8.4 for the old
 flat tier 3, so specializations add choice without a hidden power spike
 or drop.
+**P3-M4a — Multi-route engine** *(done, no player-visible change)*. Level 4
+needs three converging roads, and `GameState` used to derive exactly one
+path. A level may now define `routes: [{ id, waypoints }]` (absent means
+one route from `pathWaypoints`, so Levels 1-3 needed no data change).
+Each route has its own cells, polyline and length; `pathCells`/`pathIndex`
+are the union, so `isPath`, `isBuildable`, `cellKind` and road rendering
+work unchanged; `isSpawn` covers every route start; the cobbled tail comes
+from the primary route. Enemies carry `e.route` (named so to avoid the
+existing `e.lane` sideways offset); `spawnEnemy(type, routeId)` and
+`pathPosAt(d, out, route)` take it. Targeting became "closest to the
+gate": the same `dist` comparison when two enemies share a road (so
+single-road levels are bit-identical) and least road left across roads.
+Wave groups gain optional `route` and `at` (an absolute start time for
+groups that truly come at once). Planning found that groups have always
+been strictly sequential, `delay` counting from the previous group's last
+spawn, so Level 3's finale (described above as a Troll column, Trickster
+rush and Bat swarm "all at delay 0 together") actually arrives back to
+back, not simultaneously. Its balance is unchanged; making it truly
+simultaneous with `at` is a separate, user-visible decision. New
+`tools/validate-levels.js` (plain Node, run first by the harness)
+enforces the road rules for every level and drives a synthetic
+three-route level through the real engine. It caught a crossing-roads
+error in its own first fixture, and a mutation check (swapping the old
+targeting rule back in) confirmed its targeting test really separates
+the two rules. The gate was strict: 15 seeded full-level bot runs across
+Levels 1-3 reproduced the pre-change lives, gold and kills exactly.
+
 - **P3-M4 — Level 4: The Elderroot Ward** (climax). Deep within the
   Shadow Hollow itself, ~80% corrupted — only a small living foothold
   around the endpoint. Endpoint: the Elderroot, a colossal still-living

@@ -31,3 +31,18 @@ totalWaves)` mixed-defense and single-tower-type pass against each
 additional level, reading its `botBuildSpots`/`waveCount` from this fixture
 table. A third level should extend that same per-level block rather than
 duplicating Level 1's full mechanic suite again.
+
+`validate-levels.js` (plain Node, no browser; `playtest.js` runs it first)
+loads the palette, level files and `GameState` into a `vm` context. It
+checks every level's roads against the rules the engine relies on: each
+waypoint pair is a straight run, a road crosses the stream column only at
+the chokepoint, never walks through the endpoint, ends at the gate, and
+roads that meet stay merged. It then drives a synthetic three-route level
+through the real engine and confirms single-route levels derive exactly
+the pre-route path. Run it alone with `node tools/validate-levels.js`.
+
+Multi-route levels (P3-M4a): a level may define
+`routes: [{ id, waypoints }, ...]` instead of `pathWaypoints` (first route
+= primary: its tail is the cobbled stretch, its start is `level.spawn`).
+Wave groups take optional `route` (which road) and `at` (an absolute start
+time; groups without it run one after another, as before).

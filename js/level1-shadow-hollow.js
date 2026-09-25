@@ -5,7 +5,9 @@
 // with; its data and scene-building code just moved into its own file.
 // ===================================================================
 const LEVEL_1 = (() => {
-  const g = (type, count, gap, delay = 0) => ({ type, count, gap, delay });
+  // route/at are optional: which road the group takes, and an absolute start
+  // time for groups that come at once (see GameState.startWave)
+  const g = (type, count, gap, delay = 0, route, at) => ({ type, count, gap, delay, route, at });
 
   // The twelve waves. Each group spawns after `delay` seconds, one enemy
   // every `gap` seconds. Flavor lines teach the new threat in-world.

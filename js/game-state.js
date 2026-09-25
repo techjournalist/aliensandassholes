@@ -3,7 +3,10 @@
 // ===================================================================
 const GameState = (() => {
   let level = null, cols = 0, rows = 0;
-  let pathCells = [], pathIndex = new Map(), pathPoints = [], pathLens = [0], pathLength = 0, gate = { x: 0, z: 0 };
+  // Routes: every road an enemy can walk, from its own spawn to the shared
+  // gate. Most levels have one; pathCells/pathIndex are the union of all.
+  let routes = [], cobbleCells = new Set(), spawnCells = new Set();
+  let pathCells = [], pathIndex = new Map(), gate = { x: 0, z: 0 };
 
   // Every tower is a character with a job.
   const TOWER_TYPES = {
@@ -73,7 +76,7 @@ const GameState = (() => {
   function isStream(c, r) { return c === level.chokepoint.streamCol && !(c === level.chokepoint.cell[0] && r === level.chokepoint.cell[1]); }
   function isBridge(c, r) { return c === level.chokepoint.cell[0] && r === level.chokepoint.cell[1]; }
   function isBastion(c, r) { return level.endpoint.cells.some(([bc, br]) => bc === c && br === r); }
-  function isSpawn(c, r) { return c === level.spawn[0] && r === level.spawn[1]; }
+  function isSpawn(c, r) { return spawnCells.has(key(c, r)); }
 
   // 0 = pleasant countryside, 1 = deep in this level's dangerous zone.
   // Defined for any cell, including the decorative border, so the danger
@@ -103,7 +106,7 @@ const GameState = (() => {
   }
 
   function pathIndexOf(c, r) { const i = pathIndex.get(key(c, r)); return i === undefined ? -1 : i; }
-  function isCobble(c, r) { const i = pathIndexOf(c, r); return i >= 0 && i >= pathCells.length - level.cobbleTailCells; }
+  function isCobble(c, r) { return cobbleCells.has(key(c, r)); }
 
   const state = {};
   let nextId = 1;
@@ -113,28 +116,35 @@ const GameState = (() => {
   function loadLevel(def) {
     level = def; cols = def.grid.cols; rows = def.grid.rows; nextId = 1;
 
-    pathCells = [];
-    for (let i = 0; i < def.pathWaypoints.length - 1; i++) {
-      const [ax, az] = def.pathWaypoints[i];
-      const [bx, bz] = def.pathWaypoints[i + 1];
-      const dx = Math.sign(bx - ax), dz = Math.sign(bz - az);
-      let x = ax, z = az;
-      if (i === 0) pathCells.push([x, z]);
-      while (x !== bx || z !== bz) { x += dx; z += dz; pathCells.push([x, z]); }
-    }
-    pathIndex = new Map(pathCells.map(([c, r], i) => [`${c},${r}`, i]));
-
-    // World-space polyline the enemies walk: waypoint centers, plus a final
-    // step into the endpoint's gate so leaks visibly go through the door.
-    pathPoints = def.pathWaypoints.map(([c, r]) => ({ x: worldX(c), z: worldZ(r) }));
+    // Each route: its grid cells, and the world-space polyline enemies walk
+    // (waypoint centers plus a final step into the endpoint's gate so leaks
+    // visibly go through the door). A level without `routes` has one, built
+    // from `pathWaypoints`.
     gate = { x: worldX(def.endpoint.gateCell[0]), z: worldZ(def.endpoint.gateCell[1] + 1) - 0.72 };
-    pathPoints.push(gate);
-    pathLens = [0];
-    for (let i = 1; i < pathPoints.length; i++) {
-      const a = pathPoints[i - 1], b = pathPoints[i];
-      pathLens.push(pathLens[i - 1] + Math.hypot(b.x - a.x, b.z - a.z));
+    const defs = def.routes || [{ id: 'main', waypoints: def.pathWaypoints }];
+    routes = defs.map((rd, index) => {
+      const wps = rd.waypoints, cells = [];
+      for (let i = 0; i < wps.length - 1; i++) {
+        const [ax, az] = wps[i], [bx, bz] = wps[i + 1];
+        const dx = Math.sign(bx - ax), dz = Math.sign(bz - az);
+        let x = ax, z = az;
+        if (i === 0) cells.push([x, z]);
+        while (x !== bx || z !== bz) { x += dx; z += dz; cells.push([x, z]); }
+      }
+      const points = wps.map(([c, r]) => ({ x: worldX(c), z: worldZ(r) }));
+      points.push(gate);
+      const lens = [0];
+      for (let i = 1; i < points.length; i++) lens.push(lens[i - 1] + Math.hypot(points[i].x - points[i - 1].x, points[i].z - points[i - 1].z));
+      return { id: rd.id, index, cells, points, lens, length: lens[lens.length - 1] };
+    });
+    // the union of every route's cells, primary route first and in order
+    pathCells = []; pathIndex = new Map();
+    for (const rt of routes) for (const [c, r] of rt.cells) {
+      if (!pathIndex.has(key(c, r))) { pathIndex.set(key(c, r), pathCells.length); pathCells.push([c, r]); }
     }
-    pathLength = pathLens[pathLens.length - 1];
+    const primary = routes[0].cells;
+    cobbleCells = new Set(primary.slice(Math.max(0, primary.length - def.cobbleTailCells)).map(([c, r]) => key(c, r)));
+    spawnCells = new Set(routes.map((rt) => key(rt.cells[0][0], rt.cells[0][1])));
 
     Object.assign(state, {
       gold: def.startGold, lives: def.startLives, wave: 0, time: 0,
@@ -147,14 +157,20 @@ const GameState = (() => {
   function currentLevel() { return level; }
   function totalWaves() { return level.waves.length; }
 
-  function pathPosAt(d, out) {
+  function routeOf(id) {
+    if (id === undefined || id === null) return routes[0];
+    if (typeof id === 'number') return routes[id] || routes[0];
+    return routes.find((rt) => rt.id === id) || routes[0];
+  }
+  function pathPosAt(d, out, route) {
     out = out || { x: 0, z: 0 };
-    if (d <= 0) { out.x = pathPoints[0].x; out.z = pathPoints[0].z; return out; }
-    if (d >= pathLength) { out.x = gate.x; out.z = gate.z; return out; }
+    const { points, lens, length } = route || routes[0];
+    if (d <= 0) { out.x = points[0].x; out.z = points[0].z; return out; }
+    if (d >= length) { out.x = gate.x; out.z = gate.z; return out; }
     let i = 1;
-    while (pathLens[i] < d) i++;
-    const a = pathPoints[i - 1], b = pathPoints[i];
-    const t = (d - pathLens[i - 1]) / (pathLens[i] - pathLens[i - 1]);
+    while (lens[i] < d) i++;
+    const a = points[i - 1], b = points[i];
+    const t = (d - lens[i - 1]) / (lens[i] - lens[i - 1]);
     out.x = a.x + (b.x - a.x) * t;
     out.z = a.z + (b.z - a.z) * t;
     return out;
@@ -309,14 +325,14 @@ const GameState = (() => {
   }
 
   // -------- enemies --------
-  function spawnEnemy(typeId) {
-    const t = ENEMY_TYPES[typeId];
+  function spawnEnemy(typeId, routeId) {
+    const t = ENEMY_TYPES[typeId], route = routeOf(routeId);
     const hp = Math.round(t.hp * state.hpScale);
     const e = {
       id: nextId++, type: typeId, name: t.name, hp, maxHp: hp, speed: t.speed,
       flying: t.flying, bounty: t.bounty,
       dist: 0, lane: t.boss ? 0 : (Math.random() - 0.5) * 0.44,   // lateral offset so a crowd doesn't walk single file
-      x: pathPoints[0].x, z: pathPoints[0].z, dirX: 1, dirZ: 0, age: 0,
+      route: route.index, x: route.points[0].x, z: route.points[0].z, dirX: 1, dirZ: 0, age: 0,
       chillUntil: 0, chillMul: 1, rootUntil: 0, speedMul: 1,
       armor: t.armor || 0, wobble: !!t.wobble, boss: !!t.boss,
     };
@@ -332,15 +348,16 @@ const GameState = (() => {
     e.chilled = state.time < e.chillUntil;
     e.speedMul = e.rooted ? 0 : (e.chilled ? e.chillMul : 1);
     e.dist += e.speed * e.speedMul * dt;
-    pathPosAt(e.dist - 0.3, _a);
-    pathPosAt(e.dist + 0.3, _b);
+    const route = routes[e.route];
+    pathPosAt(e.dist - 0.3, _a, route);
+    pathPosAt(e.dist + 0.3, _b, route);
     let dx = _b.x - _a.x, dz = _b.z - _a.z;
     const l = Math.hypot(dx, dz) || 1;
     dx /= l; dz /= l;
     e.dirX = dx; e.dirZ = dz;
-    pathPosAt(e.dist, _a);
+    pathPosAt(e.dist, _a, route);
     // lane offset fades out over the last stretch so everyone funnels into the gate
-    const funnel = Math.min(1, Math.max(0, (pathLength - e.dist) / 1.2));
+    const funnel = Math.min(1, Math.max(0, (route.length - e.dist) / 1.2));
     const lane = e.lane + (e.wobble ? Math.sin(e.dist * 3.1 + e.id) * 0.22 : 0);
     e.x = _a.x + -dz * lane * funnel;
     e.z = _a.z + dx * lane * funnel;
@@ -372,14 +389,20 @@ const GameState = (() => {
   // -------- combat --------
   function enemyById(id) { return state.enemies.find((e) => e.id === id) || null; }
 
-  // Towers shoot whichever reachable enemy is furthest down the road.
+  // Towers shoot whichever reachable enemy is closest to the gate. On one
+  // road that's simply the furthest along; across roads of different
+  // lengths it's the least distance left to walk.
+  function ahead(a, b) {
+    if (a.route === b.route) return a.dist > b.dist;
+    return routes[a.route].length - a.dist < routes[b.route].length - b.dist;
+  }
   function pickTarget(tower, type) {
     let best = null;
     for (const e of state.enemies) {
       if (e.flying && !type.hitsFlying) continue;
       const d = Math.hypot(e.x - tower.x, e.z - tower.z);
       if (d > tower.range || d < (type.minRange || 0)) continue;
-      if (!best || e.dist > best.dist) best = e;
+      if (!best || ahead(e, best)) best = e;
     }
     return best;
   }
@@ -390,7 +413,7 @@ const GameState = (() => {
     const rest = state.enemies.filter((e) => e !== primary && (!e.flying || type.hitsFlying)
       && Math.hypot(e.x - tower.x, e.z - tower.z) <= tower.range
       && Math.hypot(e.x - tower.x, e.z - tower.z) >= (type.minRange || 0));
-    rest.sort((a, b) => b.dist - a.dist);
+    rest.sort((a, b) => (ahead(a, b) ? -1 : ahead(b, a) ? 1 : 0));
     for (let i = 0; i < rest.length && out.length < n; i++) out.push(rest[i]);
     return out;
   }
@@ -503,12 +526,19 @@ const GameState = (() => {
     if (state.waveActive || state.phase !== 'playing' || state.wave >= level.waves.length) return false;
     state.wave += 1;
     const def = level.waves[state.wave - 1];
+    // Groups run one after another (`delay` counts from the previous group's
+    // last spawn). A group with `at` instead starts at that time on its own,
+    // so groups on different routes can come at once. `route` picks the road.
     const sched = [];
     let t = 0.6;
     for (const grp of def.groups) {
-      t += grp.delay;
-      for (let i = 0; i < grp.count; i++) { sched.push({ t, type: grp.type }); t += grp.gap; }
+      let gt;
+      if (grp.at !== undefined) gt = 0.6 + grp.at;
+      else { t += grp.delay; gt = t; }
+      for (let i = 0; i < grp.count; i++) { sched.push({ t: gt, type: grp.type, route: grp.route }); gt += grp.gap; }
+      if (grp.at === undefined) t = gt;
     }
+    sched.sort((a, b) => a.t - b.t);
     state.schedule = sched;
     state.waveQueue = sched.map((e) => e.type);
     state.waveTime = 0;
@@ -537,7 +567,8 @@ const GameState = (() => {
     if (state.waveActive) {
       state.waveTime += dt;
       while (state.schedule.length && state.schedule[0].t <= state.waveTime) {
-        spawnEnemy(state.schedule.shift().type);
+        const next = state.schedule.shift();
+        spawnEnemy(next.type, next.route);
         state.waveQueue.shift();
       }
     } else if (state.prep > 0) {
@@ -550,7 +581,7 @@ const GameState = (() => {
     for (let i = state.enemies.length - 1; i >= 0; i--) {
       const e = state.enemies[i];
       moveEnemy(e, dt);
-      if (e.dist >= pathLength) {
+      if (e.dist >= routes[e.route].length) {
         state.enemies.splice(i, 1);
         leak(e);
       }
@@ -571,7 +602,7 @@ const GameState = (() => {
 
   return {
     get cols() { return cols; }, get rows() { return rows; },
-    get pathCells() { return pathCells; }, get gate() { return gate; },
+    get pathCells() { return pathCells; }, get gate() { return gate; }, get routes() { return routes; },
     TOWER_TYPES, TOWER_ORDER, TIERS, BRANCHES, ENEMY_TYPES, towerStats, upgradeCost, sellValue, towerById, upgradeTower, sellTower,
     pathPosAt,
     state, on, emit, update, worldX, worldZ, startGame, pause, resume, setSpeed,

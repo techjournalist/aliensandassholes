@@ -49,6 +49,8 @@ async function enterLevel(page, levelId) {
 }
 
 (async () => {
+  // ---- level authoring rules + the multi-route engine, no browser needed ----
+  for (const r of require('./validate-levels.js').validate()) check(r.name, r.ok, r.detail);
   const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
   const log = [];
 
