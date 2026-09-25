@@ -14,8 +14,38 @@ const GameState = (() => {
     artillery: { id: 'artillery', name: 'Acorn Artillery',    cost: 120, range: 4.2, minRange: 1.4, damage: 15, cooldown: 2.4, windup: 0.35, projectileSpeed: 5, projectile: 'bigacorn', splash: 0.7, hitsFlying: true, icon: '&#127792;', blurb: 'Lobs a huge acorn far, not near. Splashes. Reaches flyers.' },
   };
   const TOWER_ORDER = ['slinger', 'warden', 'druid', 'golem', 'artillery'];
-  // Flat tier progression: tiers 2 and 3 multiply damage, trim cooldown and
-  // add range. Tier 3 becomes the branch choice in a later milestone.
+  // Tier 3 is a permanent choice between two specializations. Each is about
+  // as strong overall as a flat tier 3 would be, but concentrated: clearly
+  // better than its sibling in one situation, clearly worse in another.
+  // damage/cooldown multiply the base type, range adds; splash and effect
+  // replace the base values when given. shots: targets per volley.
+  // pierce: ignores armor. groundSplash: the blast lands on the ground, so
+  // flyers other than the one aimed at are untouched.
+  const BRANCHES = {
+    slinger: {
+      marksman: { name: 'Thornshot Marksman', icon: '&#127919;', blurb: 'One slow, huge shot that pierces armor.', damage: 5, cooldown: 1.7, range: 1.1, pierce: true },
+      bloom:    { name: 'Rapid Bloom',        icon: '&#127804;', blurb: 'Fast shots at two targets. Weak vs armor.', damage: 1.25, cooldown: 0.6, range: 0.3, shots: 2 },
+    },
+    warden: {
+      thicket: { name: 'Thicket Keeper', icon: '&#127795;', blurb: 'Wide thorns that root a crowd for long.', damage: 1.3, cooldown: 1.0, range: 0.3, splash: 1.2, effect: { root: 1.4 } },
+      briarstorm: { name: 'Briarstorm',     icon: '&#127786;', blurb: 'Big thorn blasts. Roots only briefly.', damage: 3.4, cooldown: 0.8, range: 0.3, splash: 1.15, effect: { root: 0.4 } },
+    },
+    druid: {
+      hoarfrost: { name: 'Hoarfrost Circle', icon: '&#10052;', blurb: 'Frost bursts that slow a whole crowd.', damage: 1.2, cooldown: 0.95, range: 0.2, splash: 1.0, groundSplash: true, effect: { chill: 2.2, chillMul: 0.45 } },
+      seer: { name: 'Icicle Seer', icon: '&#128142;', blurb: 'Sharp icicles, long reach. Kills flyers.', damage: 5, cooldown: 0.7, range: 0.8, effect: { chill: 1.0, chillMul: 0.75 } },
+    },
+    golem: {
+      earthshaker: { name: 'Earthshaker', icon: '&#127755;', blurb: 'The slam cracks the ground and roots a crowd.', damage: 1.5, cooldown: 1, range: 0.3, splash: 1.0, effect: { root: 0.4 } },
+      mountainheart: { name: 'Mountainheart', icon: '&#128081;', blurb: 'A crushing blow that ignores armor.', damage: 4.2, cooldown: 1.0, range: 0.3, pierce: true },
+    },
+    artillery: {
+      oakfall: { name: 'Oakfall Mortar', icon: '&#128165;', blurb: 'A giant acorn with a huge blast. Slow.', damage: 3.2, cooldown: 1.2, range: 1.0, splash: 1.4, groundSplash: true },
+      squirrel: { name: 'Squirrel Battery', icon: '&#128063;', blurb: 'Three acorns at three targets. Small blasts.', damage: 1.3, cooldown: 0.75, range: 0.5, splash: 0.35, shots: 3 },
+    },
+  };
+  // Tier progression. Tier 2 is a flat step up. Tier 3's stats here are only a
+  // fallback: reaching tier 3 requires a specialization (BRANCHES above),
+  // whose own numbers replace these. costMul still prices every step.
   const TIERS = [
     { damage: 1,    cooldown: 1,    range: 0,    costMul: 0 },
     { damage: 1.5,  cooldown: 0.92, range: 0.25, costMul: 0.8 },
@@ -193,9 +223,18 @@ const GameState = (() => {
   function canAfford(typeId) { return state.gold >= TOWER_TYPES[typeId].cost; }
   function towerStats(tower) {
     const type = TOWER_TYPES[tower.type], tier = TIERS[tower.tier - 1];
+    const br = tower.tier >= 3 && tower.branch ? BRANCHES[tower.type][tower.branch] : null;
+    if (br) {
+      return {
+        damage: Math.round(type.damage * br.damage), cooldown: type.cooldown * br.cooldown,
+        range: type.range + br.range, splash: br.splash ?? type.splash, effect: br.effect || type.effect || null,
+        shots: br.shots || 1, pierce: !!br.pierce, groundSplash: !!br.groundSplash,
+      };
+    }
     return {
       damage: Math.round(type.damage * tier.damage), cooldown: type.cooldown * tier.cooldown,
       range: type.range + tier.range, splash: type.splash, effect: type.effect || null,
+      shots: 1, pierce: false,
     };
   }
   function upgradeCost(tower) {
@@ -210,11 +249,14 @@ const GameState = (() => {
   }
   function towerById(id) { return state.towers.find((t) => t.id === id) || null; }
 
-  function upgradeTower(id) {
+  function upgradeTower(id, branch) {
     const tower = towerById(id);
     if (!tower) return { ok: false, reason: 'No tower there.' };
     const cost = upgradeCost(tower);
     if (cost === null) return { ok: false, reason: 'Already at full strength.' };
+    // the last tier is a permanent specialization and needs a choice
+    const needsBranch = tower.tier + 1 >= TIERS.length;
+    if (needsBranch && !(branch && BRANCHES[tower.type][branch])) return { ok: false, reason: 'Pick a specialization.' };
     if (state.gold < cost) {
       const res = { ok: false, reason: `Not enough gold. The upgrade costs ${cost}.` };
       emit('placeRejected', res);
@@ -222,6 +264,7 @@ const GameState = (() => {
     }
     state.gold -= cost;
     tower.tier += 1;
+    if (needsBranch) tower.branch = branch;
     tower.range = towerStats(tower).range;
     emit('towerUpgraded', tower);
     emit('goldChanged', state.gold);
@@ -341,6 +384,17 @@ const GameState = (() => {
     return best;
   }
 
+  // Multi-shot towers: the primary target plus the next furthest along.
+  function pickTargets(tower, type, primary, n) {
+    const out = [primary];
+    const rest = state.enemies.filter((e) => e !== primary && (!e.flying || type.hitsFlying)
+      && Math.hypot(e.x - tower.x, e.z - tower.z) <= tower.range
+      && Math.hypot(e.x - tower.x, e.z - tower.z) >= (type.minRange || 0));
+    rest.sort((a, b) => b.dist - a.dist);
+    for (let i = 0; i < rest.length && out.length < n; i++) out.push(rest[i]);
+    return out;
+  }
+
   function updateTower(tower, dt) {
     const type = TOWER_TYPES[tower.type];
     const stats = towerStats(tower);
@@ -368,15 +422,21 @@ const GameState = (() => {
   }
 
   function fire(tower, type, stats, target) {
+    const targets = stats.shots > 1 ? pickTargets(tower, type, target, stats.shots) : [target];
+    let first = null;
+    for (const t of targets) { const p = launch(tower, type, stats, t); first = first || p; }
+    emit('towerFired', { tower, projectile: first });
+  }
+  function launch(tower, type, stats, target) {
     const p = {
       id: nextId++, towerId: tower.id, targetId: target.id, damage: stats.damage,
-      kind: type.projectile, splash: stats.splash, effect: stats.effect, hitsFlying: type.hitsFlying,
+      kind: type.projectile, splash: stats.splash, effect: stats.effect, hitsFlying: type.hitsFlying && !stats.groundSplash, pierce: stats.pierce,
       targetFlying: target.flying, targetBoss: !!target.boss,
       x: tower.x, z: tower.z, sx: tower.x, sz: tower.z, speed: type.projectileSpeed, t: 0, total: 1,
     };
     p.total = Math.max(0.2, Math.hypot(target.x - tower.x, target.z - tower.z));
     state.projectiles.push(p);
-    emit('towerFired', { tower, projectile: p });
+    return p;
   }
 
   function updateProjectiles(dt) {
@@ -405,7 +465,7 @@ const GameState = (() => {
     if (p.splash > 0) {
       // splash hits everything the tower could target within the radius
       for (const e of state.enemies.slice()) {
-        if (e.flying && !p.hitsFlying) continue;
+        if (e.flying && !p.hitsFlying && e !== target) continue;
         const d = Math.hypot(e.x - x, e.z - z);
         if (d > p.splash) continue;
         const falloff = e === target ? 1 : 0.65;
@@ -425,7 +485,7 @@ const GameState = (() => {
   }
 
   function damage(e, amount, source) {
-    const dealt = Math.max(1, amount - e.armor);
+    const dealt = Math.max(1, amount - (source && source.pierce ? 0 : e.armor));
     e.hp -= dealt;
     emit('enemyHit', { enemy: e, amount: dealt, armored: dealt < amount, x: e.x, z: e.z, kind: source && source.kind });
     if (e.hp <= 0) {
@@ -512,7 +572,7 @@ const GameState = (() => {
   return {
     get cols() { return cols; }, get rows() { return rows; },
     get pathCells() { return pathCells; }, get gate() { return gate; },
-    TOWER_TYPES, TOWER_ORDER, TIERS, ENEMY_TYPES, towerStats, upgradeCost, sellValue, towerById, upgradeTower, sellTower,
+    TOWER_TYPES, TOWER_ORDER, TIERS, BRANCHES, ENEMY_TYPES, towerStats, upgradeCost, sellValue, towerById, upgradeTower, sellTower,
     pathPosAt,
     state, on, emit, update, worldX, worldZ, startGame, pause, resume, setSpeed,
     loadLevel, currentLevel, totalWaves,

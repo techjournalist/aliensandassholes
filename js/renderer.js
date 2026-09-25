@@ -1027,7 +1027,77 @@ const Renderer = (() => {
   }
 
   // Tier dressing: what an upgraded tower wears so its tier reads at a glance.
-  function tierParts(tier) {
+  // Specialization dressing: a tier-3 tower wears its branch so the choice
+  // reads by shape, not just color. All merged into the tower's mesh.
+  const ring5 = (n, r, y, fn) => Array.from({ length: n }, (_, i) => { const a = (i / n) * Math.PI * 2; return fn(Math.cos(a) * r, y, Math.sin(a) * r, a, i); });
+  const BRANCH_PARTS = {
+    marksman: () => [
+      P(GEO.sphereLo, PALETTE.gold, M(-0.21, 1.08, -0.04, { sx: 0.045, sy: 0.22, sz: 0.05, rz: 0.4 })),
+      P(GEO.sphereLo, PALETTE.capRed, M(-0.27, 1.2, -0.05, { sx: 0.03, sy: 0.12, sz: 0.035, rz: 0.6 }), false),
+      P(GEO.ring, PALETTE.gold, M(0.075, 0.77, 0.212, { s: 0.036 }), false),
+      P(GEO.cyl, PALETTE.wood, M(-0.12, 0.5, -0.2, { sx: 0.06, sy: 0.34, sz: 0.06, rz: 0.25 })),
+      P(GEO.cone, PALETTE.cream, M(-0.17, 0.72, -0.2, { sx: 0.03, sy: 0.1, sz: 0.012, rz: 0.25 }), false),
+      P(GEO.cone, PALETTE.cream, M(-0.12, 0.73, -0.24, { sx: 0.03, sy: 0.1, sz: 0.012, rz: 0.2 }), false),
+    ],
+    bloom: () => [
+      P(GEO.cyl, PALETTE.wood, M(-0.34, 0.66, 0.12, { sx: 0.045, sy: 0.42, sz: 0.045, rz: 0.12 })),
+      P(GEO.cyl, PALETTE.wood, M(-0.24, 1.0, 0.12, { sx: 0.035, sy: 0.34, sz: 0.035, rz: -0.6 })),
+      P(GEO.cyl, PALETTE.wood, M(-0.48, 1.0, 0.12, { sx: 0.035, sy: 0.34, sz: 0.035, rz: 0.6 })),
+      P(GEO.box, PALETTE.outline, M(-0.36, 1.13, 0.12, { sx: 0.3, sy: 0.025, sz: 0.025 }), false),
+      ...ring5(6, 0.24, 0.9, (x, y, z, a, i) => P(GEO.bead, i % 2 ? PALETTE.flowerYellow : PALETTE.flowerPink, M(x, y, z, { s: 0.045 }), false)),
+    ],
+    thicket: () => ring5(7, 0.36, 0.2, (x, y, z, a) => P(GEO.cone, PALETTE.cloakDark, M(x, y + 0.08, z, { sx: 0.05, sy: 0.3, sz: 0.05, rz: -Math.cos(a) * 0.35, rx: Math.sin(a) * 0.35 }))),
+    briarstorm: () => [
+      P(GEO.cone, PALETTE.magic, M(0, 1.42, 0.03, { sx: 0.07, sy: 0.16, sz: 0.07 })),
+      P(GEO.cone, PALETTE.magic, M(0, 1.3, 0.03, { sx: 0.07, sy: 0.1, sz: 0.07, rx: Math.PI }), false),
+      ...ring5(3, 0.25, 0.88, (x, y, z, a) => P(GEO.cone, PALETTE.magic, M(x, y, z, { sx: 0.03, sy: 0.14, sz: 0.03, rz: -Math.cos(a) * 1.2, rx: Math.sin(a) * 1.2 }), false)),
+    ],
+    hoarfrost: () => [
+      P(GEO.torus, PALETTE.frost, M(0, 0.1, 0, { s: 0.46, rx: Math.PI / 2 }), false),
+      ...ring5(6, 0.44, 0.14, (x, y, z, a) => P(GEO.cone, PALETTE.frost, M(x, y, z, { sx: 0.04, sy: 0.18, sz: 0.04, rz: -Math.cos(a) * 0.4, rx: Math.sin(a) * 0.4 }))),
+    ],
+    seer: () => [
+      ...ring5(5, 0.1, 1.02, (x, y, z, a) => P(GEO.cone, PALETTE.frost, M(x, y, z, { sx: 0.03, sy: 0.22, sz: 0.03, rz: -Math.cos(a) * 0.25, rx: Math.sin(a) * 0.25 }))),
+      P(GEO.cyl, PALETTE.frostRobe, M(-0.3, 0.55, 0.1, { sx: 0.025, sy: 0.9, sz: 0.025 })),
+      P(GEO.cone, PALETTE.frost, M(-0.3, 1.08, 0.1, { sx: 0.05, sy: 0.18, sz: 0.05 })),
+    ],
+    earthshaker: () => [
+      ...ring5(6, 0.46, 0.06, (x, y, z, a, i) => P(GEO.rock, i % 2 ? PALETTE.stoneDark : PALETTE.stone, M(x, y, z, { sx: 0.1, sy: 0.14 + (i % 3) * 0.03, sz: 0.1, ry: a }))),
+      P(GEO.cone, PALETTE.stoneDark, M(0.12, 0.8, -0.22, { sx: 0.06, sy: 0.22, sz: 0.06, rx: -0.4 })),
+      P(GEO.cone, PALETTE.stoneDark, M(-0.12, 0.8, -0.22, { sx: 0.06, sy: 0.22, sz: 0.06, rx: -0.4 })),
+    ],
+    mountainheart: () => [
+      P(GEO.cone, PALETTE.gold, M(0, 0.99, 0.06, { sx: 0.035, sy: 0.12, sz: 0.035 })),
+      P(GEO.cone, PALETTE.gold, M(0.07, 0.96, 0.06, { sx: 0.03, sy: 0.09, sz: 0.03, rz: -0.3 })),
+      P(GEO.cone, PALETTE.gold, M(-0.07, 0.96, 0.06, { sx: 0.03, sy: 0.09, sz: 0.03, rz: 0.3 })),
+      P(GEO.cone, PALETTE.magic, M(0.1, 0.72, -0.22, { sx: 0.06, sy: 0.24, sz: 0.06, rx: -0.3 })),
+      P(GEO.cone, PALETTE.magic, M(-0.08, 0.7, -0.24, { sx: 0.05, sy: 0.18, sz: 0.05, rx: -0.4 })),
+    ],
+    oakfall: () => [
+      P(GEO.sphereLo, PALETTE.acorn, M(0.32, 0.26, 0.2, { sx: 0.1, sy: 0.12, sz: 0.1 })),
+      P(GEO.sphereLo, PALETTE.acorn, M(0.3, 0.26, 0.36, { sx: 0.1, sy: 0.12, sz: 0.1 })),
+      P(GEO.sphereLo, PALETTE.acorn, M(0.44, 0.26, 0.28, { sx: 0.1, sy: 0.12, sz: 0.1 })),
+      P(GEO.sphereLo, PALETTE.acorn, M(0.35, 0.44, 0.28, { sx: 0.11, sy: 0.13, sz: 0.11 })),
+      P(GEO.dome, PALETTE.acornCap, M(0.35, 0.53, 0.28, { sx: 0.11, sy: 0.06, sz: 0.11 }), false),
+    ],
+    squirrel: () => [
+      P(GEO.cyl, PALETTE.woodLight, M(0.17, 0.44, 0.08, { sx: 0.05, sy: 0.3, sz: 0.05, rx: -0.85 })),
+      P(GEO.cyl, PALETTE.woodLight, M(-0.17, 0.44, 0.08, { sx: 0.05, sy: 0.3, sz: 0.05, rx: -0.85 })),
+      // the squirrel gunner, perched on the frame with its tail up
+      P(GEO.sphereLo, PALETTE.capBrown, M(-0.2, 0.42, -0.16, { sx: 0.11, sy: 0.14, sz: 0.1 })),
+      P(GEO.sphereLo, PALETTE.cream, M(-0.2, 0.4, -0.07, { sx: 0.06, sy: 0.09, sz: 0.03 }), false),
+      P(GEO.sphereLo, PALETTE.capBrown, M(-0.2, 0.61, -0.1, { s: 0.09 })),
+      P(GEO.cone, PALETTE.capBrown, M(-0.25, 0.71, -0.1, { sx: 0.03, sy: 0.07, sz: 0.025 })),
+      P(GEO.cone, PALETTE.capBrown, M(-0.15, 0.71, -0.1, { sx: 0.03, sy: 0.07, sz: 0.025 })),
+      P(GEO.bead, PALETTE.outline, M(-0.17, 0.63, -0.02, { s: 0.018 }), false),
+      P(GEO.bead, PALETTE.outline, M(-0.23, 0.63, -0.02, { s: 0.018 }), false),
+      P(GEO.sphereLo, PALETTE.capBrown, M(-0.26, 0.62, -0.3, { sx: 0.1, sy: 0.24, sz: 0.09, rx: 0.35 })),
+      P(GEO.sphereLo, PALETTE.woodLight, M(-0.26, 0.8, -0.26, { sx: 0.08, sy: 0.08, sz: 0.07 })),
+    ],
+  };
+  const BRANCH_PENNANT = { marksman: PALETTE.capRed, bloom: PALETTE.flowerPink, thicket: PALETTE.cloak, briarstorm: PALETTE.magic,
+    hoarfrost: PALETTE.frost, seer: PALETTE.cream, earthshaker: PALETTE.stoneDark, mountainheart: PALETTE.gold, oakfall: PALETTE.acorn, squirrel: PALETTE.woodLight };
+  function tierParts(tier, branch) {
     const parts = [];
     if (tier >= 2) {
       parts.push(P(GEO.torus, PALETTE.stone, M(0, 0.05, 0, { sx: 0.42, sy: 0.42, sz: 0.42, rx: Math.PI / 2 }), true, { name: 'tierRing' }));
@@ -1037,7 +1107,8 @@ const Renderer = (() => {
     if (tier >= 3) {
       parts.push(P(GEO.torus, PALETTE.gold, M(0, 0.06, 0, { sx: 0.46, sy: 0.46, sz: 0.46, rx: Math.PI / 2 }), false, { name: 'tierRingGold', unlit: true }));
       parts.push(P(GEO.cyl, PALETTE.wood, M(0.36, 0.42, -0.3, { sx: 0.02, sy: 0.7, sz: 0.02 }), false));
-      parts.push(P(GEO.box, PALETTE.magic, M(0.42, 0.68, -0.3, { sx: 0.14, sy: 0.1, sz: 0.01 }), false, { name: 'pennant2', live: true, unlit: true }));
+      parts.push(P(GEO.box, BRANCH_PENNANT[branch] ?? PALETTE.magic, M(0.42, 0.68, -0.3, { sx: 0.14, sy: 0.1, sz: 0.01 }), false, { name: 'pennant2', live: true, unlit: true }));
+      if (BRANCH_PARTS[branch]) parts.push(...BRANCH_PARTS[branch]());
     }
     return parts;
   }
@@ -1314,7 +1385,7 @@ const Renderer = (() => {
   // -------- tower views --------
   const towerViews = new Map();
   function addTowerView(tower, quiet) {
-    const parts = TOWER_RECIPES[tower.type]().concat(tierParts(tower.tier));
+    const parts = TOWER_RECIPES[tower.type]().concat(tierParts(tower.tier, tower.branch));
     const g = liveProp(parts, tower.x, 0, tower.z);
     g.name = `tower-${tower.id}`;
     decal(0, 0, 0.36, g);
@@ -1691,6 +1762,11 @@ const Renderer = (() => {
       removeTowerView(tower.id);
       addTowerView(tower, true);
       puff(tower.x, 0.5, tower.z, { count: 14, color: PALETTE.gold, speed: 1.4, size: 0.09, up: 2.0, ttl: 0.8 });
+      if (tower.branch) {
+        // a specialization is a bigger moment: a second, magic burst and a thump
+        puff(tower.x, 0.9, tower.z, { count: 18, color: PALETTE.magic, speed: 2.2, size: 0.1, up: 2.6, ttl: 1.0 });
+        shakeCamera(0.06, 0.25);
+      }
     });
     GameState.on('towerSold', ({ tower }) => {
       removeTowerView(tower.id);

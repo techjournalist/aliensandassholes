@@ -48,6 +48,7 @@ const UI = (() => {
 
   // The panel in the corner: what you can do with the selected thing.
   let preview = 'slinger';   // the tower type whose range the tile preview shows
+  let armed = { tower: null, branch: null };   // a specialization card tapped once, awaiting confirmation
   function previewType() { return preview; }
   const rangeWord = (r) => (r < 2.4 ? 'short' : r < 3.2 ? 'medium' : 'long');
   const rateWord = (cd) => (cd < 0.8 ? 'fast' : cd < 1.8 ? 'steady' : 'slow');
@@ -76,20 +77,40 @@ const UI = (() => {
       const up = GameState.upgradeCost(tower);
       const affordUp = up !== null && GameState.state.gold >= up;
       const flyers = t.hitsFlying ? 'Hits flyers' : 'Ground only';
+      const br = tower.branch ? GameState.BRANCHES[tower.type][tower.branch] : null;
+      const tags = (st.pierce ? '<span><b>Pierces armor</b></span>' : '') + (st.shots > 1 ? `<span><b>${st.shots} targets</b></span>` : '');
+      // the last upgrade is a permanent fork: two cards, tap once to arm, again to commit
+      const branching = up !== null && tower.tier + 1 >= GameState.TIERS.length;
+      if (!branching || armed.tower !== tower.id) armed = { tower: null, branch: null };
+      const sell = `<button class="act-btn sell" data-sell="${tower.id}">Sell <span class="build-cost">&#9679; ${GameState.sellValue(tower)}</span></button>`;
+      let actions;
+      if (branching) {
+        const cards = Object.entries(GameState.BRANCHES[tower.type]).map(([id, b]) => {
+          const on = armed.branch === id;
+          return `<button class="branch-btn ${on ? 'armed' : ''}" data-branch="${id}" data-tower-id="${tower.id}" ${affordUp ? '' : 'disabled'} aria-label="${b.name}, ${up} gold${on ? ', tap again to confirm' : ''}">
+            <span class="branch-head"><span class="build-icon">${b.icon}</span><span class="build-name">${b.name}</span></span>
+            <span class="build-blurb">${on ? 'Tap again to confirm' : b.blurb}</span>
+            <span class="build-cost ${affordUp ? '' : 'poor'}">&#9679; ${up}</span>
+          </button>`;
+        }).join('');
+        actions = `<div class="branch-label">Choose one. This is permanent.</div><div class="branch-grid">${cards}</div><div class="actions">${sell}</div>`;
+      } else {
+        actions = `<div class="actions">
+          ${up === null
+            ? '<button class="act-btn" disabled>Full strength</button>'
+            : `<button class="act-btn upgrade" data-upgrade="${tower.id}" ${affordUp ? '' : 'disabled'}>Upgrade <span class="build-cost ${affordUp ? '' : 'poor'}">&#9679; ${up}</span></button>`}
+          ${sell}
+        </div>`;
+      }
       panel.innerHTML = `
-        <div class="panel-title">${t.icon} ${t.name} <span class="tier">Tier ${tower.tier}</span></div>
+        <div class="panel-title">${br ? br.icon : t.icon} ${br ? br.name : t.name} <span class="tier">${br ? t.name : `Tier ${tower.tier}`}</span></div>
         <div class="stats">
           <span>Hit <b>${st.damage}</b>${st.splash ? ' splash' : ''}</span>
           <span>Rate <b>${rateWord(st.cooldown)}</b></span>
           <span>Reach <b>${rangeWord(st.range)}</b></span>
-          <span><b>${flyers}</b></span>
+          <span><b>${flyers}</b></span>${tags}
         </div>
-        <div class="actions">
-          ${up === null
-            ? '<button class="act-btn" disabled>Full strength</button>'
-            : `<button class="act-btn upgrade" data-upgrade="${tower.id}" ${affordUp ? '' : 'disabled'}>Upgrade <span class="build-cost ${affordUp ? '' : 'poor'}">&#9679; ${up}</span></button>`}
-          <button class="act-btn sell" data-sell="${tower.id}">Sell <span class="build-cost">&#9679; ${GameState.sellValue(tower)}</span></button>
-        </div>`;
+        ${actions}`;
     }
   }
 
@@ -354,6 +375,11 @@ const UI = (() => {
       let res = null;
       if (btn.dataset.tower) { preview = btn.dataset.tower; res = GameState.placeTower(btn.dataset.tower); }
       else if (btn.dataset.upgrade) res = GameState.upgradeTower(+btn.dataset.upgrade);
+      else if (btn.dataset.branch) {
+        const id = +btn.dataset.towerId;
+        if (armed.tower === id && armed.branch === btn.dataset.branch) { armed = { tower: null, branch: null }; res = GameState.upgradeTower(id, btn.dataset.branch); }
+        else { armed = { tower: id, branch: btn.dataset.branch }; Audio.sfx.select(); }
+      }
       else if (btn.dataset.sell) res = GameState.sellTower(+btn.dataset.sell);
       if (res && !res.ok && res.reason) toast(res.reason, true);
       renderPanel();
@@ -444,6 +470,9 @@ const UI = (() => {
     });
     GameState.on('gameLost', () => setTimeout(() => showEnd(false), 900));
 
+    // a half-made permanent choice never survives looking away
+    GameState.on('selectionCleared', () => { armed = { tower: null, branch: null }; });
+    GameState.on('tileSelected', () => { armed = { tower: null, branch: null }; });
     GameState.on('tileSelected', renderPanel);
     GameState.on('towerSelected', renderPanel);
     GameState.on('selectionCleared', renderPanel);
@@ -451,7 +480,9 @@ const UI = (() => {
     GameState.on('towerUpgraded', renderPanel);
     GameState.on('goldChanged', renderPanel);
     GameState.on('towerSold', ({ value }) => toast(`Sold for ${value} gold.`));
-    GameState.on('towerUpgraded', (tw) => toast(`${GameState.TOWER_TYPES[tw.type].name} grows to tier ${tw.tier}!`));
+    GameState.on('towerUpgraded', (tw) => toast(tw.branch
+      ? `${GameState.TOWER_TYPES[tw.type].name} becomes a ${GameState.BRANCHES[tw.type][tw.branch].name}!`
+      : `${GameState.TOWER_TYPES[tw.type].name} grows to tier ${tw.tier}!`));
     GameState.on('tileRejected', (res) => { renderPanel(); toast(res.reason, true); });
     GameState.on('placeRejected', (res) => toast(res.reason, true));
     GameState.on('enemyLeaked', (e) => { flash('leak'); toast(`A ${e.name} slipped into ${GameState.currentLevel().endpoint.name}!`, true); });

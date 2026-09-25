@@ -589,13 +589,50 @@ win cuts only its own ground and recedes to its full radius, the road
 ahead is `open` with the next node marked, and the Level 1 to 2 road
 reads `claimed` once both are won.
 
-- **P3-M3 — M5: tier-3 upgrade branches**, reordered here per the
-  user's decision. Two permanent specializations per tower (all 5),
-  built to the Sprout Slinger worked example already in this document.
-  Touches shared tower data, not one level, so its regression check
-  spans Levels 1-3. Explicitly verify each branch is a genuine
-  trade-off rather than a power spike, per the "neither a strict
-  upgrade" framing below.
+**P3-M3 — M5: tier-3 specializations** *(done)*. Tier 3 is now a
+permanent choice between two specializations per tower
+(`BRANCHES` in `js/game-state.js`, same 1.3x cost as the old flat tier 3,
+so the upgrade-vs-new-tower economy is unchanged): Sprout Slinger
+**Thornshot Marksman** (slow, huge, armor-piercing) vs **Rapid Bloom**
+(fast, two targets per volley); Bramblecast Warden **Thicket Keeper** (wide
+long roots) vs **Briarstorm** (big blasts, brief roots); Frostmoss Druid
+**Hoarfrost Circle** (area chill) vs **Icicle Seer** (long-reach single
+target, the flyer killer); Stonebark Golem **Earthshaker** (splash slam with a
+brief root) vs **Mountainheart** (armor-piercing crushing blow); Acorn
+Artillery **Oakfall Mortar** (huge blast) vs **Squirrel Battery** (three
+targets per volley). New engine hooks: `shots` (multi-target volleys via
+`pickTargets`), `pierce` (ignores armor) and `groundSplash` (the blast lands
+on the ground, so only the aimed-at flyer is hit). The flying rule is
+unchanged: only the Druid and Artillery hit flyers, in either branch.
+`upgradeTower(id, branch)` refuses tier 3 without a branch and a branch
+can't be changed. In the panel, tier 2 shows two branch cards under
+"Choose one. This is permanent."; because it is irreversible, the first
+tap arms a card ("Tap again to confirm") and the second commits, and the
+armed state clears whenever the selection changes. Each branch adds a
+silhouette accessory merged into the tower's mesh (a feather plume and
+quiver, a second slingshot and flower crown, a thorn crown, a hood crystal,
+a frost ring, an icicle crown and staff, rock spurs, a gold crown, an acorn
+pile, a squirrel gunner), a tinted pennant, a bigger gold-and-magic burst
+and its own `specialize()` fanfare. Balance was tuned with a seeded
+scenario duel (now a harness check): each branch beside a tier-2 Slinger
+against a Trickster swarm, a Troll column, a Grunt stream and a Bat swarm.
+Each tower's two branches must each beat the other by 10%+ somewhere, so
+neither is a strict upgrade. The critic pass changed real things: the
+first Hoarfrost made every nearby tower better and even out-killed the
+Seer against bats; the first Squirrel Battery beat Oakfall everywhere;
+Thicket's root outlasted its cooldown and locked Trolls permanently (100%);
+Mountainheart lost to Earthshaker on Trolls. Fixed by ground-only splash
+for Hoarfrost and Oakfall (fits the fiction: a frost burst and a mortar
+blast land on the ground), a root shorter than its cycle, and retuned
+numbers. It also found a test bug: the duel's state reset left a wave-prep
+countdown running, so real waves auto-launched mid-duel until the level
+"won" with 9,999 lives and recorded 3 stars. The single-type stress test
+now runs per branch (30 runs across Levels 1-3), none trivializes a level;
+the mixed bots pick the flyer branch on anti-air towers (as a player
+reading "Kills flyers" would) and alternate the rest. A 5-seed Level 2
+comparison put blind branch picks at 7.4 mean lives vs 8.4 for the old
+flat tier 3, so specializations add choice without a hidden power spike
+or drop.
 - **P3-M4 — Level 4: The Elderroot Ward** (climax). Deep within the
   Shadow Hollow itself, ~80% corrupted — only a small living foothold
   around the endpoint. Endpoint: the Elderroot, a colossal still-living

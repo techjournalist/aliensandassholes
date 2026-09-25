@@ -121,6 +121,22 @@
   .act-btn:active { transform: scale(0.96); }
   .act-btn:disabled { opacity: 0.55; cursor: default; border-color: #6d6e66; }
   .act-btn.sell { border-color: #b08a52; flex: 0.8; }
+  .branch-label { font-size: 13px; font-weight: 700; color: var(--gold); margin: 0 4px 6px; }
+  .branch-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px; }
+  .branch-btn {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-height: 64px; padding: 6px 10px;
+    background: #2f4a33; color: var(--cream); border: 2px solid var(--magic); border-radius: 12px;
+    font: inherit; text-align: left; cursor: pointer; transition: transform 0.08s ease, background 0.1s ease;
+  }
+  .branch-btn:active { transform: scale(0.97); }
+  .branch-btn:disabled { opacity: 0.55; cursor: default; border-color: #6d6e66; }
+  .branch-btn.armed { border-color: var(--gold); background: #3a5a3f; box-shadow: 0 0 0 2px var(--gold); animation: armed 0.9s ease-in-out infinite; }
+  .branch-btn.armed .build-blurb { color: var(--gold); font-weight: 800; opacity: 1; }
+  .branch-head { display: flex; align-items: center; gap: 6px; }
+  .branch-head .build-icon { font-size: 20px; }
+  .branch-btn .build-name { font-size: 14px; line-height: 1.15; }
+  .branch-btn .build-cost { font-size: 15px; }
+  @keyframes armed { 0%, 100% { box-shadow: 0 0 0 2px var(--gold); } 50% { box-shadow: 0 0 0 4px rgba(242, 193, 78, 0.5); } }
   @media (max-height: 520px) {
     #panel { max-width: 62vw; width: auto; padding: 8px 10px; }
     #toast { left: auto; right: max(10px, env(safe-area-inset-right)); bottom: max(10px, env(safe-area-inset-bottom)); transform: translate(0, 10px); max-width: 36vw; white-space: normal; text-align: center; font-size: 15px; }
@@ -134,6 +150,11 @@
     .build-grid .build-blurb { display: none; }
     .build-grid .build-cost { font-size: 13px; }
     .build-grid .build-icon { font-size: 20px; }
+    .branch-btn { min-height: 48px; padding: 4px 8px; }
+    .branch-btn .build-blurb { display: none; }
+    .branch-btn.armed .build-blurb { display: block; font-size: 11px; }
+    .branch-label { font-size: 12px; margin-bottom: 4px; }
+    .branch-grid { margin-bottom: 6px; }
   }
   .build-grid .build-btn { min-height: 52px; padding: 4px 8px; gap: 8px; }
   .panel-title .tier { color: var(--cream); font-weight: 600; opacity: 0.8; margin-left: 6px; }

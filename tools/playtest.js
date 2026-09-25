@@ -58,6 +58,7 @@ async function enterLevel(page, levelId) {
   watch(page, log);
   await page.goto(PAGE);
   await page.waitForTimeout(2000);
+  const BRANCH_KEYS = await page.evaluate(() => GameState.BRANCHES);
   await page.screenshot({ path: `${OUT}/title.png` });
   check('title screen shows on load', await page.locator('#title').isVisible());
   check('game does not run behind the title', (await S(page)).wave === 0 && await page.evaluate(() => GameState.state.phase === 'title'));
@@ -262,8 +263,19 @@ async function enterLevel(page, levelId) {
   const tw = await page.evaluate(() => GameState.state.towers.find((t) => t.type === 'warden'));
   check('warden upgraded to tier 2 and charged', tw.tier === 2 && (await S(page)).gold === goldBefore - 88, `tier=${tw.tier} gold=${(await S(page)).gold}`);
   check('tier 2 stats grow', await page.evaluate(() => { const t = GameState.state.towers.find((t) => t.type === 'warden'); const s = GameState.towerStats(t); const b = GameState.TOWER_TYPES.warden; return s.damage === Math.round(b.damage * 1.5) && s.range > b.range; }));
-  await page.locator('button[data-upgrade]').click(); await page.waitForTimeout(250);
-  check('tier 3 reached and upgrade button retires', await page.evaluate(() => GameState.state.towers.find((t) => t.type === 'warden').tier === 3) && await page.locator('button[data-upgrade]').count() === 0);
+  // ---- P3-M3: tier 3 is a permanent fork between two specializations ----
+  check('at tier 2 the plain upgrade gives way to two specialization cards', await page.locator('button[data-upgrade]').count() === 0 && await page.locator('button[data-branch]').count() === 2);
+  check('the engine refuses tier 3 without a specialization', await page.evaluate(() => { const t = GameState.state.towers.find((t) => t.type === 'warden'); return !GameState.upgradeTower(t.id).ok && t.tier === 2; }));
+  const goldPreBranch = (await S(page)).gold;
+  await page.locator('button[data-branch="thicket"]').click(); await page.waitForTimeout(200);
+  check('one tap only arms a specialization, it does not buy it', await page.evaluate(() => GameState.state.towers.find((t) => t.type === 'warden').tier === 2) && (await S(page)).gold === goldPreBranch && await page.locator('button[data-branch="thicket"].armed').count() === 1);
+  await page.screenshot({ path: `${OUT}/branch-armed.png` });
+  await page.locator('button[data-branch="thicket"]').click(); await page.waitForTimeout(250);
+  const t3 = await page.evaluate(() => { const t = GameState.state.towers.find((t) => t.type === 'warden'); return { tier: t.tier, branch: t.branch }; });
+  check('the second tap commits: tier 3 Thicket Keeper', t3.tier === 3 && t3.branch === 'thicket', JSON.stringify(t3));
+  check('tier 3 reached and upgrade button retires', await page.locator('button[data-upgrade]').count() === 0 && await page.locator('button[data-branch]').count() === 0);
+  check('a specialization is permanent', await page.evaluate(() => { const t = GameState.state.towers.find((t) => t.type === 'warden'); return !GameState.upgradeTower(t.id, 'briarstorm').ok && t.branch === 'thicket'; }));
+  check('the panel names the specialization', (await page.locator('#panel .panel-title').innerText()).includes('Thicket Keeper'));
   const [zx2, zy2] = await cellToScreen(page, 7, 5);
   await page.screenshot({ path: `${OUT}/tower-warden-t3.png`, clip: { x: zx2 - 70, y: zy2 - 110, width: 140, height: 150 } });
   const goldPreSell = (await S(page)).gold;
@@ -335,9 +347,70 @@ async function enterLevel(page, levelId) {
   await page.waitForTimeout(1200);
   await page.screenshot({ path: `${OUT}/bastion-damaged.png`, clip: { x: 820, y: 330, width: 360, height: 330 } });
   await page.evaluate(() => { GameState.state.lives = 20; GameState.state.endpointState = 0; GameState.emit('endpointStateChanged', 0); });
+  // ---- P3-M3: every specialization is a trade-off, never a strict upgrade ----
+  // Each branch, alone beside a tier-2 Slinger, faces scripted groups: a
+  // Trickster swarm, a Troll column, a Grunt stream and (for the two
+  // anti-air towers) a Bat swarm. Score = share of enemy HP removed.
+  // Math.random is seeded so both branches see identical walking lanes.
+  const duel = await page.evaluate(() => {
+    const G = GameState, S = G.state, realRandom = Math.random;
+    const SCEN = { swarm: ['trickster', 22, 0.25], armored: ['troll', 6, 1.2], mixed: ['grunt', 14, 0.4], air: ['bat', 16, 0.35] };
+    const run = (type, branch, scen) => {
+      let seed = 12345; Math.random = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+      S.enemies.length = 0; S.projectiles.length = 0; S.towers.length = 0;
+      // prep must be 0: a leftover countdown would auto-launch real waves mid-duel
+      S.gold = 99999; S.lives = 9999; S.hpScale = 1.8; S.paused = false; S.phase = 'playing'; S.waveActive = false; S.schedule = []; S.waveQueue = []; S.prep = 0;
+      const place = (t, c, r, br) => { S.selected = { kind: 'tile', c, r }; G.placeTower(t); const tw = S.towers[S.towers.length - 1]; G.upgradeTower(tw.id); if (br) G.upgradeTower(tw.id, br); return tw; };
+      place('slinger', 6, 5); place(type, 7, 5, branch);
+      const [et, n, gap] = SCEN[scen], spawned = [];
+      let time = 0, queued = 0;
+      for (let i = 0; i < 60 * 90; i++) {
+        while (queued < n && queued * gap <= time) { spawned.push(G.spawnEnemy(et)); queued++; }
+        G.update(1 / 60); time += 1 / 60;
+        if (queued >= n && !S.enemies.length) break;
+      }
+      let rem = 0, tot = 0;
+      for (const e of spawned) { tot += e.maxHp; rem += e.maxHp - Math.max(0, e.hp); }
+      return Math.round(100 * rem / tot);
+    };
+    const out = {};
+    for (const type of G.TOWER_ORDER) {
+      const scens = G.TOWER_TYPES[type].hitsFlying ? ['swarm', 'armored', 'mixed', 'air'] : ['swarm', 'armored', 'mixed'];
+      const [a, b] = Object.keys(G.BRANCHES[type]);
+      out[type] = { a, b, rows: scens.map((sc) => ({ sc, a: run(type, a, sc), b: run(type, b, sc) })) };
+    }
+    Math.random = realRandom;
+    S.enemies.length = 0; S.projectiles.length = 0; S.towers.length = 0; S.hpScale = 1; S.lives = 20; S.wave = 0; S.gold = 150;
+    return out;
+  });
+  for (const [type, d] of Object.entries(duel)) {
+    console.log(`BRANCH DUEL ${type}: ${d.a} vs ${d.b} | ` + d.rows.map((r) => `${r.sc} ${r.a}/${r.b}`).join(' | '));
+    const aWins = d.rows.some((r) => r.a >= r.b * 1.1), bWins = d.rows.some((r) => r.b >= r.a * 1.1);
+    check(`${type}: neither specialization is a strict upgrade (each wins a situation by 10%+)`, aWins && bWins, JSON.stringify(d.rows));
+  }
+  check('Mountainheart ignores Troll armor', await page.evaluate(() => {
+    const G = GameState, S = G.state;
+    S.gold = 99999; S.selected = { kind: 'tile', c: 7, r: 5 }; G.placeTower('golem');
+    const tw = S.towers[S.towers.length - 1]; G.upgradeTower(tw.id); G.upgradeTower(tw.id, 'mountainheart');
+    let hit = null; G.on('enemyHit', (h) => { if (!hit) hit = h; });
+    const troll = G.spawnEnemy('troll');
+    G.state.projectiles.push({ id: 999999, towerId: tw.id, targetId: troll.id, damage: G.towerStats(tw).damage, kind: 'boulder', splash: 0, effect: null, hitsFlying: false, pierce: true, targetFlying: false, targetBoss: false, x: troll.x, z: troll.z, sx: troll.x, sz: troll.z, speed: 99, t: 0, total: 0.2 });
+    G.update(1 / 60);
+    const ok = hit && hit.amount === G.towerStats(tw).damage && !hit.armored;
+    S.enemies.length = 0; S.projectiles.length = 0; S.towers.length = 0; S.selected = null;
+    return ok;
+  }));
+
   // ---- full play-through bots: a mixed builder, then one tower type only ----
-  const runBot = (plan) => page.evaluate((plan) => {
+  const runBot = (plan, pick = 'alt') => page.evaluate(({ plan, pick }) => {
     const S = GameState.state;
+    const branchFor = (t) => {
+      const keys = Object.keys(GameState.BRANCHES[t.type]);
+      if (pick !== 'alt') return keys[pick];
+      // a player who reads "Kills flyers" keeps anti-air towers anti-air; the rest vary
+      if (GameState.TOWER_TYPES[t.type].hitsFlying) return keys.find((k) => !GameState.BRANCHES[t.type][k].groundSplash);
+      return keys[t.id % 2];
+    };
     S.enemies.length = 0; S.projectiles.length = 0; S.towers.length = 0;
     S.gold = 150; S.lives = 20; S.wave = 0; S.prep = 0; S.waveActive = false; S.schedule = []; S.waveQueue = []; S.phase = 'playing'; S.endpointState = 0; S.kills = 0;
     const flyersIn = (n) => { const w = GameState.waveInfo(n); return !!w && w.groups.some((g) => g.type === 'bat' || g.type === 'boss'); };
@@ -357,7 +430,7 @@ async function enterLevel(page, levelId) {
         next++;
       }
       const order = S.towers.slice().sort((a, b) => (GameState.TOWER_TYPES[b.type].hitsFlying - GameState.TOWER_TYPES[a.type].hitsFlying));
-      for (const t of order) { const c = GameState.upgradeCost(t); if (c !== null && S.gold >= c + 40) GameState.upgradeTower(t.id); }
+      for (const t of order) { const c = GameState.upgradeCost(t); if (c !== null && S.gold >= c + 40) GameState.upgradeTower(t.id, branchFor(t)); }
     };
     const leaks = [];
     for (let w = 1; w <= 12; w++) {
@@ -370,7 +443,7 @@ async function enterLevel(page, levelId) {
       if (S.phase !== 'playing') break;
     }
     return { leaks, lives: S.lives, phase: S.phase, towers: S.towers.length, tiers: S.towers.map((t) => t.tier).join(''), gold: S.gold, stars: S.phase === 'won' ? GameState.stars() : 0 };
-  }, plan);
+  }, { plan, pick });
   const mixed = await runBot(['slinger', 'slinger', 'warden', 'druid', 'artillery', 'golem', 'druid', 'warden', 'slinger', 'golem', 'artillery', 'warden', 'druid', 'slinger', 'golem', 'artillery']);
   console.log('MIXED BOT: ' + JSON.stringify(mixed));
   check('a mixed defense can win all 12 waves', mixed.phase === 'won', `lives=${mixed.lives} leaks=${mixed.leaks}`);
@@ -399,7 +472,9 @@ async function enterLevel(page, levelId) {
   }));
   check('winning Level 1 cuts its ground out of the blight, and only its ground', wm1.cut && wm1.otherCuts === 0, JSON.stringify(wm1));
   check('the road to the next battle is open and that node is marked next', /\bopen\b/.test(wm1.seg || '') && wm1.next === 'millbrook-watch', JSON.stringify(wm1));
-  await page.waitForTimeout(1400);
+  // the recession is time-based; wait for it to finish rather than sleeping a
+  // fixed time (the bot's no-frame catch-up can stall the first frames)
+  await page.waitForFunction(() => { const c = document.querySelector('#wm-cuts .wm-cut[data-level="shadow-hollow"]'); return c && +c.getAttribute('r') >= 109.5; }, null, { timeout: 8000 }).catch(() => {});
   const cutR = await page.evaluate(() => ({ r: +document.querySelector('#wm-cuts .wm-cut[data-level="shadow-hollow"]').getAttribute('r'), full: LEVELS.find((l) => l.id === 'shadow-hollow').map.reclaim }));
   check('the blight finishes receding to the level\'s reclaim radius', Math.abs(cutR.r - cutR.full) < 0.5, JSON.stringify(cutR));
   await page.evaluate(() => { document.getElementById('worldmap').classList.remove('show'); });
@@ -420,11 +495,12 @@ async function enterLevel(page, levelId) {
   check('an unknown active-level id falls back to the first level', await page.evaluate(() => GameState.currentLevel().id === 'shadow-hollow'));
   await enterLevel(page, 'shadow-hollow');
 
-  for (const type of ['slinger', 'warden', 'druid', 'golem', 'artillery']) {
-    const r = await runBot([type]);
+  for (const type of ['slinger', 'warden', 'druid', 'golem', 'artillery']) for (const pick of [0, 1]) {
+    const br = Object.keys(BRANCH_KEYS[type])[pick];
+    const r = await runBot([type], pick);
     const clean = r.leaks.filter((l) => l <= 1).length;
-    console.log(`ONLY ${type}: ` + JSON.stringify(r) + ` clean waves=${clean}/12`);
-    check(`only ${type} does not trivialize the level`, !(r.phase === 'won' && clean > 7), `phase=${r.phase} clean=${clean}`);
+    console.log(`ONLY ${type}/${br}: ` + JSON.stringify(r) + ` clean waves=${clean}/12`);
+    check(`only ${type} (${br}) does not trivialize the level`, !(r.phase === 'won' && clean > 7), `phase=${r.phase} clean=${clean}`);
   }
   await page.waitForTimeout(1600);   // the last bot's end screen arrives 900ms after its loss
   await page.evaluate(() => { GameState.state.enemies.length = 0; document.getElementById('end').classList.remove('show'); });
@@ -468,8 +544,15 @@ async function enterLevel(page, levelId) {
   });
   check('Level 2 wave 1 is winnable by a single lone tower (no leaks)', lone.leaks === 0 && lone.lives === 20, JSON.stringify(lone));
 
-  const runBotOn = (plan, spots, totalWaves) => page.evaluate(({ plan, spots, totalWaves }) => {
+  const runBotOn = (plan, spots, totalWaves, pick = 'alt') => page.evaluate(({ plan, spots, totalWaves, pick }) => {
     const S = GameState.state;
+    const branchFor = (t) => {
+      const keys = Object.keys(GameState.BRANCHES[t.type]);
+      if (pick !== 'alt') return keys[pick];
+      // a player who reads "Kills flyers" keeps anti-air towers anti-air; the rest vary
+      if (GameState.TOWER_TYPES[t.type].hitsFlying) return keys.find((k) => !GameState.BRANCHES[t.type][k].groundSplash);
+      return keys[t.id % 2];
+    };
     S.enemies.length = 0; S.projectiles.length = 0; S.towers.length = 0;
     S.gold = 150; S.lives = 20; S.wave = 0; S.prep = 0; S.waveActive = false; S.schedule = []; S.waveQueue = []; S.phase = 'playing'; S.endpointState = 0; S.kills = 0;
     const flyersIn = (n) => { const w = GameState.waveInfo(n); return !!w && w.groups.some((g) => g.type === 'bat' || g.type === 'boss'); };
@@ -486,7 +569,7 @@ async function enterLevel(page, levelId) {
         next++;
       }
       const order = S.towers.slice().sort((a, b) => (GameState.TOWER_TYPES[b.type].hitsFlying - GameState.TOWER_TYPES[a.type].hitsFlying));
-      for (const t of order) { const c = GameState.upgradeCost(t); if (c !== null && S.gold >= c + 40) GameState.upgradeTower(t.id); }
+      for (const t of order) { const c = GameState.upgradeCost(t); if (c !== null && S.gold >= c + 40) GameState.upgradeTower(t.id, branchFor(t)); }
     };
     const leaks = [];
     for (let w = 1; w <= totalWaves; w++) {
@@ -499,7 +582,7 @@ async function enterLevel(page, levelId) {
       if (S.phase !== 'playing') break;
     }
     return { leaks, lives: S.lives, phase: S.phase, towers: S.towers.length, gold: S.gold, stars: S.phase === 'won' ? GameState.stars() : 0 };
-  }, { plan, spots, totalWaves });
+  }, { plan, spots, totalWaves, pick });
 
   const L2F = LEVEL_FIXTURES['millbrook-watch'];
   const mixed2 = await runBotOn(['slinger', 'slinger', 'warden', 'druid', 'artillery', 'golem', 'druid', 'warden', 'slinger', 'golem'], L2F.botBuildSpots, L2F.waveCount);
@@ -522,11 +605,12 @@ async function enterLevel(page, levelId) {
   }
   await page.evaluate(() => { document.getElementById('end').classList.remove('show'); });
 
-  for (const type of ['slinger', 'warden', 'druid', 'golem', 'artillery']) {
-    const r = await runBotOn([type], L2F.botBuildSpots, L2F.waveCount);
+  for (const type of ['slinger', 'warden', 'druid', 'golem', 'artillery']) for (const pick of [0, 1]) {
+    const br = Object.keys(BRANCH_KEYS[type])[pick];
+    const r = await runBotOn([type], L2F.botBuildSpots, L2F.waveCount, pick);
     const clean = r.leaks.filter((l) => l <= 1).length;
-    console.log(`LEVEL 2 ONLY ${type}: ` + JSON.stringify(r) + ` clean waves=${clean}/${L2F.waveCount}`);
-    check(`Level 2: only ${type} does not trivialize the level`, !(r.phase === 'won' && clean > Math.floor(L2F.waveCount * 0.6)), `phase=${r.phase} clean=${clean}`);
+    console.log(`LEVEL 2 ONLY ${type}/${br}: ` + JSON.stringify(r) + ` clean waves=${clean}/${L2F.waveCount}`);
+    check(`Level 2: only ${type} (${br}) does not trivialize the level`, !(r.phase === 'won' && clean > Math.floor(L2F.waveCount * 0.6)), `phase=${r.phase} clean=${clean}`);
   }
   await page.waitForTimeout(1600);
   await page.evaluate(() => { GameState.state.enemies.length = 0; document.getElementById('end').classList.remove('show'); });
@@ -568,11 +652,12 @@ async function enterLevel(page, levelId) {
   check('Level 3 win screen keeps "Choose another battle" (no Level 4 yet)', (await page.locator('#end-map-btn').innerText()) === 'Choose another battle');
   await page.evaluate(() => { document.getElementById('end').classList.remove('show'); });
 
-  for (const type of ['slinger', 'warden', 'druid', 'golem', 'artillery']) {
-    const r = await runBotOn([type], L3F.botBuildSpots, L3F.waveCount);
+  for (const type of ['slinger', 'warden', 'druid', 'golem', 'artillery']) for (const pick of [0, 1]) {
+    const br = Object.keys(BRANCH_KEYS[type])[pick];
+    const r = await runBotOn([type], L3F.botBuildSpots, L3F.waveCount, pick);
     const clean = r.leaks.filter((l) => l <= 1).length;
-    console.log(`LEVEL 3 ONLY ${type}: ` + JSON.stringify(r) + ` clean waves=${clean}/${L3F.waveCount}`);
-    check(`Level 3: only ${type} does not trivialize the level`, !(r.phase === 'won' && clean > Math.floor(L3F.waveCount * 0.6)), `phase=${r.phase} clean=${clean}`);
+    console.log(`LEVEL 3 ONLY ${type}/${br}: ` + JSON.stringify(r) + ` clean waves=${clean}/${L3F.waveCount}`);
+    check(`Level 3: only ${type} (${br}) does not trivialize the level`, !(r.phase === 'won' && clean > Math.floor(L3F.waveCount * 0.6)), `phase=${r.phase} clean=${clean}`);
   }
   await page.waitForTimeout(1600);
   await page.evaluate(() => { GameState.state.enemies.length = 0; document.getElementById('end').classList.remove('show'); });

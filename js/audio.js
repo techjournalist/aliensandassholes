@@ -155,6 +155,12 @@ const Audio = (() => {
       voice({ type: 'sine', freq: 1568, to: 2093, dur: 0.25, vol: 0.14, cutoff: 6000, delay: 0.28, jitter: 0 });
       noise({ dur: 0.3, vol: 0.08, freq: 6000, q: 0.5, delay: 0.26 });
     },
+    specialize() {   // a bigger moment than a plain upgrade: a rising fanfare and a sparkle tail
+      [392, 523, 659, 784, 1047].forEach((f, i) => voice({ type: 'triangle', freq: f, to: f, dur: 0.16, vol: 0.2, cutoff: 3400, delay: i * 0.07, jitter: 0 }));
+      voice({ type: 'sawtooth', freq: 196, to: 262, dur: 0.4, vol: 0.12, cutoff: 1400, delay: 0.02, jitter: 0 });
+      [1568, 2093, 2637].forEach((f, i) => voice({ type: 'sine', freq: f, to: f * 1.06, dur: 0.22, vol: 0.1, cutoff: 7000, delay: 0.38 + i * 0.07, jitter: 0 }));
+      noise({ dur: 0.45, vol: 0.08, freq: 7000, q: 0.5, delay: 0.36 });
+    },
     sell() {
       [1318, 1568, 1046, 1760].forEach((f, i) => voice({ type: 'sine', freq: f, to: f, dur: 0.08, vol: 0.14, cutoff: 5000, delay: i * 0.06, jitter: 0.01 }));
       noise({ dur: 0.1, vol: 0.12, freq: 4500, q: 2 });
@@ -313,7 +319,7 @@ const Audio = (() => {
     GameState.on('tileRejected', () => sfx.reject());
     GameState.on('placeRejected', () => sfx.reject());
     GameState.on('towerPlaced', () => sfx.place());
-    GameState.on('towerUpgraded', () => sfx.upgrade());
+    GameState.on('towerUpgraded', (t) => (t.branch ? sfx.specialize() : sfx.upgrade()));
     GameState.on('towerSold', () => sfx.sell());
     GameState.on('gameStarted', () => sfx.gameStart());
     GameState.on('waveStarted', () => sfx.waveStart());
