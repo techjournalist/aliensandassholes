@@ -14,10 +14,10 @@ const vm = require('vm');
 const ROOT = path.join(__dirname, '..');
 const FILES = ['palette-config.js', 'level1-shadow-hollow.js', 'level2-millbrook-watch.js', 'level3-cairnwatch.js', 'level4-splintered-vale.js', 'levels.js', 'game-state.js'];
 
-function loadGame() {
+function loadGame(consoleImpl = console) {
   const src = FILES.map((f) => fs.readFileSync(path.join(ROOT, 'js', f), 'utf8')).join('\n;\n')
     + '\n;this.__game = { LEVELS, GameState };';
-  const ctx = { Math, console };
+  const ctx = { Math, console: consoleImpl };
   vm.createContext(ctx);
   vm.runInContext(src, ctx, { filename: 'game-bundle.js' });
   return ctx.__game;
@@ -184,12 +184,36 @@ function legacyTests(G, LEVELS) {
   return out;
 }
 
+// ---- 4. a failing listener can never stop the game from ending ----
+// (P3-FIX1: GameState.emit used to call listeners with no protection, so one
+// exception during the last wave's end would have skipped the win entirely.)
+function isolationTests() {
+  const errors = [];
+  const { GameState: G } = loadGame({ ...console, error: (...a) => errors.push(a.map(String).join(' ')), log: () => {} });
+  const def = syntheticLevel();
+  G.loadLevel(def);
+  G.startGame();
+  let won = 0, after = 0;
+  G.on('waveEnded', () => { throw new Error('boom from a test listener'); });
+  G.on('waveEnded', () => { after++; });
+  G.on('gameWon', () => { won++; });
+  const S = G.state;
+  S.wave = def.waves.length; S.waveActive = true; S.schedule = []; S.waveQueue = []; S.enemies.length = 0;
+  G.update(1 / 60);
+  return [
+    { name: 'listener isolation: a throwing waveEnded listener does not stop the win', ok: S.phase === 'won' && won === 1, detail: `phase=${S.phase} won=${won}` },
+    { name: 'listener isolation: listeners after the failing one still run', ok: after === 1 },
+    { name: 'listener isolation: the failure is reported once, with its event', ok: errors.length === 1 && G.lastError && G.lastError.event === 'waveEnded', detail: JSON.stringify(G.lastError) },
+  ];
+}
+
 function validate() {
   const { LEVELS, GameState } = loadGame();
   const results = [];
   for (const def of LEVELS) results.push(...checkLevel(def));
   results.push(...legacyTests(GameState, LEVELS));
   results.push(...engineTests(GameState));
+  results.push(...isolationTests());
   return results;
 }
 

@@ -1632,11 +1632,16 @@ const Renderer = (() => {
     pivotMatrix(-0.12, 0.02, 0, 0, 0, -flap, -0.26, 0, 0, 0.52, 0.02, 0.3, v.wingR.matrix);
     v.decal.position.y = -(BAT_HEIGHT + bob) + 0.012;   // shadow stays on the ground
   }
+  // Exit animations are capped: if more than this many are playing at once
+  // (never in real play), the oldest simply finish, so a pile-up of deaths
+  // can't stall the page on one enormous frame.
+  const MAX_DYING = 60;
   function removeEnemyView(e, exit) {
     const v = enemyViews.get(e.id);
     if (!v) return;
     enemyViews.delete(e.id);
     exit(v);
+    while (dying.length > MAX_DYING) scene.remove(dying.shift().group);
   }
   // Silly death: a surprised hop, a fast spin, a stretch, then a puff of smoke.
   function deathExit(v) {

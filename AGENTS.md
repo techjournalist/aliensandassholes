@@ -699,6 +699,40 @@ Levels 1-3), Level 3's win screen now offers Continue, and a new check
 confirms single-road levels build no markers. 76 draw calls on Level 4's
 title view.
 
+**P3-FIX1 — A finished level could strand the player** *(done,
+user-reported)*. After winning Level 4 the user ended up on the
+battlefield with no screen, "The valley is quiet" and a pause button that
+did nothing. Reproduced step for step: "Choose another battle" opened the
+world map with the just-finished level pre-selected (Level 4 is the last
+level), its button read "Hold The Splintered Vale", and for the loaded
+level `commitLevel()` only hid the map and called `startGame()`, which
+does nothing unless the phase is 'title'. `pause()` likewise refuses
+unless the phase is 'playing'. The same trap existed after a loss on any
+level. Fixed at the cause and closed from both sides: the map's button
+now follows the game phase ("Hold X" before a battle, "Return to X" from
+a paused battle, "Play X again" after a win or loss, which does a clean
+restart through the existing reload path); the pause button reopens the
+end screen once a level is finished; the pause menu gained a "World map"
+button (the user asked for a way out); and `UI.frame` brings the end
+screen back if a finished level ever shows no screen for 1.5s, so the
+condition can't recur by any path. Defense in depth: `GameState.emit` now
+runs each listener in its own try/catch (logged once, kept as
+`GameState.lastError`), since the code also allowed a throwing sound or
+visual listener during the last wave's end to skip the win entirely. The
+harness replays the user's exact sequence (win, Choose another battle,
+"Play … again" lands in a fresh game) and checks the pause behaviors and
+the safety net; the validator proves a throwing listener no longer blocks
+the win. The regression runs found two more real issues on the way: the
+safety net first counted clamped frame time (0.05s max per frame), so on
+a slow device it ran far slower than real seconds (now wall-clock); and
+the end-screen timers (0.9s after a win or loss) could fire late on a
+heavy frame and cover a game that was running again, so they now check
+the result still stands before showing anything. Exit (death and leak)
+animations are also capped at 60 at a time, the oldest finishing
+instantly: the harness bots' no-frame runs had queued hundreds, and the
+catch-up frame could stall the page for over 8 seconds. Real play never
+reaches the cap.
+
 - **P3-M5 — Level 5: The Elderroot Ward** (climax, next). Deep within the
   Shadow Hollow itself, ~80% corrupted, with only a small living foothold
   around the endpoint. Endpoint: the Elderroot, a colossal still-living

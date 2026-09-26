@@ -308,7 +308,12 @@ const UI = (() => {
       blurb.append(name, sel.subtitle);
     } else blurb.textContent = 'Pick a battle on the map.';
     $('wm-play-btn').disabled = !sel;
-    $('wm-play-btn').textContent = sel && sel.id === GameState.currentLevel().id ? `Hold ${sel.name}` : sel ? `March to ${sel.name}` : 'Choose a battle';
+    const here = sel && sel.id === GameState.currentLevel().id, phase = GameState.state.phase;
+    $('wm-play-btn').textContent = !sel ? 'Choose a battle'
+      : !here ? `March to ${sel.name}`
+      : phase === 'title' ? `Hold ${sel.name}`
+      : phase === 'playing' ? `Return to ${sel.name}`
+      : `Play ${sel.name} again`;
   }
   // The payoff for a first win: the blight visibly pulls back from the
   // battlefield, with a burst of spores and a chime.
@@ -342,11 +347,21 @@ const UI = (() => {
     if (reclaimedId) playReclaim(reclaimedId);
   }
   function commitLevel(id) {
-    if (id === GameState.currentLevel().id) {
+    const phase = GameState.state.phase;
+    if (id === GameState.currentLevel().id && phase === 'title') {
       $('worldmap').classList.remove('show');
       GameState.startGame();
       return;
     }
+    // a battle in progress (opened from the pause menu): go back to it
+    if (id === GameState.currentLevel().id && phase === 'playing') {
+      $('worldmap').classList.remove('show');
+      if (GameState.state.paused) $('pause').classList.add('show');
+      return;
+    }
+    // A different level, or a finished one played again: both need a clean
+    // start. (A won or lost level can't restart in place; calling startGame
+    // there did nothing and left the player on a dead battlefield.)
     // Switching to a level that isn't loaded needs a reload (see P3-M0's
     // no-disposal-code rationale). The player already chose and confirmed
     // this level once, so the reload should drop them straight into play,
@@ -423,7 +438,14 @@ const UI = (() => {
       firstWin = null;
     });
     $('pause-restart-btn').addEventListener('click', () => location.reload());
-    $('pause-btn').addEventListener('click', () => { Audio.unlock(); GameState.pause(); });
+    // never a dead button: once a level is won or lost, it brings back the end screen
+    $('pause-btn').addEventListener('click', () => {
+      Audio.unlock();
+      const phase = GameState.state.phase;
+      if (phase === 'won' || phase === 'lost') showEnd(phase === 'won');
+      else GameState.pause();
+    });
+    $('pause-map-btn').addEventListener('click', () => { $('pause').classList.remove('show'); enterWorldMap(); });
     $('resume-btn').addEventListener('click', () => { Audio.unlock(); GameState.resume(); });
     $('speed-btn').addEventListener('click', () => { Audio.unlock(); GameState.setSpeed(GameState.state.speed === 1 ? 2 : 1); });
     GameState.on('paused', () => {
@@ -468,9 +490,11 @@ const UI = (() => {
     GameState.on('gameWon', () => {
       firstWin = Progress.starsFor(GameState.currentLevel().id) === 0 ? GameState.currentLevel().id : null;
       Progress.recordWin(GameState.currentLevel().id, GameState.stars(), GameState.state.lives);
-      setTimeout(() => showEnd(true), 900);
+      // only if the result still stands when the timer fires (a stale
+      // timer must never put an end screen over a game that's running)
+      setTimeout(() => { if (GameState.state.phase === 'won') showEnd(true); }, 900);
     });
-    GameState.on('gameLost', () => setTimeout(() => showEnd(false), 900));
+    GameState.on('gameLost', () => setTimeout(() => { if (GameState.state.phase === 'lost') showEnd(false); }, 900));
 
     // a half-made permanent choice never survives looking away
     GameState.on('selectionCleared', () => { armed = { tower: null, branch: null }; });
@@ -492,9 +516,24 @@ const UI = (() => {
     GameState.on('waveEnded', ({ wave }) => { updateHud(); if (wave < GameState.totalWaves()) toast('The road is quiet. Build, upgrade, breathe.'); });
   }
 
+  // Safety net: a finished level must always show its end screen (or some
+  // other screen). If nothing is up for a moment after a win or loss, bring
+  // the end screen back, so the player is never left on a dead battlefield.
+  // Measured in wall-clock time: frame dt is clamped, so on a slow device
+  // it would run far slower than real seconds.
+  let noScreenSince = 0;
+  function guardEnd() {
+    const phase = GameState.state.phase;
+    if ((phase === 'won' || phase === 'lost') && !document.querySelector('.screen.show')) {
+      const now = performance.now();
+      if (!noScreenSince) noScreenSince = now;
+      else if (now - noScreenSince > 1500) { noScreenSince = 0; showEnd(phase === 'won'); }
+    } else noScreenSince = 0;
+  }
   function frame(dt) {
     updateHud();
     updateTip();
+    guardEnd();
     if (!debugOn) return;
     fpsAcc += dt; fpsFrames++;
     if (fpsAcc >= 0.5) {

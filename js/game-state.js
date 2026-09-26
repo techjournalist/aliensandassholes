@@ -65,7 +65,20 @@ const GameState = (() => {
 
   const listeners = {};
   function on(event, fn) { (listeners[event] = listeners[event] || []).push(fn); }
-  function emit(event, payload) { (listeners[event] || []).forEach((fn) => fn(payload)); }
+  // Each listener runs on its own: a failing sound, visual or UI listener
+  // is logged once and never stops the game logic or the listeners after it.
+  let lastError = null;
+  const reported = new Set();
+  function emit(event, payload) {
+    const ls = listeners[event];
+    if (!ls) return;
+    for (const fn of ls.slice()) {
+      try { fn(payload); } catch (err) {
+        lastError = { event, message: String((err && err.message) || err) };
+        if (!reported.has(event)) { reported.add(event); console.error(`GameState: a '${event}' listener failed`, err); }
+      }
+    }
+  }
 
   const worldX = (c) => c - cols / 2 + 0.5;
   const worldZ = (r) => r - rows / 2 + 0.5;
@@ -608,7 +621,7 @@ const GameState = (() => {
 
   return {
     get cols() { return cols; }, get rows() { return rows; },
-    get pathCells() { return pathCells; }, get gate() { return gate; }, get routes() { return routes; },
+    get pathCells() { return pathCells; }, get gate() { return gate; }, get routes() { return routes; }, get lastError() { return lastError; },
     TOWER_TYPES, TOWER_ORDER, TIERS, BRANCHES, ENEMY_TYPES, towerStats, upgradeCost, sellValue, towerById, upgradeTower, sellTower,
     pathPosAt,
     state, on, emit, update, worldX, worldZ, startGame, pause, resume, setSpeed,

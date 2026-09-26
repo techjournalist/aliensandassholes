@@ -710,6 +710,33 @@ async function enterLevel(page, levelId) {
   await page.screenshot({ path: `${OUT}/level4-win.png` });
   check('Level 4 win recorded progress', await page.evaluate(() => Progress.starsFor('splintered-vale') > 0));
   check('Level 4 win screen keeps "Choose another battle" (no Level 5 yet)', (await page.locator('#end-map-btn').innerText()) === 'Choose another battle');
+
+  // ---- P3-FIX1: a finished level can never strand the player ----
+  // the user's exact sequence: win, Choose another battle, the map pre-selects
+  // this same level; its button used to "Hold" it, which did nothing
+  if (mixed4.phase === 'won') {
+    await page.evaluate(() => { document.getElementById('end').classList.remove('show'); });
+    await page.locator('#pause-btn').click(); await page.waitForTimeout(200);
+    check('after a win the pause button brings back the end screen', await page.locator('#end').isVisible());
+    await page.evaluate(() => { document.getElementById('end').classList.remove('show'); });
+    await page.waitForTimeout(2300);
+    check('safety net: a finished level with no screen showing gets its end screen back', await page.locator('#end').isVisible());
+    await page.locator('#end-map-btn').click(); await page.waitForTimeout(300);
+    const replayLabel = await page.locator('#wm-play-btn').innerText();
+    check('the map offers to play the finished level again', replayLabel === 'Play The Splintered Vale again', replayLabel);
+    await page.locator('#wm-play-btn').click();
+    await page.waitForTimeout(2500);
+    const fresh = await page.evaluate(() => ({ id: GameState.currentLevel().id, phase: GameState.state.phase, wave: GameState.state.wave, lives: GameState.state.lives }));
+    check('playing it again lands in a fresh game of that level', fresh.id === 'splintered-vale' && fresh.phase === 'playing' && fresh.wave === 0 && fresh.lives === 20, JSON.stringify(fresh));
+    await page.locator('#pause-btn').click(); await page.waitForTimeout(200);
+    await page.locator('#pause-map-btn').click(); await page.waitForTimeout(300);
+    check('the pause menu has a way out to the world map', await page.locator('#worldmap').isVisible());
+    const backLabel = await page.locator('#wm-play-btn').innerText();
+    check('from a paused battle the map offers to return to it', backLabel === 'Return to The Splintered Vale', backLabel);
+    await page.locator('#wm-play-btn').click(); await page.waitForTimeout(250);
+    check('returning brings back the pause menu, game still paused', await page.locator('#pause').isVisible() && await page.evaluate(() => GameState.state.paused && GameState.state.phase === 'playing'));
+    await page.locator('#resume-btn').click(); await page.waitForTimeout(150);
+  }
   await page.evaluate(() => { document.getElementById('end').classList.remove('show'); });
 
   for (const type of ['slinger', 'warden', 'druid', 'golem', 'artillery']) for (const pick of [0, 1]) {
