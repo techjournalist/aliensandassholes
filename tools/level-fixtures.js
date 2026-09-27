@@ -44,4 +44,11 @@ module.exports = {
     botPlan: ['slinger', 'slinger', 'slinger', 'warden', 'druid', 'artillery', 'golem', 'druid', 'warden', 'slinger', 'golem', 'artillery', 'warden', 'druid', 'slinger', 'golem'],
     waveCount: 12, hasBossOnWave: null,
   },
+  'elderroot-ward': {
+    roadTile: [4, 4], streamTile: [2, 4], farTile: [18, 13],
+    firstSlingerTile: [3, 3],
+    botBuildSpots: [[0, 5], [5, 4], [5, 8], [3, 12], [8, 13], [12, 13], [16, 11], [16, 7], [16, 3], [12, 3], [8, 3], [6, 5], [11, 4], [14, 7], [11, 10]],
+    botPlan: ['slinger', 'slinger', 'warden', 'druid', 'artillery', 'golem', 'druid', 'warden', 'slinger', 'golem', 'artillery', 'warden', 'druid', 'slinger', 'golem'],
+    waveCount: 14, hasBossOnWave: 14,
+  },
 };

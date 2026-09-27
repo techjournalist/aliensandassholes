@@ -231,6 +231,9 @@ const UI = (() => {
       + '<circle class="wd" cx="9" cy="2" r="6"></circle><path class="wd" d="M 3 2 H 15 M 9 -4 V 8"></path>',
     camp: '<path class="st" d="M -13 7 L -13 -3 M -9 7 L -9 -4 M 9 7 L 9 -4 M 13 7 L 13 -3" style="fill:none;stroke:var(--bark);stroke-width:2.2"></path>'
       + '<path class="tn" d="M -7 6 L 0 -10 L 7 6 Z"></path><path class="wd" d="M 0 -10 V -15"></path><path class="rf" d="M 0 -15 L 6 -13 L 0 -11 Z"></path><rect class="wn" x="-1.5" y="1" width="3" height="5"></rect>',
+    elderroot: '<circle class="er-ring" cx="0" cy="4" r="15" style="fill:none;stroke:var(--magic);stroke-width:2;opacity:0.75"></circle>'
+      + '<path class="wd" d="M -6 8 L -4 -2 L -1 3 L 1 -6 L 4 1 L 7 -4 L 9 8 Z" style="fill:var(--bark);stroke:var(--ink);stroke-width:1.4"></path>'
+      + '<circle class="wn" cx="1" cy="-1" r="2.4" style="fill:var(--magic)"></circle>',
     tower: '<rect class="st" x="-5" y="-10" width="10" height="17"></rect><path class="rb" d="M -7 -10 L 0 -20 L 7 -10 Z"></path><rect class="wn" x="-1.5" y="-5" width="3" height="4"></rect>',
   };
   const HOME_TREES = [[720, 108], [742, 160], [700, 88], [738, 226], [714, 268], [668, 68], [750, 118], [690, 290]];

@@ -474,11 +474,14 @@ async function enterLevel(page, levelId) {
   }));
   check('winning Level 1 cuts its ground out of the blight, and only its ground', wm1.cut && wm1.otherCuts === 0, JSON.stringify(wm1));
   check('the road to the next battle is open and that node is marked next', /\bopen\b/.test(wm1.seg || '') && wm1.next === 'millbrook-watch', JSON.stringify(wm1));
-  // the recession is time-based; wait for it to finish rather than sleeping a
-  // fixed time (the bot's no-frame catch-up can stall the first frames)
-  await page.waitForFunction(() => { const c = document.querySelector('#wm-cuts .wm-cut[data-level="shadow-hollow"]'); return c && +c.getAttribute('r') >= 109.5; }, null, { timeout: 8000 }).catch(() => {});
+  // the recession is time-based (a requestAnimationFrame loop, ~1.1s of real
+  // time), not frame-based; wait for it to finish rather than sleeping a fixed
+  // time. Under headless CPU contention rAF ticks can go sparse for seconds at
+  // a stretch (observed directly: r plateaus, then jumps straight to full on
+  // the next tick), so this margin is generous on purpose, not a fixed cost.
+  await page.waitForFunction(() => { const c = document.querySelector('#wm-cuts .wm-cut[data-level="shadow-hollow"]'); return c && +c.getAttribute('r') >= 109.5; }, null, { timeout: 20000 }).catch(() => {});
   const cutR = await page.evaluate(() => ({ r: +document.querySelector('#wm-cuts .wm-cut[data-level="shadow-hollow"]').getAttribute('r'), full: LEVELS.find((l) => l.id === 'shadow-hollow').map.reclaim }));
-  check('the blight finishes receding to the level\'s reclaim radius', Math.abs(cutR.r - cutR.full) < 0.5, JSON.stringify(cutR));
+  check('the blight finishes receding to the level\'s reclaim radius', Math.abs(cutR.r - cutR.full) <= 0.5, JSON.stringify(cutR));
   await page.evaluate(() => { document.getElementById('worldmap').classList.remove('show'); });
 
   // ---- progress persistence: the win must survive a reload, via localStorage ----
@@ -709,34 +712,8 @@ async function enterLevel(page, levelId) {
   check('Level 4 win screen shows stars', mixed4.phase !== 'won' || (await page.locator('#end').isVisible() && await page.locator('#stars span.lit').count() === mixed4.stars));
   await page.screenshot({ path: `${OUT}/level4-win.png` });
   check('Level 4 win recorded progress', await page.evaluate(() => Progress.starsFor('splintered-vale') > 0));
-  check('Level 4 win screen keeps "Choose another battle" (no Level 5 yet)', (await page.locator('#end-map-btn').innerText()) === 'Choose another battle');
+  check('Level 4 win screen now offers Continue to Level 5', (await page.locator('#end-map-btn').innerText()) === 'Continue');
 
-  // ---- P3-FIX1: a finished level can never strand the player ----
-  // the user's exact sequence: win, Choose another battle, the map pre-selects
-  // this same level; its button used to "Hold" it, which did nothing
-  if (mixed4.phase === 'won') {
-    await page.evaluate(() => { document.getElementById('end').classList.remove('show'); });
-    await page.locator('#pause-btn').click(); await page.waitForTimeout(200);
-    check('after a win the pause button brings back the end screen', await page.locator('#end').isVisible());
-    await page.evaluate(() => { document.getElementById('end').classList.remove('show'); });
-    await page.waitForTimeout(2300);
-    check('safety net: a finished level with no screen showing gets its end screen back', await page.locator('#end').isVisible());
-    await page.locator('#end-map-btn').click(); await page.waitForTimeout(300);
-    const replayLabel = await page.locator('#wm-play-btn').innerText();
-    check('the map offers to play the finished level again', replayLabel === 'Play The Splintered Vale again', replayLabel);
-    await page.locator('#wm-play-btn').click();
-    await page.waitForTimeout(2500);
-    const fresh = await page.evaluate(() => ({ id: GameState.currentLevel().id, phase: GameState.state.phase, wave: GameState.state.wave, lives: GameState.state.lives }));
-    check('playing it again lands in a fresh game of that level', fresh.id === 'splintered-vale' && fresh.phase === 'playing' && fresh.wave === 0 && fresh.lives === 20, JSON.stringify(fresh));
-    await page.locator('#pause-btn').click(); await page.waitForTimeout(200);
-    await page.locator('#pause-map-btn').click(); await page.waitForTimeout(300);
-    check('the pause menu has a way out to the world map', await page.locator('#worldmap').isVisible());
-    const backLabel = await page.locator('#wm-play-btn').innerText();
-    check('from a paused battle the map offers to return to it', backLabel === 'Return to The Splintered Vale', backLabel);
-    await page.locator('#wm-play-btn').click(); await page.waitForTimeout(250);
-    check('returning brings back the pause menu, game still paused', await page.locator('#pause').isVisible() && await page.evaluate(() => GameState.state.paused && GameState.state.phase === 'playing'));
-    await page.locator('#resume-btn').click(); await page.waitForTimeout(150);
-  }
   await page.evaluate(() => { document.getElementById('end').classList.remove('show'); });
 
   for (const type of ['slinger', 'warden', 'druid', 'golem', 'artillery']) for (const pick of [0, 1]) {
@@ -745,6 +722,92 @@ async function enterLevel(page, levelId) {
     const clean = r.leaks.filter((l) => l <= 1).length;
     console.log(`LEVEL 4 ONLY ${type}/${br}: ` + JSON.stringify(r) + ` clean waves=${clean}/${L4F.waveCount}`);
     check(`Level 4: only ${type} (${br}) does not trivialize the level`, !(r.phase === 'won' && clean > Math.floor(L4F.waveCount * 0.6)), `phase=${r.phase} clean=${clean}`);
+  }
+  await page.waitForTimeout(1600);
+  await page.evaluate(() => { GameState.state.enemies.length = 0; document.getElementById('end').classList.remove('show'); });
+
+  // ---------------- Level 5: The Elderroot Ward (climax, spiral + boss reprise) ----------------
+  check('winning Level 4 unlocked Level 5', await page.evaluate(() => Progress.isUnlocked('elderroot-ward')));
+  await page.reload(); await page.waitForTimeout(1000);
+  await enterLevel(page, 'elderroot-ward');
+  check('Level 5 loads with its own spiral path', await page.evaluate(() => GameState.currentLevel().id === 'elderroot-ward' && GameState.routes.length === 1));
+  await page.waitForTimeout(1500);
+  await page.screenshot({ path: `${OUT}/level5-title.png` });
+  console.log('LEVEL 5 DEBUG OVERLAY: ' + (await page.locator('#debug').innerText()).replace(/\n/g, ' | '));
+
+  const L5F = LEVEL_FIXTURES['elderroot-ward'];
+  const lone5 = await page.evaluate((tip) => {
+    const S = GameState.state; S.towers.length = 0; S.enemies.length = 0; S.projectiles.length = 0;
+    S.gold = GameState.currentLevel().startGold; S.lives = 20; S.wave = 0; S.phase = 'playing';
+    S.selected = { kind: 'tile', c: tip[0], r: tip[1] };
+    GameState.placeTower('slinger');
+    GameState.startWave();
+    let leaks = 0; GameState.on('enemyLeaked', () => leaks++);
+    for (let i = 0; i < 60 * 90 && GameState.state.waveActive; i++) GameState.update(1 / 60);
+    const r = { leaks, lives: GameState.state.lives };
+    GameState.state.towers.length = 0; GameState.state.enemies.length = 0;
+    return r;
+  }, L5F.firstSlingerTile);
+  check('Level 5 wave 1 is winnable by a single lone tower (no leaks)', lone5.leaks === 0 && lone5.lives === 20, JSON.stringify(lone5));
+
+  const mixed5 = await runBotOn(L5F.botPlan, L5F.botBuildSpots, L5F.waveCount);
+  console.log('LEVEL 5 MIXED BOT: ' + JSON.stringify(mixed5));
+  check('Level 5: a mixed defense can win all 14 waves', mixed5.phase === 'won', `lives=${mixed5.lives} leaks=${JSON.stringify(mixed5.leaks)}`);
+  check('Level 5: waves 1 and 2 are nearly unloseable', mixed5.leaks[0] + mixed5.leaks[1] <= 1, `leaks=${JSON.stringify(mixed5.leaks.slice(0, 2))}`);
+  if (mixed5.phase === 'won') await page.locator('#end.show').waitFor({ timeout: 10000 }).catch(() => {});
+  await page.waitForTimeout(300);
+  check('Level 5 win screen shows stars', mixed5.phase !== 'won' || (await page.locator('#end').isVisible() && await page.locator('#stars span.lit').count() === mixed5.stars));
+  await page.screenshot({ path: `${OUT}/level5-win.png` });
+  check('Level 5 win recorded progress', await page.evaluate(() => Progress.starsFor('elderroot-ward') > 0));
+  check('Level 5 win screen keeps "Choose another battle" (no Level 6 yet)', (await page.locator('#end-map-btn').innerText()) === 'Choose another battle');
+  await page.evaluate(() => { document.getElementById('end').classList.remove('show'); });
+
+  // ---- P3-FIX1: a finished level can never strand the player ----
+  // the user's exact sequence: win, Choose another battle, the map pre-selects
+  // this same level; its button used to "Hold" it, which did nothing.
+  // Level 5 is the currently-last level, so this is where that scenario lives.
+  if (mixed5.phase === 'won') {
+    await page.locator('#pause-btn').click(); await page.waitForTimeout(200);
+    check('after a win the pause button brings back the end screen', await page.locator('#end').isVisible());
+    await page.evaluate(() => { document.getElementById('end').classList.remove('show'); });
+    await page.waitForTimeout(2300);
+    check('safety net: a finished level with no screen showing gets its end screen back', await page.locator('#end').isVisible());
+    await page.locator('#end-map-btn').click(); await page.waitForTimeout(300);
+    const replayLabel = await page.locator('#wm-play-btn').innerText();
+    check('the map offers to play the finished level again', replayLabel === 'Play The Elderroot Ward again', replayLabel);
+    await page.locator('#wm-play-btn').click();
+    await page.waitForTimeout(2500);
+    const fresh = await page.evaluate(() => ({ id: GameState.currentLevel().id, phase: GameState.state.phase, wave: GameState.state.wave, lives: GameState.state.lives }));
+    check('playing it again lands in a fresh game of that level', fresh.id === 'elderroot-ward' && fresh.phase === 'playing' && fresh.wave === 0 && fresh.lives === 20, JSON.stringify(fresh));
+    await page.locator('#pause-btn').click(); await page.waitForTimeout(200);
+    await page.locator('#pause-map-btn').click(); await page.waitForTimeout(300);
+    check('the pause menu has a way out to the world map', await page.locator('#worldmap').isVisible());
+    const backLabel = await page.locator('#wm-play-btn').innerText();
+    check('from a paused battle the map offers to return to it', backLabel === 'Return to The Elderroot Ward', backLabel);
+    await page.locator('#wm-play-btn').click(); await page.waitForTimeout(250);
+    check('returning brings back the pause menu, game still paused', await page.locator('#pause').isVisible() && await page.evaluate(() => GameState.state.paused && GameState.state.phase === 'playing'));
+    await page.locator('#resume-btn').click(); await page.waitForTimeout(150);
+  }
+  await page.evaluate(() => { document.getElementById('end').classList.remove('show'); });
+
+  // the boss reprise: same enemy type as Level 1's, stiffened by wave 14's hpScale
+  const boss5 = await page.evaluate(() => {
+    const S = GameState.state, G = GameState;
+    S.towers.length = 0; S.enemies.length = 0; S.projectiles.length = 0; S.phase = 'playing';
+    S.hpScale = 1 + (13) * 0.05;
+    const b = G.spawnEnemy('boss');
+    const r = { hp: b.hp, maxHp: b.maxHp, expected: Math.round(G.ENEMY_TYPES.boss.hp * S.hpScale), flying: b.flying, bounty: b.bounty };
+    S.enemies.length = 0; S.hpScale = 1;
+    return r;
+  });
+  check('Level 5\'s boss reprise is the same Shadow-Crow Swarm, stiffened by wave 14', boss5.hp === boss5.expected && boss5.flying === true, JSON.stringify(boss5));
+
+  for (const type of ['slinger', 'warden', 'druid', 'golem', 'artillery']) for (const pick of [0, 1]) {
+    const br = Object.keys(BRANCH_KEYS[type])[pick];
+    const r = await runBotOn([type], L5F.botBuildSpots, L5F.waveCount, pick);
+    const clean = r.leaks.filter((l) => l <= 1).length;
+    console.log(`LEVEL 5 ONLY ${type}/${br}: ` + JSON.stringify(r) + ` clean waves=${clean}/${L5F.waveCount}`);
+    check(`Level 5: only ${type} (${br}) does not trivialize the level`, !(r.phase === 'won' && clean > Math.floor(L5F.waveCount * 0.6)), `phase=${r.phase} clean=${clean}`);
   }
   await page.waitForTimeout(1600);
   await page.evaluate(() => { GameState.state.enemies.length = 0; document.getElementById('end').classList.remove('show'); });

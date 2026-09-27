@@ -733,26 +733,87 @@ instantly: the harness bots' no-frame runs had queued hundreds, and the
 catch-up frame could stall the page for over 8 seconds. Real play never
 reaches the cap.
 
-- **P3-M5 — Level 5: The Elderroot Ward** (climax, next). Deep within the
-  Shadow Hollow itself, ~80% corrupted, with only a small living foothold
-  around the endpoint. Endpoint: the Elderroot, a colossal still-living
-  tree stump ringed by a ward-circle. A spiral path descending terraced
-  ground (render-only elevation), 14 waves ending in a Shadow-Crow Swarm
-  reprise (the existing boss, unchanged stats; the per-wave `hpScale`
-  stiffening alone makes it harder than Level 1's wave-12 fight).
-  Highest tuning risk: longest path, busiest scene (check draw calls
-  against the established budget), and a boss whose difficulty now
-  depends on which tier-3 branches the player took.
+**P3-M5 — Level 5: The Elderroot Ward** *(done, campaign climax)*. Deep
+within the Shadow Hollow (`js/level5-elderroot-ward.js`, 19x15 grid): a
+rectangular two-ring spiral (trace ring 1's perimeter, part of ring 2's,
+then cut straight inward) coils past the Elderroot itself before doubling
+back to reach it, leaving ring 2's interior open as a plaza for the
+endpoint. A first, denser spiral attempt (mathematical outward-then-
+reverse spiral) filled nearly the whole bounding box and left no room for
+a multi-cell endpoint, and its center column was crossed by every leg of
+the path, which the single-crossing chokepoint rule rejects outright — the
+two-ring redesign fixed both at once. **Chokepoint**: the entry corridor
+at (2,4), crossed exactly once. **Endpoint**: the Elderroot, a colossal
+living stump (root-flare base, bark ridges, moss patches, living shoots, a
+glowing heart via `kit.glow`) ringed by 7 of 8 standing stones with a
+south-facing gate gap, a pulsing ground rune, and a banner on a stone pole
+near the gate; the usual 3-state damage overlay layers corruption-vine
+creep on top. **14 waves**, finale (`The Shadow-Crow Returns`) reprising
+the unchanged Shadow-Crow Swarm boss; the per-wave `hpScale` formula alone
+takes its hp from 640 to 1056 (confirmed exactly by the harness) purely
+from being wave 14 instead of wave 12, no manual boss buff. **Terraces
+(render-only elevation) were skipped**, shipping the spiral flat — this
+was this document's own named cut-order item for exactly this situation
+(budget considerations, an unproven render/picking change), not a
+last-minute cut; the level is complete and fully verified without it.
 
-**Recommended, not yet decided**: M6 (player abilities), M10 (hero,
-stretch), and the remaining M11 items (full palette consistency check,
-UI cleanup, mobile performance profiling) sit in a closing pass after
-P3-M4, since they should work across all four levels' geometry before
-being called done. Confirm this re-sequencing with the user once P3-M4
-is reached rather than treating it as locked today.
+Two new, opt-in engine features, both backward-compatible (Levels 1-4
+needed no data changes): `chokepoint.streamRows: [r0, r1]` bounds the
+fissure to a row range instead of the full grid height, needed because a
+spiral's column is approached from more than one direction, unlike every
+earlier level's single crossing; `theme.foothold: {center, radius,
+falloffWidth}` adds a second, independent local falloff that forces the
+ground healthy near a specific point regardless of the primary falloff.
+The foothold fix was necessary, not cosmetic: the first pass had the map
+almost entirely *healthy* with only a small corrupted patch near spawn,
+the exact opposite of "~80% corrupted with a small living foothold",
+because a single-point radial falloff can't make a point *surrounded by
+its own path* read healthier than the ring around it — some ring cell is
+always closer to the corruption source. `theme.foothold` clears the
+Elderroot's plaza independent of that math; `radiusIn` was widened to
+2.15 so the rest of the map, including the far corner, reads corrupted.
 
-**If budget runs out early**, cut order: P3-M4 (Level 4, largest scope)
-first, then P3-M3 (M5) is independently cuttable since flat-tier towers
-already clear every wave table by construction. Cut P3-M1/P3-M2 last —
-losing a level is a bigger change to what was promised than losing an
-upgrade layer.
+Balance: the wave-1 lone-tower check is clean (0 leaks, 20/20 lives); a
+mixed defense wins all 14 waves with 14/20 lives, only wave 5 (bats
+introduced) and wave 9 leaking at all (5 and 1) — in line with the
+campaign's established 8-14 life margins. The single-tower-type stress
+test (5 types x 2 branches, 10 runs) tops out at 7/14 clean waves
+(Slinger, either branch), short of the 60%-of-waves (8.4) threshold that
+would flag a dominant strategy; no combination wins outright. The critic
+pass also caught: damage-state 2 barely reading different from state 0
+(fixed by more/bigger creep vines and much starker dimming toward
+`PALETTE.spore` purple); an early "rune banner" laid flat as a ground mat,
+which would have rippled its flutter animation vertically through the
+ground plane (fixed to a conventional vertical banner on a pole, matching
+every other level's pattern).
+
+While building this level's harness section, the test-authoring pattern
+that bit Level 4 also bit this milestone: a regression block written to
+assume "the last level in the campaign" (the win → pause → replay →
+pause-map → return sequence) had to move from Level 4's section to
+Level 5's now that Level 5 is last, and Level 4's own "keeps Choose
+another battle" check flipped to expect "Continue" — this is correct game
+behavior (`Progress.recordWin` unlocks Level 5 the moment it's won), the
+tests were just stale. A genuine harness bug turned up during this
+insertion: the new Level 5 block had been placed after Level 4 section's
+own `ctx.close()` rather than before it, so its `page.evaluate()` calls
+ran against an already-closed browser context — fixed by moving the
+misplaced `close()` to after the Level 5 section. Chasing the harness's
+one remaining failure after that (an overworld check, unrelated to this
+level: "the blight finishes receding to its reclaim radius") led to two
+more small, genuine fixes to that pre-existing check, not to any game
+code: its `requestAnimationFrame`-driven wait could legitimately need
+more than 8s under headless CPU contention (confirmed directly — the
+animation's `r` value can plateau for seconds between sparse frames, then
+jump straight to completion), so the wait was extended to 20s; and its
+final assertion (`diff < 0.5`) was one comparison stricter than the wait
+condition it followed (`r >= 109.5`, i.e. `diff <= 0.5`), so a value of
+exactly the boundary always failed — fixed to match. Full harness: 290/290
+checks passing.
+
+**Recommended, not yet decided**: with all five campaign levels done, M6
+(player abilities), M10 (hero, stretch), and the remaining M11 items (full
+palette consistency check, UI cleanup, mobile performance profiling) are
+the natural closing pass, since they should work across all five levels'
+geometry before being called done. Not started; confirm with the user
+before beginning this pass rather than treating it as decided here.

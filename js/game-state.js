@@ -86,7 +86,16 @@ const GameState = (() => {
   function key(c, r) { return `${c},${r}`; }
   function inGrid(c, r) { return c >= 0 && r >= 0 && c < cols && r < rows; }
   function isPath(c, r) { return pathIndex.has(key(c, r)); }
-  function isStream(c, r) { return c === level.chokepoint.streamCol && !(c === level.chokepoint.cell[0] && r === level.chokepoint.cell[1]); }
+  // A level's fissure normally spans the whole grid height (one crossing,
+  // the chokepoint, so nothing else needs bounding). A path that visits its
+  // own column's rows more than once (a spiral) needs the water bounded to
+  // a short stretch instead, via optional chokepoint.streamRows: [r0, r1].
+  function isStream(c, r) {
+    if (c !== level.chokepoint.streamCol) return false;
+    if (c === level.chokepoint.cell[0] && r === level.chokepoint.cell[1]) return false;
+    const rows = level.chokepoint.streamRows;
+    return !rows || (r >= rows[0] && r <= rows[1]);
+  }
   function isBridge(c, r) { return c === level.chokepoint.cell[0] && r === level.chokepoint.cell[1]; }
   function isBastion(c, r) { return level.endpoint.cells.some(([bc, br]) => bc === c && br === r); }
   function isSpawn(c, r) { return spawnCells.has(key(c, r)); }
@@ -95,10 +104,22 @@ const GameState = (() => {
   // Defined for any cell, including the decorative border, so the danger
   // bleeds off the edge of the map instead of stopping at a hard line.
   function zoneFalloff(c, r) {
-    const { center, radiusOut, radiusIn, falloffWidth } = level.theme;
+    const { center, radiusOut, radiusIn, falloffWidth, foothold } = level.theme;
     const dx = (c - center[0]) / radiusOut.x, dz = (r - center[1]) / radiusOut.z;
     const d = Math.sqrt(dx * dx + dz * dz);
-    return Math.max(0, Math.min(1, (radiusIn - d) / falloffWidth));
+    let h = Math.max(0, Math.min(1, (radiusIn - d) / falloffWidth));
+    // A single radial source can't cleanly clear a pocket of health around a
+    // point that sits *inside* its own danger zone (an endpoint the road
+    // spirals around, say) — some other cell is always closer to the source.
+    // An optional second, local falloff forces the ground healthy near that
+    // point instead, without touching corruption anywhere else on the map.
+    if (foothold) {
+      const fdx = c - foothold.center[0], fdz = r - foothold.center[1];
+      const fd = Math.sqrt(fdx * fdx + fdz * fdz);
+      const clear = Math.max(0, Math.min(1, (fd - foothold.radius) / foothold.falloffWidth));
+      h = Math.min(h, clear);
+    }
+    return h;
   }
 
   // Buildable = inside the grid, on plain ground, and touching the road.
