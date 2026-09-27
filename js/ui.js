@@ -14,14 +14,19 @@ const UI = (() => {
     const wave = s.wave > 0 ? `Wave ${s.wave}/${total}` : 'Prep';
     if (shown.wave !== wave) { $('hud-wave').textContent = wave; shown.wave = wave; }
     const btn = $('wave-btn');
-    let label;
-    if (s.waveActive) label = `${GameState.enemiesLeft()} coming`;
-    else if (s.wave === 0) label = 'Send the first wave';
-    else if (s.wave >= total) label = 'The valley is quiet';
-    else if (s.prep > 0) label = `Send wave ${s.wave + 1}<span class="sub">auto in ${Math.ceil(s.prep)}s &middot; now for +${Math.round(s.prep * 1.5)} gold</span>`;
-    else label = `Send wave ${s.wave + 1}`;
+    let main, sub = '';
+    if (s.waveActive) main = `${GameState.enemiesLeft()} coming`;
+    else if (s.wave === 0) main = 'Send the first wave';
+    else if (s.wave >= total) main = 'The valley is quiet';
+    else if (s.prep > 0) { main = `Send wave ${s.wave + 1}`; sub = `auto in ${Math.ceil(s.prep)}s · now for +${Math.round(s.prep * 1.5)} gold`; }
+    else main = `Send wave ${s.wave + 1}`;
+    // Written to two persistent child spans via textContent, never btn.innerHTML:
+    // rebuilding the button's own subtree mid-tap can drop the click on touch
+    // devices if the node the gesture started on no longer exists by touchend.
+    const label = main + '|' + sub;
     if (shown.waveBtn !== label) {
-      btn.innerHTML = label;
+      $('wave-btn-main').textContent = main;
+      $('wave-btn-sub').textContent = sub;
       btn.disabled = s.waveActive || s.wave >= total;
       shown.waveBtn = label;
     }

@@ -205,6 +205,19 @@ async function enterLevel(page, levelId) {
   check('kills pay gold', st.gold > 10, `gold=${st.gold}`);
   check('floating numbers rendered', (await page.evaluate(() => window.__floaters || 0)) >= 0);
   check('wave ended, button re-armed for wave 2 with a prep countdown', !st.waveActive && (await page.locator('#wave-btn').innerText()).includes('wave 2') && (await page.evaluate(() => GameState.state.prep > 0)));
+  // Regression for the "sometimes doesn't respond" bug: updateHud() used to
+  // do btn.innerHTML = label every time the countdown's displayed second
+  // changed, destroying and recreating the button's child nodes — a tap in
+  // flight on one of those nodes could be dropped by the browser. It must
+  // now only ever write textContent onto two persistent spans.
+  const stableNodes = await page.evaluate(() => {
+    const main = document.getElementById('wave-btn-main'), sub = document.getElementById('wave-btn-sub');
+    main.__marked = true; sub.__marked = true;
+    for (let i = 0; i < 5 && GameState.state.prep > 1; i++) { GameState.state.prep -= 1; UI.updateHud(); }
+    const mainNow = document.getElementById('wave-btn-main'), subNow = document.getElementById('wave-btn-sub');
+    return { mainSame: mainNow === main && mainNow.__marked === true, subSame: subNow === sub && subNow.__marked === true, text: mainNow.textContent };
+  });
+  check('the wave button\'s countdown never rebuilds its own child nodes', stableNodes.mainSame && stableNodes.subSame, JSON.stringify(stableNodes));
   const earlyGold = await page.evaluate(() => { const g0 = GameState.state.gold; GameState.sendWave(); return GameState.state.gold - g0; });
   check('sending early pays a bonus', earlyGold > 0, `bonus=${earlyGold}`);
   check('wave banner shows name and flavor', (await page.locator('#wave-banner').innerText()).includes('Wave 2'));

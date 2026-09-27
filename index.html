@@ -222,6 +222,7 @@
     #worldmap h1 { font-size: 30px; }
   }
   #wave-btn .sub { display: block; font-size: 12px; font-weight: 700; opacity: 0.8; line-height: 1.1; }
+  #wave-btn .sub:empty { display: none; }
   #boss-bar {
     position: absolute; top: max(64px, calc(env(safe-area-inset-top) + 54px)); left: 50%; transform: translateX(-50%);
     width: min(420px, 46vw); display: none; text-align: center;
@@ -382,7 +383,7 @@
     <button id="speed-btn" class="pill iconbtn" type="button" aria-label="Game speed" title="Speed">1&times;</button>
     <button id="pause-btn" class="pill iconbtn" type="button" aria-label="Pause" title="Pause"><span class="icon">&#10074;&#10074;</span></button>
   </div>
-  <button id="wave-btn" type="button">Send the first wave</button>
+  <button id="wave-btn" type="button"><span id="wave-btn-main">Send the first wave</span><span id="wave-btn-sub" class="sub"></span></button>
   <div id="boss-bar"><div class="boss-name">Shadow-Crow Swarm</div><div class="boss-track"><div class="boss-fill"></div></div></div>
   <div id="wave-banner"><div class="wb-title"></div><div class="wb-flavor"></div></div>
   <div id="panel"></div>
