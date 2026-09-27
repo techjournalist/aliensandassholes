@@ -51,4 +51,19 @@ module.exports = {
     botPlan: ['slinger', 'slinger', 'warden', 'druid', 'artillery', 'golem', 'druid', 'warden', 'slinger', 'golem', 'artillery', 'warden', 'druid', 'slinger', 'golem'],
     waveCount: 14, hasBossOnWave: 14,
   },
+  'sunken-market': {
+    roadTile: [8, 5], streamTile: [12, 2], farTile: [17, 10],
+    firstSlingerTile: [2, 4],
+    // one lone Slinger per road, near that road's entry (per-road wave-1 check)
+    laneSlingerTiles: { 'market-row': [2, 4], 'north-docks': [6, 1], 'south-docks': [6, 9] },
+    // the tip tile first, then the junction and shared trunk (every road
+    // passes there once merged), then each road's own entry
+    botBuildSpots: [[2, 4], [7, 4], [7, 6], [9, 4], [9, 6], [11, 4], [11, 6], [13, 4], [13, 6], [6, 1], [6, 9], [4, 1], [4, 9], [14, 4], [3, 6], [3, 4]],
+    // druid before warden: at 109 gold after 3 Slingers, a 110-cost Warden
+    // was one gold short and stalled the whole build queue for two waves
+    // (the bot only tries the next planned type, never skips to a cheaper
+    // one); a 90-cost Druid clears that gap and keeps towers coming.
+    botPlan: ['slinger', 'slinger', 'slinger', 'druid', 'warden', 'artillery', 'golem', 'druid', 'warden', 'slinger', 'golem', 'artillery', 'warden', 'druid', 'slinger', 'golem'],
+    waveCount: 12, hasBossOnWave: null,
+  },
 };

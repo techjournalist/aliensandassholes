@@ -811,9 +811,60 @@ condition it followed (`r >= 109.5`, i.e. `diff <= 0.5`), so a value of
 exactly the boundary always failed — fixed to match. Full harness: 290/290
 checks passing.
 
-**Recommended, not yet decided**: with all five campaign levels done, M6
-(player abilities), M10 (hero, stretch), and the remaining M11 items (full
-palette consistency check, UI cleanup, mobile performance profiling) are
-the natural closing pass, since they should work across all five levels'
-geometry before being called done. Not started; confirm with the user
-before beginning this pass rather than treating it as decided here.
+**Campaign extension (user decision, after Level 5)**: the user disliked
+how Level 5 (The Elderroot Ward) turned out and, after reviewing a concept
+board of three real top-down maps, asked for all three to be built as
+additional levels reusing Level 4's multi-route engine exactly as it
+stands — no engine changes, only new geography, theme and waves. Level 5
+is left in place rather than replaced (removing a shipped, tested level
+is itself real work with its own regression risk, and the user's requests
+consistently prioritized moving forward over relitigating Level 5). The
+three new levels are appended as Levels 6-8. Each still runs the full
+Gauntlet Loop plus the fixture-based harness before being called done, the
+same as every earlier level.
+
+**P3-M6 — Level 6: The Sunken Market** *(done)*. A flooded trade-town
+(`js/level6-sunken-market.js`, 18x11 grid, ~35% corrupted): three flooded
+quays (Market Row, direct; North Docks and South Docks, each a short loop)
+converge at one junction, then a long shared causeway of lashed barrels
+and planks crosses the flooded square to the Counting-House, a modest
+timber office raised on stilts with lantern-lit windows and a merchant
+banner. Damage states: a cracked, listing stilt at state 1, a snapped-leg
+tilt and a half-sunk floor at state 2. 12 waves, no boss (matches Level
+4's own convention). `GameState`, `Renderer` and `Renderer-fx` needed zero
+changes — the endpoint reuses `masonry()`/`roofCourses()`/`windowDress()`/
+`glow()`/`bannerGeo()` exactly as earlier endpoints do, and a new
+`reedClusterParts()` recipe (this level's one new signature prop, in the
+established one-per-level pattern) is built from existing `GEO` primitives.
+
+Balance was the real work here, not the scene. The wave table was first
+copied verbatim from Level 4's (proven on a 20x13 grid) with route names
+swapped — this failed the harness outright: the mixed bot lost around wave
+9, and root-causing it found a genuine bot-fragility bug, not a level
+design flaw: the shared `runBotOn` test bot tries only the next planned
+tower type and stops entirely (dumping all gold into upgrades instead) the
+moment that one type is unaffordable, so 3 Slingers leaving exactly 109
+gold one short of a 110-cost Warden stalled the whole build queue for two
+waves. Swapping in a 90-cost Druid first fixed that specific cliff, but
+repeated local `Math.random()` lane-jitter (unseeded, real in every level)
+made the fix's true win rate only ~50-60% over many trial runs — a real,
+if disguised, balance shortfall on this smaller grid, not just bot noise.
+Chasing individual waves' numbers up and down shifted the pressure point
+wave to wave (easing wave 9 alone just made wave 10 the new spike) until
+waves 7-11 were eased together by roughly 15-25% each, which is what
+actually fixed it: 8 of 8 isolated trial runs won afterward (mean ~5.4
+lives, range 1-13), and the real harness confirmed a clean 14-life win.
+Starting gold and the tower-plan order were both tried as levers first and
+made things *worse* in isolation (this bot's greedy algorithm is sensitive
+to exact thresholds in ways that don't move monotonically with more
+resources) — recorded here so a future level's first-pass balance work
+doesn't re-spend budget rediscovering it. The wave-1 lone-tower check and
+the per-road lone-Slinger check are both clean; the single-type stress
+test (5 types x 2 branches) tops out at 6/12 clean waves, no dominant
+strategy. Overworld node placed on the existing landmass art's west coast
+(no new coastline needed); a new `market` glyph added to `GLYPHS`.
+
+**Recommended, not yet decided**: with Levels 6-8 and all closing-pass
+polish (M6 player abilities, M10 hero, remaining M11 items) still open,
+confirm scope and order with the user before starting further work rather
+than treating either as decided here.

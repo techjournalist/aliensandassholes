@@ -12,7 +12,7 @@ const path = require('path');
 const vm = require('vm');
 
 const ROOT = path.join(__dirname, '..');
-const FILES = ['palette-config.js', 'level1-shadow-hollow.js', 'level2-millbrook-watch.js', 'level3-cairnwatch.js', 'level4-splintered-vale.js', 'level5-elderroot-ward.js', 'levels.js', 'game-state.js'];
+const FILES = ['palette-config.js', 'level1-shadow-hollow.js', 'level2-millbrook-watch.js', 'level3-cairnwatch.js', 'level4-splintered-vale.js', 'level5-elderroot-ward.js', 'level6-sunken-market.js', 'levels.js', 'game-state.js'];
 
 function loadGame(consoleImpl = console) {
   const src = FILES.map((f) => fs.readFileSync(path.join(ROOT, 'js', f), 'utf8')).join('\n;\n')
