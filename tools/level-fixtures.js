@@ -66,4 +66,18 @@ module.exports = {
     botPlan: ['slinger', 'slinger', 'slinger', 'druid', 'warden', 'artillery', 'golem', 'druid', 'warden', 'slinger', 'golem', 'artillery', 'warden', 'druid', 'slinger', 'golem'],
     waveCount: 12, hasBossOnWave: null,
   },
+  'amber-terraces': {
+    roadTile: [9, 7], streamTile: [15, 2], farTile: [1, 11],
+    firstSlingerTile: [2, 2],
+    laneSlingerTiles: { 'grove-path': [2, 2], 'hollow-way': [3, 2], 'basket-road': [3, 11] },
+    // tip first, then the trunk between the junctions and the tram line,
+    // then each road's own entry (same druid-before-warden lesson as
+    // sunken-market: 3 Slingers leave 109 gold, one short of a Warden).
+    // [10,8] is 4th on purpose: that's where the plan's first Druid lands,
+    // and it's the one spot in range of the whole Basket Road approach
+    // (col 9, rows 7-10) — anywhere else left every bat on wave 5 untouched.
+    botBuildSpots: [[2, 2], [6, 6], [6, 8], [10, 8], [8, 8], [10, 6], [8, 6], [12, 6], [12, 8], [14, 6], [14, 8], [3, 2], [3, 11], [11, 2], [9, 5], [16, 6]],
+    botPlan: ['slinger', 'slinger', 'slinger', 'druid', 'warden', 'artillery', 'golem', 'druid', 'warden', 'slinger', 'golem', 'artillery', 'warden', 'druid', 'slinger', 'golem'],
+    waveCount: 12, hasBossOnWave: null,
+  },
 };

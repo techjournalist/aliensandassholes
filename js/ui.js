@@ -243,6 +243,9 @@ const UI = (() => {
     market: '<path class="wd" d="M -13 6 L -13 -4 M 13 6 L 13 -4" style="fill:none;stroke:var(--bark);stroke-width:2.2"></path>'
       + '<path class="rf" d="M -15 -4 L 0 -12 L 15 -4 Z"></path><path class="rf" d="M -15 -4 L -8 -1 L -8 -8 Z" style="fill:var(--gold);opacity:0.8"></path>'
       + '<rect class="wn" x="-9" y="0" width="18" height="6" style="fill:var(--water)"></rect>',
+    apiary: '<rect class="st" x="-6" y="-2" width="12" height="14"></rect>'
+      + '<path class="rf" d="M -6 -2 A 6 5 0 0 1 6 -2 Z" style="fill:var(--gold)"></path>'
+      + '<rect class="wn" x="-2" y="4" width="4" height="5"></rect>',
   };
   const HOME_TREES = [[720, 108], [742, 160], [700, 88], [738, 226], [714, 268], [668, 68], [750, 118], [690, 290]];
   const DEADWOOD = [[150, 160], [92, 228], [204, 268], [380, 282], [462, 118], [250, 212], [520, 272], [176, 70], [412, 60]];

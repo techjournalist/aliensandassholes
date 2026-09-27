@@ -840,35 +840,7 @@ async function enterLevel(page, levelId) {
   check('Level 6 win screen shows stars', mixed6.phase !== 'won' || (await page.locator('#end').isVisible() && await page.locator('#stars span.lit').count() === mixed6.stars));
   await page.screenshot({ path: `${OUT}/level6-win.png` });
   check('Level 6 win recorded progress', await page.evaluate(() => Progress.starsFor('sunken-market') > 0));
-  check('Level 6 win screen keeps "Choose another battle" (no Level 7 yet)', (await page.locator('#end-map-btn').innerText()) === 'Choose another battle');
-  await page.evaluate(() => { document.getElementById('end').classList.remove('show'); });
-
-  // ---- P3-FIX1: a finished level can never strand the player ----
-  // the user's exact sequence: win, Choose another battle, the map pre-selects
-  // this same level; its button used to "Hold" it, which did nothing.
-  // Level 6 is the currently-last level, so this is where that scenario lives.
-  if (mixed6.phase === 'won') {
-    await page.locator('#pause-btn').click(); await page.waitForTimeout(200);
-    check('after a win the pause button brings back the end screen', await page.locator('#end').isVisible());
-    await page.evaluate(() => { document.getElementById('end').classList.remove('show'); });
-    await page.waitForTimeout(2300);
-    check('safety net: a finished level with no screen showing gets its end screen back', await page.locator('#end').isVisible());
-    await page.locator('#end-map-btn').click(); await page.waitForTimeout(300);
-    const replayLabel = await page.locator('#wm-play-btn').innerText();
-    check('the map offers to play the finished level again', replayLabel === 'Play The Sunken Market again', replayLabel);
-    await page.locator('#wm-play-btn').click();
-    await page.waitForTimeout(2500);
-    const fresh = await page.evaluate(() => ({ id: GameState.currentLevel().id, phase: GameState.state.phase, wave: GameState.state.wave, lives: GameState.state.lives }));
-    check('playing it again lands in a fresh game of that level', fresh.id === 'sunken-market' && fresh.phase === 'playing' && fresh.wave === 0 && fresh.lives === 20, JSON.stringify(fresh));
-    await page.locator('#pause-btn').click(); await page.waitForTimeout(200);
-    await page.locator('#pause-map-btn').click(); await page.waitForTimeout(300);
-    check('the pause menu has a way out to the world map', await page.locator('#worldmap').isVisible());
-    const backLabel = await page.locator('#wm-play-btn').innerText();
-    check('from a paused battle the map offers to return to it', backLabel === 'Return to The Sunken Market', backLabel);
-    await page.locator('#wm-play-btn').click(); await page.waitForTimeout(250);
-    check('returning brings back the pause menu, game still paused', await page.locator('#pause').isVisible() && await page.evaluate(() => GameState.state.paused && GameState.state.phase === 'playing'));
-    await page.locator('#resume-btn').click(); await page.waitForTimeout(150);
-  }
+  check('Level 6 win screen now offers Continue to Level 7', (await page.locator('#end-map-btn').innerText()) === 'Continue');
   await page.evaluate(() => { document.getElementById('end').classList.remove('show'); });
 
   for (const type of ['slinger', 'warden', 'druid', 'golem', 'artillery']) for (const pick of [0, 1]) {
@@ -877,6 +849,90 @@ async function enterLevel(page, levelId) {
     const clean = r.leaks.filter((l) => l <= 1).length;
     console.log(`LEVEL 6 ONLY ${type}/${br}: ` + JSON.stringify(r) + ` clean waves=${clean}/${L6F.waveCount}`);
     check(`Level 6: only ${type} (${br}) does not trivialize the level`, !(r.phase === 'won' && clean > Math.floor(L6F.waveCount * 0.6)), `phase=${r.phase} clean=${clean}`);
+  }
+  await page.waitForTimeout(1600);
+  await page.evaluate(() => { GameState.state.enemies.length = 0; document.getElementById('end').classList.remove('show'); });
+
+  // ---------------- Level 7: The Amber Terraces (staggered joins on one trunk) ----------------
+  check('winning Level 6 unlocked Level 7', await page.evaluate(() => Progress.isUnlocked('amber-terraces')));
+  await page.reload(); await page.waitForTimeout(1000);
+  await enterLevel(page, 'amber-terraces');
+  check('Level 7 loads with three routes', await page.evaluate(() => GameState.currentLevel().id === 'amber-terraces' && GameState.routes.length === 3));
+  await page.waitForTimeout(1500);
+  await page.screenshot({ path: `${OUT}/level7-title.png` });
+  console.log('LEVEL 7 DEBUG OVERLAY: ' + (await page.locator('#debug').innerText()).replace(/\n/g, ' | '));
+  const markers7 = await page.evaluate(() => {
+    const sc = Renderer.debugScene(), vis = (id) => { const g = sc.getObjectByName(`route-marker-${id}`); return g ? g.visible : null; };
+    return { 'grove-path': vis('grove-path'), 'hollow-way': vis('hollow-way'), 'basket-road': vis('basket-road'), next: GameState.routesForWave(1) };
+  });
+  check('an incoming-road marker stands at the road wave 1 uses, and only there', markers7['grove-path'] === true && markers7['hollow-way'] === false && markers7['basket-road'] === false, JSON.stringify(markers7));
+
+  const L7F = LEVEL_FIXTURES['amber-terraces'];
+  const lone7 = await page.evaluate(({ tip, lanes }) => {
+    const G = GameState, S = G.state, out = {};
+    const reset = () => { S.towers.length = 0; S.enemies.length = 0; S.projectiles.length = 0; S.gold = 170; S.lives = 20; S.wave = 0; S.prep = 0; S.waveActive = false; S.schedule = []; S.waveQueue = []; S.phase = 'playing'; };
+    reset(); S.selected = { kind: 'tile', c: tip[0], r: tip[1] }; G.placeTower('slinger');
+    G.startWave();
+    for (let i = 0; i < 60 * 90 && S.waveActive; i++) G.update(1 / 60);
+    out.wave1 = 20 - S.lives;
+    for (const [route, [c, r]] of Object.entries(lanes)) {
+      reset(); S.selected = { kind: 'tile', c, r }; G.placeTower('slinger');
+      let t = 0, n = 0;
+      for (let i = 0; i < 60 * 90; i++) { if (n < 5 && t >= n * 3.2) { G.spawnEnemy('grunt', route); n++; } G.update(1 / 60); t += 1 / 60; if (n >= 5 && !S.enemies.length) break; }
+      out[route] = 20 - S.lives;
+    }
+    reset();
+    return out;
+  }, { tip: L7F.firstSlingerTile, lanes: L7F.laneSlingerTiles });
+  check('Level 7 wave 1 is winnable by a single lone tower (no leaks)', lone7.wave1 === 0, JSON.stringify(lone7));
+  check('Level 7: every road can be held early by one Slinger at its entry', lone7['grove-path'] === 0 && lone7['hollow-way'] === 0 && lone7['basket-road'] === 0, JSON.stringify(lone7));
+
+  const mixed7 = await runBotOn(L7F.botPlan, L7F.botBuildSpots, L7F.waveCount);
+  console.log('LEVEL 7 MIXED BOT: ' + JSON.stringify(mixed7));
+  check('Level 7: a mixed defense can win all 12 waves', mixed7.phase === 'won', `lives=${mixed7.lives} leaks=${JSON.stringify(mixed7.leaks)}`);
+  check('Level 7: waves 1 and 2 are nearly unloseable', mixed7.leaks[0] + mixed7.leaks[1] <= 1, `leaks=${JSON.stringify(mixed7.leaks.slice(0, 2))}`);
+  if (mixed7.phase === 'won') await page.locator('#end.show').waitFor({ timeout: 10000 }).catch(() => {});
+  await page.waitForTimeout(300);
+  check('Level 7 win screen shows stars', mixed7.phase !== 'won' || (await page.locator('#end').isVisible() && await page.locator('#stars span.lit').count() === mixed7.stars));
+  await page.screenshot({ path: `${OUT}/level7-win.png` });
+  check('Level 7 win recorded progress', await page.evaluate(() => Progress.starsFor('amber-terraces') > 0));
+  check('Level 7 win screen keeps "Choose another battle" (no Level 8 yet)', (await page.locator('#end-map-btn').innerText()) === 'Choose another battle');
+  await page.evaluate(() => { document.getElementById('end').classList.remove('show'); });
+
+  // ---- P3-FIX1: a finished level can never strand the player ----
+  // the user's exact sequence: win, Choose another battle, the map pre-selects
+  // this same level; its button used to "Hold" it, which did nothing.
+  // Level 7 is the currently-last level, so this is where that scenario lives.
+  if (mixed7.phase === 'won') {
+    await page.locator('#pause-btn').click(); await page.waitForTimeout(200);
+    check('after a win the pause button brings back the end screen', await page.locator('#end').isVisible());
+    await page.evaluate(() => { document.getElementById('end').classList.remove('show'); });
+    await page.waitForTimeout(2300);
+    check('safety net: a finished level with no screen showing gets its end screen back', await page.locator('#end').isVisible());
+    await page.locator('#end-map-btn').click(); await page.waitForTimeout(300);
+    const replayLabel = await page.locator('#wm-play-btn').innerText();
+    check('the map offers to play the finished level again', replayLabel === 'Play The Amber Terraces again', replayLabel);
+    await page.locator('#wm-play-btn').click();
+    await page.waitForTimeout(2500);
+    const fresh = await page.evaluate(() => ({ id: GameState.currentLevel().id, phase: GameState.state.phase, wave: GameState.state.wave, lives: GameState.state.lives }));
+    check('playing it again lands in a fresh game of that level', fresh.id === 'amber-terraces' && fresh.phase === 'playing' && fresh.wave === 0 && fresh.lives === 20, JSON.stringify(fresh));
+    await page.locator('#pause-btn').click(); await page.waitForTimeout(200);
+    await page.locator('#pause-map-btn').click(); await page.waitForTimeout(300);
+    check('the pause menu has a way out to the world map', await page.locator('#worldmap').isVisible());
+    const backLabel = await page.locator('#wm-play-btn').innerText();
+    check('from a paused battle the map offers to return to it', backLabel === 'Return to The Amber Terraces', backLabel);
+    await page.locator('#wm-play-btn').click(); await page.waitForTimeout(250);
+    check('returning brings back the pause menu, game still paused', await page.locator('#pause').isVisible() && await page.evaluate(() => GameState.state.paused && GameState.state.phase === 'playing'));
+    await page.locator('#resume-btn').click(); await page.waitForTimeout(150);
+  }
+  await page.evaluate(() => { document.getElementById('end').classList.remove('show'); });
+
+  for (const type of ['slinger', 'warden', 'druid', 'golem', 'artillery']) for (const pick of [0, 1]) {
+    const br = Object.keys(BRANCH_KEYS[type])[pick];
+    const r = await runBotOn([type], L7F.botBuildSpots, L7F.waveCount, pick);
+    const clean = r.leaks.filter((l) => l <= 1).length;
+    console.log(`LEVEL 7 ONLY ${type}/${br}: ` + JSON.stringify(r) + ` clean waves=${clean}/${L7F.waveCount}`);
+    check(`Level 7: only ${type} (${br}) does not trivialize the level`, !(r.phase === 'won' && clean > Math.floor(L7F.waveCount * 0.6)), `phase=${r.phase} clean=${clean}`);
   }
   await page.waitForTimeout(1600);
   await page.evaluate(() => { GameState.state.enemies.length = 0; document.getElementById('end').classList.remove('show'); });

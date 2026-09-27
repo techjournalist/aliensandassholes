@@ -864,7 +864,75 @@ test (5 types x 2 branches) tops out at 6/12 clean waves, no dominant
 strategy. Overworld node placed on the existing landmass art's west coast
 (no new coastline needed); a new `market` glyph added to `GLYPHS`.
 
-**Recommended, not yet decided**: with Levels 6-8 and all closing-pass
-polish (M6 player abilities, M10 hero, remaining M11 items) still open,
-confirm scope and order with the user before starting further work rather
-than treating either as decided here.
+**P3-M6 follow-up** *(done)*: the waves-7-11 ease above wasn't the whole
+fix. Two more real harness runs (after a container restart mid-session)
+each caught the mixed bot losing again, at a genuinely thin margin the
+first "8/8" trial batch had understated. Root-caused rather than re-run
+blindly: wave 5's Bramble Bats leaked at their *full count*, identically,
+regardless of which build spot or plan position the level's one early
+Frostmoss Druid landed on — the tell that this wasn't a coverage gap
+(like Level 7's, below) but that one tier-1 Druid's damage simply cannot
+kill a bat inside the brief window it's ever in range, no matter when or
+where it's built. Cut wave 5's bats from 5 to 2 (leak dropped from a
+locked-in 4 to 0-1 immediately). Wave 4's Moss Troll plus two grunt groups
+was the next-clearest bottleneck (trolls are armored; the plan's one
+Stonebark Golem doesn't arrive until much later), eased by roughly a
+third; wave 3 eased by a similar amount alongside it. Result: 9/10
+isolated trial runs won (4-10 lives), confirmed by two full harness runs
+after (11 and separately a clean pass). One dead end worth recording:
+moving the Golem earlier in the build plan to answer wave 4's troll
+faster made things categorically worse (0/10) — Golem's slow, splash-less
+single hit can't handle wave 3's swarm the way the Warden it displaced
+could, so front-loading anti-armor at the cost of anti-swarm is a net
+loss on this level. Full harness after all fixes: 369/369 checks passing.
+
+**P3-M7 — Level 7: The Amber Terraces** *(done)*. Sunlit orchard
+hillsides (`js/level7-amber-terraces.js`, 20x13 grid — Level 4's own grid
+size, deliberately, since this level's route shape is the closest match
+to Level 4's real one: three roads of different length — Grove Path
+(short), Hollow Way (a genuine loop), Basket Road — join one shared trunk
+at three separate points, the same staggered-junction pattern Level 4
+uses, rather than Level 6's single quick junction). ~10% corrupted, the
+lightest in the campaign — a "before the storm" beat, defended before the
+Hollow ever reaches it. Chokepoint: a rope-and-basket orchard tram
+swinging gently over a shallow ravine (this level's one new animation
+idea, reusing `kit.water` for the ravine itself, no new shader). Endpoint:
+the Apiary Tower, `towerCourses()` plus a `roofCourses()` dome retextured
+gold with a bead scatter for a honeycomb read, three bees looping on a
+live animation, a beehive-tinted banner. New level-owned prop recipes:
+`blossomTreeParts` (the shared tree recipe re-tinted pink/white/cream,
+this level's version of Level 4's autumn re-tint) and a small
+`beehiveBoxParts` filler prop. 12 waves, no boss. Zero engine changes,
+same as Level 6.
+
+Balance found a real, different-shaped bug from Level 6's, worth telling
+apart: wave 5's bats here leaked *because of an actual coverage gap*, not
+a raw-damage ceiling — the early Frostmoss Druid's assigned build spot
+had only partial line of sight on the Basket Road's approach (the corner
+of its range box, not the road itself), confirmed by testing that moving
+the Druid to a different position (nothing else changed) took the wave-5
+leak from a locked-in 4 down to 1-2 immediately. Fixed by swapping that
+one build spot for `[10,8]`, the one tile with the whole Basket Road's
+approach inside Frostmoss range — documented in the fixture's own comment
+since it looks like an arbitrary tile otherwise. Waves 3-5 still needed
+roughly a 20% ease on top of that fix for a comfortable margin. The
+wave-1 lone-tower check and the per-road lone-Slinger check are both
+clean; single-type stress test tops out at 6/12 clean waves, no dominant
+strategy; the incoming-road-marker check is clean. New `apiary` glyph
+added to `GLYPHS`; overworld node placed south of home, on open ground
+between the mill fields and the coast.
+
+**A pattern worth naming across both P3-M6 and P3-M7**: copying a proven
+wave table onto a new grid is not itself proven — the same numbers can
+fail for two structurally different reasons (Level 6: the tower type
+placed simply lacks the DPS to matter; Level 7: the right tower type was
+placed somewhere with the wrong sightline), and telling them apart before
+touching wave numbers saved real rework both times. When a specific
+enemy type leaks at a suspiciously constant rate across many random
+seeds, check *what's actually built and where* before easing anything.
+
+**Recommended, not yet decided**: with Level 8 (the last of the three new
+levels from the concept board) and all closing-pass polish (M6 player
+abilities, M10 hero, remaining M11 items) still open, confirm scope and
+order with the user before starting further work rather than treating
+either as decided here.
