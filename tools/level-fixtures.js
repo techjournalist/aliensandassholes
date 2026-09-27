@@ -80,4 +80,20 @@ module.exports = {
     botPlan: ['slinger', 'slinger', 'slinger', 'druid', 'warden', 'artillery', 'golem', 'druid', 'warden', 'slinger', 'golem', 'artillery', 'warden', 'druid', 'slinger', 'golem'],
     waveCount: 12, hasBossOnWave: null,
   },
+  'frostpine-camp': {
+    roadTile: [9, 10], streamTile: [11, 2], farTile: [14, 3],
+    firstSlingerTile: [2, 5],
+    laneSlingerTiles: { 'scree-path': [2, 5], 'high-trail': [10, 1], 'frozen-draw': [2, 14] },
+    // tip first, then trunk spots either side of the shared row-10 run and
+    // the ice-log crossing, then each road's own entry. [5,12] is 4th on
+    // purpose: that's where the plan's first Druid lands, and it's the one
+    // spot in range of the whole Frozen Draw's vertical approach (col 4,
+    // rows 10-13) — same druid-before-warden gold-cliff lesson as the
+    // other two levels (3 Slingers leave 109 gold, one short of a Warden).
+    // [10,8] (2nd druid, position 7) covers High Trail's own vertical
+    // approach (col 9, rows 6-10) for wave 11's bats on that road.
+    botBuildSpots: [[2, 5], [6, 9], [12, 9], [5, 12], [13, 9], [8, 9], [14, 9], [10, 8], [10, 1], [2, 14], [7, 7], [10, 11], [7, 2], [4, 5], [1, 5], [14, 11]],
+    botPlan: ['slinger', 'slinger', 'slinger', 'druid', 'warden', 'artillery', 'golem', 'druid', 'warden', 'slinger', 'golem', 'artillery', 'warden', 'druid', 'slinger', 'golem'],
+    waveCount: 12, hasBossOnWave: null,
+  },
 };

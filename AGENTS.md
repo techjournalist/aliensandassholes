@@ -931,8 +931,82 @@ touching wave numbers saved real rework both times. When a specific
 enemy type leaks at a suspiciously constant rate across many random
 seeds, check *what's actually built and where* before easing anything.
 
-**Recommended, not yet decided**: with Level 8 (the last of the three new
-levels from the concept board) and all closing-pass polish (M6 player
-abilities, M10 hero, remaining M11 items) still open, confirm scope and
-order with the user before starting further work rather than treating
-either as decided here.
+**P3-M8 — Level 8: The Frostpine Camp** *(done, campaign's last of the
+three new levels from the concept board)*. The kingdom's northern
+highlands under first snow (`js/level8-frostpine-camp.js`, 16x15 grid,
+~20% corrupted, framed as spore-laced snow blowing in rather than ground
+corruption). Two direct roads (Scree Path from the west, Frozen Draw from
+the south) and one genuine switchback (High Trail, entering from the
+north and zigzagging down-left-down-right-down through columns 6-9 before
+joining the others) all merge onto the row-10 trunk, cross the ice-log
+crossing (snow-capped lashed logs over a slow, pale `kit.water` creek) at
+the chokepoint, and reach the Frostpine Camp — a snow-roofed timber
+watch-post with icicle eaves, a live bonfire (`glow()`, guttering smoke at
+damage state 1, a smothered ember at state 2), and a fur banner. New
+signature props: `frostPineParts` (the shared tree recipe re-tinted to
+`PALETTE.pine`/`snow` via a color-swap map, this level's version of Level
+4's autumn re-tint and Level 7's blossom re-tint) and a small
+`snowdriftParts` filler. 12 waves, no boss, adapted from Level 7's own
+already-tuned final numbers rather than Level 4's raw ones. Zero engine
+changes — same multi-route engine as Levels 4, 6 and 7, unchanged.
+
+Three lessons from Levels 6 and 7 were deliberately pre-applied before
+ever running a test, specifically to see whether front-loading them would
+avoid re-paying for the same two balance-bug archetypes a third time:
+wave 5's bat count was pre-cut to 3 (Level 6's damage-ceiling lesson — a
+single tier-1 Druid cannot kill more bats than that in its window), a
+specific build spot (`[5,12]`) was hand-verified by distance calculation
+to cover the whole Frozen Draw approach before ever placing a tower there
+(Level 7's coverage-gap lesson), and the proven-safe `botPlan` tower order
+was reused verbatim (avoiding Level 6's Golem-front-loading dead end). All
+three held: the isolated wave-1 lone-tower check, the per-road lone-Slinger
+check, and six independent isolated trial runs (via a new
+`scratchpad/l8bot.js`, following the exact `l6bot.js`/`l7bot.js` pattern)
+all won cleanly on the first attempt, 4-12 lives, with no re-tuning
+needed — a first for this trio of levels, and a genuine data point that
+diagnosing the *type* of balance bug before touching numbers (rather than
+just re-running trial-and-error) generalizes to new content, not just to
+fixing what already broke.
+
+The one real bug this milestone did find was structural, not a balance
+number: the first-drafted High Trail switchback crossed Scree Path's own
+vertical descent at (5,7) — the two routes touched, then diverged again
+rather than staying merged, which `tools/validate-levels.js`'s "routes
+stay merged once they meet" check caught immediately, before any browser
+time was spent on it. Root cause: a switchback's horizontal legs and a
+neighboring route's straight vertical descent will cross unless the
+switchback is banded into a column range the other route's descent never
+enters. Fixed by re-routing High Trail entirely through columns 6-9 (its
+own column band, touching columns 0-5 only via a single vertical descent
+from its own northern spawn) so it only ever touches Scree Path and Frozen
+Draw at their shared merge cells, never mid-segment. Recorded here since
+it's a new failure mode for this campaign (the first six multi-route
+levels' concept-board math only ever tripped the endpoint-approach bug,
+never a mid-route crossing) — worth checking explicitly on any future
+switchback-shaped route, not just endpoint approach geometry.
+
+The full harness's first run this milestone failed with 19 checks red,
+cascading from Levels 6 through 8 — traced immediately to `Level 6: a
+mixed defense can win all 12 waves` losing outright (0 lives), which
+locked Level 7 and Level 8 out of even loading (each level's suite only
+runs once the previous one is won and unlocked). This is Level 6's own
+already-documented unseeded-RNG flake (AGENTS.md's P3-M6 follow-up
+recorded it at roughly a 90% win rate after its fixes, not 100%), not a
+Level 8 regression — nothing in this milestone touched `js/level6-
+sunken-market.js`. A second full run passed with zero failures
+(`EXIT:0`), Level 6 included, confirming this was exactly that pre-existing
+flake rather than anything new. The single-tower-type stress test (5
+types x 2 branches) tops out at 6/12 clean waves (Slinger, either branch),
+comfortably short of the 60%-of-waves dominant-strategy threshold; the
+mixed bot wins with 9/20 lives, in line with the campaign's established
+8-14 range. Overworld node placed at the map's far north (`x:430, y:68`,
+reusing Level 4's `camp` glyph since both are timber watch-camps and the
+two nodes sit far enough apart on the map not to read as duplicates).
+
+This completes the three-level concept-board addition (Levels 6, 7, 8),
+bringing the campaign to 8 levels total. **Recommended, not yet
+decided**: with all eight levels shipped and gated, and all closing-pass
+polish (M6 player abilities, M10 hero, remaining M11 items) still open,
+confirm scope with the user — whether the campaign is considered complete
+at 8 levels or further levels are wanted — before starting further work
+rather than treating either as decided here.

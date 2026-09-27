@@ -59,6 +59,8 @@ const PALETTE = {
   autumn:       0xd9822b,
   autumnDark:   0xa8561f,
   canvas:       0xe9dcc0,
+  pine:         0x2f5548,
+  snow:         0xeef4f2,
 };
 
 const CONFIG = {
