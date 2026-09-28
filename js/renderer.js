@@ -1201,23 +1201,90 @@ const Renderer = (() => {
     ];
   }
 
-  // Shadow-Crow Swarm: a dark churning core with crows wheeling around it.
-  // The crows peel away as it weakens. Flies. Silhouette: a big dark ball
-  // with wings all round it.
+  // Boss silhouette: a churning core with small creatures wheeling around
+  // it, peeling away as it weakens. All four bosses (the original
+  // Shadow-Crow Swarm plus Levels 6-8's finales) share this one animated
+  // rig (see updateBossView) — only makeBossParts' shape/color inputs
+  // differ, so every boss reads as a genuinely different creature (a
+  // round bird-swarm vs. a flat eel-churn vs. a plump stinging swarm vs.
+  // a pale spiked shard-cloud) while reusing the exact same proven
+  // orbit/rotation math, not new per-boss animation code.
   const BOSS_CROWS = 7;
-  function bossParts() {
+  function makeBossParts(cfg) {
+    const {
+      coreColor, coreScale = { s: 0.36 }, heartColor = PALETTE.magic, heartScale = { s: 0.2 },
+      accentColor, extra = [],
+      orbitScale = { sx: 0.1, sy: 0.08, sz: 0.14 }, orbitColor,
+      wingScale = { sx: 0.4, sy: 0.02, sz: 0.14 }, wingColor,
+      beakScale = { sx: 0.03, sy: 0.08, sz: 0.03 }, beakColor,
+    } = cfg;
     const parts = [
-      P(GEO.sphereLo, PALETTE.batDark, M(0, 0, 0, { s: 0.36 }), true, { name: 'core', live: true }),
-      P(GEO.sphereLo, PALETTE.magic, M(0, 0, 0, { s: 0.2 }), false, { name: 'heart', live: true, unlit: true }),
-      P(GEO.sphereLo, PALETTE.gold, M(0.12, 0.08, 0.32, { s: 0.05 }), false, { unlit: true }),
-      P(GEO.sphereLo, PALETTE.gold, M(-0.12, 0.08, 0.32, { s: 0.05 }), false, { unlit: true }),
+      P(GEO.sphereLo, coreColor, M(0, 0, 0, coreScale), true, { name: 'core', live: true }),
+      P(GEO.sphereLo, heartColor, M(0, 0, 0, heartScale), false, { name: 'heart', live: true, unlit: true }),
+      P(GEO.sphereLo, accentColor, M(0.12, 0.08, 0.32, { s: 0.05 }), false, { unlit: true }),
+      P(GEO.sphereLo, accentColor, M(-0.12, 0.08, 0.32, { s: 0.05 }), false, { unlit: true }),
+      ...extra,
     ];
     for (let i = 0; i < BOSS_CROWS; i++) {
-      parts.push(P(GEO.sphereLo, PALETTE.batDark, M(0, 0, 0, { sx: 0.1, sy: 0.08, sz: 0.14 }), true, { name: `crow${i}`, live: true }));
-      parts.push(P(GEO.box, PALETTE.batDark, M(0, 0, 0, { sx: 0.4, sy: 0.02, sz: 0.14 }), true, { name: `crowWing${i}`, live: true }));
-      parts.push(P(GEO.cone, PALETTE.gold, M(0, 0, 0, { sx: 0.03, sy: 0.08, sz: 0.03 }), false, { name: `crowBeak${i}`, live: true, unlit: true }));
+      parts.push(P(GEO.sphereLo, orbitColor, M(0, 0, 0, orbitScale), true, { name: `crow${i}`, live: true }));
+      parts.push(P(GEO.box, wingColor, M(0, 0, 0, wingScale), true, { name: `crowWing${i}`, live: true }));
+      parts.push(P(GEO.cone, beakColor, M(0, 0, 0, beakScale), false, { name: `crowBeak${i}`, live: true, unlit: true }));
     }
     return parts;
+  }
+  // Shadow-Crow Swarm (Level 1 / Level 5 reprise): a dark churning core
+  // with crows wheeling around it. Silhouette: a big dark ball with
+  // wings all round it. Unchanged from before makeBossParts existed.
+  function bossParts() {
+    return makeBossParts({ coreColor: PALETTE.batDark, accentColor: PALETTE.gold, orbitColor: PALETTE.batDark, wingColor: PALETTE.batDark, beakColor: PALETTE.gold });
+  }
+  // The Drowned Swarm (Level 6 finale): a flattened whirlpool core
+  // ringed by foam, darting eel-shapes orbiting instead of birds.
+  // Silhouette: a flat wide disc with a churning ring, not a round ball.
+  function tidewormParts() {
+    return makeBossParts({
+      coreColor: PALETTE.waterDeep, coreScale: { sx: 0.42, sy: 0.26, sz: 0.42 }, accentColor: PALETTE.waterFoam,
+      extra: [
+        P(GEO.torus, PALETTE.waterFoam, M(0, 0.02, 0, { sx: 0.5, sy: 0.5, sz: 0.06, rx: Math.PI / 2 }), false),
+        P(GEO.torus, PALETTE.water, M(0, 0.1, 0, { sx: 0.34, sy: 0.34, sz: 0.045, rx: Math.PI / 2 }), false),
+      ],
+      orbitScale: { sx: 0.06, sy: 0.06, sz: 0.26 }, orbitColor: PALETTE.streamBed,
+      wingScale: { sx: 0.02, sy: 0.1, sz: 0.08 }, wingColor: PALETTE.water,
+      beakScale: { sx: 0.02, sy: 0.05, sz: 0.02 }, beakColor: PALETTE.waterFoam,
+    });
+  }
+  // The Hive Matriarch (Level 7 finale): a plump amber-black abdomen with
+  // two big wings and a stinger of her own, drone wasps orbiting.
+  // Silhouette: a fat oval body with wings and a tail spike, not a
+  // smooth ball.
+  function matriarchParts() {
+    return makeBossParts({
+      coreColor: PALETTE.hollowWood, coreScale: { sx: 0.3, sy: 0.32, sz: 0.44 }, accentColor: PALETTE.gold,
+      extra: [
+        P(GEO.box, PALETTE.cream, M(0.26, 0.06, -0.05, { sx: 0.28, sy: 0.01, sz: 0.16, ry: 0.5 }), false),
+        P(GEO.box, PALETTE.cream, M(-0.26, 0.06, -0.05, { sx: 0.28, sy: 0.01, sz: 0.16, ry: -0.5 }), false),
+        P(GEO.cone, PALETTE.hollowWood, M(0, 0, -0.5, { sx: 0.05, sy: 0.16, sz: 0.05, rx: -Math.PI / 2 }), false),
+      ],
+      orbitScale: { sx: 0.09, sy: 0.09, sz: 0.16 }, orbitColor: PALETTE.gold,
+      wingScale: { sx: 0.32, sy: 0.015, sz: 0.12 }, wingColor: PALETTE.cream,
+      beakScale: { sx: 0.025, sy: 0.06, sz: 0.025 }, beakColor: PALETTE.hollowWood,
+    });
+  }
+  // The Rime Swarm (Level 8 finale): a pale spiky ice-crystal core,
+  // slivers of frost orbiting instead of birds. Silhouette: a spiked
+  // pale burst, not a smooth dark ball.
+  function rimeParts() {
+    const spikes = [];
+    for (let i = 0; i < 5; i++) {
+      const a = i * 1.257, len = 0.18 + (i % 2) * 0.06;
+      spikes.push(P(GEO.cone, PALETTE.frost, M(Math.cos(a) * 0.2, Math.sin(a) * 0.12, Math.sin(a) * 0.2, { sx: 0.05, sy: len, sz: 0.05, rz: Math.cos(a), rx: -Math.sin(a) }), false));
+    }
+    return makeBossParts({
+      coreColor: PALETTE.frostRobe, coreScale: { s: 0.32 }, accentColor: PALETTE.snow, extra: spikes,
+      orbitScale: { sx: 0.05, sy: 0.05, sz: 0.24 }, orbitColor: PALETTE.frost,
+      wingScale: { sx: 0.015, sy: 0.1, sz: 0.05 }, wingColor: PALETTE.frostRobe,
+      beakScale: { sx: 0.02, sy: 0.05, sz: 0.02 }, beakColor: PALETTE.snow,
+    });
   }
 
   const WALK = {
@@ -1225,7 +1292,7 @@ const Renderer = (() => {
     trickster: { freq: 12,  bounce: 0.15, lean: 0.25, sway: 0.16 },
     troll:     { freq: 3.6, bounce: 0.05, lean: 0.06, sway: 0.05 },
   };
-  const ENEMY_RECIPES = { grunt: gruntParts, trickster: tricksterParts, troll: trollParts, bat: batParts, boss: bossParts };
+  const ENEMY_RECIPES = { grunt: gruntParts, trickster: tricksterParts, troll: trollParts, bat: batParts, boss: bossParts, tideworm: tidewormParts, matriarch: matriarchParts, rime: rimeParts };
 
   // -------- particles: a pooled dust puff --------
   // The whole pool is one Points draw call: each puff is a flat round

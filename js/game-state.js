@@ -61,6 +61,12 @@ const GameState = (() => {
     troll:     { id: 'troll',     name: 'Moss Troll',        hp: 170, speed: 0.72, bounty: 25,  flying: false, armor: 4 },
     bat:       { id: 'bat',       name: 'Bramble Bat',       hp: 22,  speed: 1.75, bounty: 10,  flying: true,  armor: 0 },
     boss:      { id: 'boss',      name: 'Shadow-Crow Swarm', hp: 640, speed: 0.78, bounty: 150, flying: true,  armor: 1, boss: true },
+    // three new finale bosses, one each for Levels 6-8 (previously boss-less).
+    // fast+armored, fast+soft and slow+heavily-armored respectively, so each
+    // demands a genuinely different anti-air answer, not just a reskin.
+    tideworm:  { id: 'tideworm',  name: 'The Drowned Swarm', hp: 580, speed: 0.85, bounty: 160, flying: true,  armor: 1, boss: true },
+    matriarch: { id: 'matriarch', name: 'The Hive Matriarch', hp: 600, speed: 0.9,  bounty: 160, flying: true,  armor: 0, boss: true },
+    rime:      { id: 'rime',      name: 'The Rime Swarm',    hp: 620, speed: 0.75, bounty: 160, flying: true,  armor: 1, boss: true },
   };
 
   const listeners = {};

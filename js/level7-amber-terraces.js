@@ -22,6 +22,7 @@ const LEVEL_7 = (() => {
     { name: 'Pincer',                 flavor: 'Trolls down both northern roads, bats over the south.',            groups: [g('troll', 2, 2.2, 0, 'hollow-way', 0), g('troll', 2, 2.2, 0, 'grove-path', 1), g('bat', 6, 0.8, 0, 'basket-road', 3), g('grunt', 6, 0.8, 0, 'basket-road', 8)] },
     { name: 'Every Row at Once',      flavor: 'The hives shake. Hold the tram line.',                             groups: [g('grunt', 10, 0.7, 0, 'grove-path', 0), g('trickster', 10, 0.5, 0, 'basket-road', 0), g('troll', 3, 2.0, 0, 'hollow-way', 0), g('bat', 5, 0.9, 0, 'hollow-way', 6)] },
     { name: 'The Orchard Falls Silent', flavor: 'A Troll column, a Trickster rush and a Bat swarm, all at once.', groups: [g('troll', 4, 2.0, 0, 'hollow-way', 0), g('trickster', 14, 0.4, 0, 'grove-path', 0), g('bat', 9, 0.55, 0, 'basket-road', 0)] },
+    { name: 'The Hive Matriarch Wakes', flavor: 'The corrupted queen leads the last of her swarm. Only Druids and Artillery reach her.', groups: [g('bat', 5, 1.0, 0, 'basket-road', 0), g('grunt', 6, 0.9, 0, 'hollow-way', 1), g('matriarch', 1, 1, 0, 'grove-path', 8)] },
   ];
 
   // -------- this level's scene (rope-and-basket tram, Apiary Tower) --------
@@ -301,9 +302,9 @@ const LEVEL_7 = (() => {
     waves, prepSeconds: 14, startGold: 170, startLives: 20, starThresholds: [16, 8],
     tipTile: [2, 2],
     endScreenText: {
-      3: () => 'Twelve waves and not a single hive lost. The Amber Terraces are still the sweetest ground in the kingdom.',
-      2: (s) => `Twelve waves across three orchard roads, ${s.lives} lives to spare. The Apiary Tower stands.`,
-      1: (s) => `The bees are rattled but the tower stands, with ${s.lives} lives to spare.`,
+      3: () => 'Thirteen waves, and the Hive Matriarch herself broke against the terraces. The Amber Terraces are still the sweetest ground in the kingdom.',
+      2: (s) => `Thirteen waves across three orchard roads and a corrupted queen, ${s.lives} lives to spare. The Apiary Tower stands.`,
+      1: (s) => `The bees are rattled and the Matriarch nearly reached the tower, but it stands, with ${s.lives} lives to spare.`,
       lose: (s) => `The Apiary Tower fell on wave ${s.wave}. Watch the horn markers for the next road, and remember only Druids and Artillery reach the bats.`,
     },
     buildScene,

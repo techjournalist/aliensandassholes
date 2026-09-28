@@ -428,7 +428,7 @@ async function enterLevel(page, levelId) {
     };
     S.enemies.length = 0; S.projectiles.length = 0; S.towers.length = 0;
     S.gold = GameState.currentLevel().startGold; S.lives = 20; S.wave = 0; S.prep = 0; S.waveActive = false; S.schedule = []; S.waveQueue = []; S.phase = 'playing'; S.endpointState = 0; S.kills = 0;
-    const flyersIn = (n) => { const w = GameState.waveInfo(n); return !!w && w.groups.some((g) => g.type === 'bat' || g.type === 'boss'); };
+    const flyersIn = (n) => { const w = GameState.waveInfo(n); return !!w && w.groups.some((g) => GameState.ENEMY_TYPES[g.type].flying); };
     const antiAir = () => S.towers.filter((t) => GameState.TOWER_TYPES[t.type].hitsFlying).length;
     const spots = [[7, 5], [6, 5], [9, 5], [7, 7], [10, 5], [12, 4], [13, 7], [15, 8], [5, 5], [3, 3], [13, 4], [15, 10], [5, 7], [12, 7], [3, 1], [15, 4]];
     let next = 0;
@@ -573,7 +573,7 @@ async function enterLevel(page, levelId) {
     };
     S.enemies.length = 0; S.projectiles.length = 0; S.towers.length = 0;
     S.gold = GameState.currentLevel().startGold; S.lives = 20; S.wave = 0; S.prep = 0; S.waveActive = false; S.schedule = []; S.waveQueue = []; S.phase = 'playing'; S.endpointState = 0; S.kills = 0;
-    const flyersIn = (n) => { const w = GameState.waveInfo(n); return !!w && w.groups.some((g) => g.type === 'bat' || g.type === 'boss'); };
+    const flyersIn = (n) => { const w = GameState.waveInfo(n); return !!w && w.groups.some((g) => GameState.ENEMY_TYPES[g.type].flying); };
     const antiAir = () => S.towers.filter((t) => GameState.TOWER_TYPES[t.type].hitsFlying).length;
     let next = 0;
     const act = () => {

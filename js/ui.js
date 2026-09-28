@@ -5,7 +5,7 @@ const UI = (() => {
   const $ = (id) => document.getElementById(id);
   let toastTimer = 0;
   let debugOn = false, fpsAcc = 0, fpsFrames = 0, fpsShown = 0;
-  const shown = { gold: null, lives: null, wave: null, waveBtn: null };
+  const shown = { gold: null, lives: null, wave: null, waveBtn: null, bossName: null };
 
   function updateHud() {
     const s = GameState.state, total = GameState.totalWaves();
@@ -32,7 +32,10 @@ const UI = (() => {
     }
     const boss = s.enemies.find((e) => e.boss);
     $('boss-bar').classList.toggle('show', !!boss);
-    if (boss) $('boss-bar').querySelector('.boss-fill').style.width = Math.max(0, 100 * boss.hp / boss.maxHp) + '%';
+    if (boss) {
+      $('boss-bar').querySelector('.boss-fill').style.width = Math.max(0, 100 * boss.hp / boss.maxHp) + '%';
+      if (shown.bossName !== boss.name) { $('boss-name').textContent = boss.name; shown.bossName = boss.name; }
+    }
   }
 
   function toast(text, bad) {

@@ -22,6 +22,7 @@ const LEVEL_6 = (() => {
     { name: 'Pincer on the Quays',    flavor: 'Trolls down both northern quays, bats over the south.',            groups: [g('troll', 2, 2.2, 0, 'north-docks', 0), g('troll', 2, 2.2, 0, 'market-row', 1), g('bat', 6, 0.85, 0, 'south-docks', 3), g('grunt', 6, 0.85, 0, 'south-docks', 8)] },
     { name: 'Every Quay at Once',     flavor: 'The square shakes. Hold the causeway.',                            groups: [g('grunt', 10, 0.7, 0, 'market-row', 0), g('trickster', 10, 0.55, 0, 'south-docks', 0), g('troll', 2, 2.0, 0, 'north-docks', 0), g('bat', 4, 1.0, 0, 'north-docks', 6)] },
     { name: 'The Market Floods',      flavor: 'A Troll column, a Trickster rush and a Bat swarm, all at once.',   groups: [g('troll', 4, 2.0, 0, 'north-docks', 0), g('trickster', 14, 0.4, 0, 'market-row', 0), g('bat', 9, 0.55, 0, 'south-docks', 0)] },
+    { name: 'The Drowned Swarm Rises', flavor: 'Something enormous surfaces in the flood. Only Druids and Artillery reach it.', groups: [g('bat', 5, 1.0, 0, 'south-docks', 0), g('grunt', 6, 0.9, 0, 'north-docks', 1), g('tideworm', 1, 1, 0, 'market-row', 8)] },
   ];
 
   // -------- this level's scene (barrel-and-plank Causeway, Counting-House) --------
@@ -290,9 +291,9 @@ const LEVEL_6 = (() => {
     waves, prepSeconds: 14, startGold: 170, startLives: 20, starThresholds: [16, 8],
     tipTile: [2, 4],
     endScreenText: {
-      3: () => 'Every quay held, and the Counting-House never took on water. The Sunken Market is dry ground again.',
-      2: (s) => `Twelve waves across three flooded quays, ${s.lives} lives to spare. The Counting-House stands.`,
-      1: (s) => `The water rose to the door, but ${s.lives} lives held it back. The Counting-House stands, just.`,
+      3: () => 'Every quay held, the Drowned Swarm broke apart in the shallows, and the Counting-House never took on water. The Sunken Market is dry ground again.',
+      2: (s) => `Thirteen waves across three flooded quays and a swarm from the depths, ${s.lives} lives to spare. The Counting-House stands.`,
+      1: (s) => `The water rose to the door and the Drowned Swarm nearly reached it, but ${s.lives} lives held. The Counting-House stands, just.`,
       lose: (s) => `The Counting-House went under on wave ${s.wave}. Watch the horn markers for the next quay, and remember only Druids and Artillery reach the bats.`,
     },
     buildScene,

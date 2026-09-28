@@ -64,7 +64,8 @@ module.exports = {
     // (the bot only tries the next planned type, never skips to a cheaper
     // one); a 90-cost Druid clears that gap and keeps towers coming.
     botPlan: ['slinger', 'slinger', 'slinger', 'druid', 'warden', 'artillery', 'golem', 'druid', 'warden', 'slinger', 'golem', 'artillery', 'warden', 'druid', 'slinger', 'golem'],
-    waveCount: 12, hasBossOnWave: null,
+    // wave 13 (added): The Drowned Swarm, a new finale boss.
+    waveCount: 13, hasBossOnWave: 13,
   },
   'amber-terraces': {
     roadTile: [9, 7], streamTile: [15, 2], farTile: [1, 11],
@@ -78,7 +79,8 @@ module.exports = {
     // (col 9, rows 7-10) — anywhere else left every bat on wave 5 untouched.
     botBuildSpots: [[2, 2], [6, 6], [6, 8], [10, 8], [8, 8], [10, 6], [8, 6], [12, 6], [12, 8], [14, 6], [14, 8], [3, 2], [3, 11], [11, 2], [9, 5], [16, 6]],
     botPlan: ['slinger', 'slinger', 'slinger', 'druid', 'warden', 'artillery', 'golem', 'druid', 'warden', 'slinger', 'golem', 'artillery', 'warden', 'druid', 'slinger', 'golem'],
-    waveCount: 12, hasBossOnWave: null,
+    // wave 13 (added): The Hive Matriarch, a new finale boss.
+    waveCount: 13, hasBossOnWave: 13,
   },
   'frostpine-camp': {
     roadTile: [9, 10], streamTile: [11, 2], farTile: [14, 3],
@@ -94,6 +96,7 @@ module.exports = {
     // approach (col 9, rows 6-10) for wave 11's bats on that road.
     botBuildSpots: [[2, 5], [6, 9], [12, 9], [5, 12], [13, 9], [8, 9], [14, 9], [10, 8], [10, 1], [2, 14], [7, 7], [10, 11], [7, 2], [4, 5], [1, 5], [14, 11]],
     botPlan: ['slinger', 'slinger', 'slinger', 'druid', 'warden', 'artillery', 'golem', 'druid', 'warden', 'slinger', 'golem', 'artillery', 'warden', 'druid', 'slinger', 'golem'],
-    waveCount: 12, hasBossOnWave: null,
+    // wave 13 (added): The Rime Swarm, a new finale boss.
+    waveCount: 13, hasBossOnWave: 13,
   },
 };

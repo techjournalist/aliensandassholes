@@ -1010,3 +1010,53 @@ polish (M6 player abilities, M10 hero, remaining M11 items) still open,
 confirm scope with the user — whether the campaign is considered complete
 at 8 levels or further levels are wanted — before starting further work
 rather than treating either as decided here.
+
+**Follow-up — finale bosses for Levels 6-8** *(done)*. The user, having
+already played and approved Levels 6-8, asked only to add a final boss to
+each (previously boss-less), one new and unique boss per level, without
+re-running the full harness. Three new `ENEMY_TYPES` entries: The Drowned
+Swarm (`tideworm`, Level 6, hp 580/armor 1/fast), The Hive Matriarch
+(`matriarch`, Level 7, hp 600/armor 0/fast), The Rime Swarm (`rime`, Level
+8, hp 620/armor 1/slow) — each a genuinely different fight (armor
+piercing matters for two of the three, not the fast soft one), not a
+reskin. Visually, `js/renderer.js`'s old single-boss `bossParts()` was
+generalized into `makeBossParts(cfg)` so all four bosses (including the
+original Shadow-Crow Swarm, kept byte-for-byte identical in output) share
+one proven animated rig — a churning core orbited by smaller creatures,
+peeling away as it weakens — while each boss's shape/palette differ
+enough to read as distinct (a flat whirlpool ringed by eels; a plump
+wasp queen with wings and a stinger; a spiked pale ice-cloud), without
+writing three new animation systems. `js/ui.js`'s boss-health-bar name is
+now read live from the enemy (`boss.name`) instead of the old hardcoded
+"Shadow-Crow Swarm" markup in `index.html`. Each level's wave list grew
+one wave (12 → 13): a light escort on two roads plus the boss delayed on
+a third, mirroring Level 1's own boss-wave shape. `tools/playtest.js`'s
+shared `runBotOn`/`runBot` bots had a real latent bug fixed while doing
+this: their "is a flyer coming" check hardcoded `type === 'boss'`, which
+would have silently failed to recognize any of these three new boss ids
+as flying threats worth building anti-air for — fixed to check
+`ENEMY_TYPES[type].flying` generically instead, so any future flying type
+is covered automatically.
+
+Per the user's explicit ask, this was verified without a full
+`tools/playtest.js` run: `node tools/validate-levels.js` (structural,
+catches syntax/route errors, unaffected by wave content) plus a new
+targeted `scratchpad/bossbot.js` that drives each level through a real
+browser exactly like the standing bot scripts, watching for console
+errors and confirming the boss actually appears with the right
+name/hp/flying/armor. First pass caught a real balance issue directly
+caused by this change, not a pre-existing one: The Rime Swarm's original
+stats (hp 700, armor 2) pushed an already-thin Level 8 run from a normal
+finish into a wave-13 loss; eased to hp 620/armor 1 (closer to the
+original boss's own hp 640/armor 1 baseline) and it won cleanly on
+re-test (4 lives). The Hive Matriarch won on the first try (3 lives). One
+run of Level 6 lost before ever reaching its new boss wave, at the
+pre-existing wave 10ish trouble spot this level's own AGENTS.md entry
+already documents as an unseeded-RNG flake (~85-90% win rate) —
+unrelated to this change (nothing in waves 1-12 was touched) and not
+chased further, per the user's direction not to relitigate levels
+they've already confirmed are solid. `tools/level-fixtures.js`'s
+`waveCount`/`hasBossOnWave` updated to 13 for all three levels so a
+future full harness run picks up the new wave automatically. A full
+`tools/playtest.js` run has not been done since this change; recommended
+before the next release-quality checkpoint, not required now.

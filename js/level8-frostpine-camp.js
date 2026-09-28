@@ -21,6 +21,7 @@ const LEVEL_8 = (() => {
     { name: 'Pincer',              flavor: 'Trolls down both northern trails, bats over the draw.',               groups: [g('troll', 2, 2.2, 0, 'high-trail', 0), g('troll', 2, 2.2, 0, 'scree-path', 1), g('bat', 6, 0.8, 0, 'frozen-draw', 3), g('grunt', 6, 0.8, 0, 'frozen-draw', 8)] },
     { name: 'Every Trail at Once', flavor: 'The camp shakes. Hold the ice-log crossing.',                         groups: [g('grunt', 10, 0.7, 0, 'scree-path', 0), g('trickster', 10, 0.5, 0, 'frozen-draw', 0), g('troll', 3, 2.0, 0, 'high-trail', 0), g('bat', 5, 0.9, 0, 'high-trail', 6)] },
     { name: 'The Long Night',      flavor: 'A Troll column, a Trickster rush and a Bat swarm, all at once.',      groups: [g('troll', 4, 2.0, 0, 'high-trail', 0), g('trickster', 14, 0.4, 0, 'scree-path', 0), g('bat', 9, 0.55, 0, 'frozen-draw', 0)] },
+    { name: 'The Rime Swarm Descends', flavor: 'The cold itself hunts you now. Only Druids and Artillery reach it.', groups: [g('bat', 5, 1.0, 0, 'frozen-draw', 0), g('grunt', 6, 0.9, 0, 'high-trail', 1), g('rime', 1, 1, 0, 'scree-path', 8)] },
   ];
 
   // -------- this level's scene (ice-log crossing, Frostpine Camp) --------
@@ -289,9 +290,9 @@ const LEVEL_8 = (() => {
     waves, prepSeconds: 14, startGold: 170, startLives: 20, starThresholds: [16, 8],
     tipTile: [2, 5],
     endScreenText: {
-      3: () => 'Twelve waves through the first snow, and the fire never went out. The Frostpine Camp stands.',
-      2: (s) => `Twelve waves across three frozen trails, ${s.lives} lives to spare. The camp holds.`,
-      1: (s) => `The fire gutters but holds, with ${s.lives} lives to spare.`,
+      3: () => 'Thirteen waves through the first snow, the Rime Swarm shattered on the ice, and the fire never went out. The Frostpine Camp stands.',
+      2: (s) => `Thirteen waves across three frozen trails and a swarm of living frost, ${s.lives} lives to spare. The camp holds.`,
+      1: (s) => `The fire gutters, and the Rime Swarm nearly snuffed it, but it holds, with ${s.lives} lives to spare.`,
       lose: (s) => `The Frostpine Camp went dark on wave ${s.wave}. Watch the horn markers for the next trail, and remember only Druids and Artillery reach the bats.`,
     },
     buildScene,
