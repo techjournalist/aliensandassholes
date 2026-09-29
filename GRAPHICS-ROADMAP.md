@@ -25,41 +25,41 @@ Already done (logged as P3-V3 in AGENTS.md):
 - Real-phone frame rate has never been measured (headless software rendering
   only). Test on a device before claiming the 30 fps target.
 
-## Roadmap status
-Items 1 to 5 below are BUILT on this branch (see P3-V4 and its addendum in
-AGENTS.md). Items 6 to 10 are still open, in the same order.
+## Roadmap: the user's original numbered list, with status
+This is the list as given to the user in chat. An earlier version of this
+file reordered it, which caused confusion; this numbering is authoritative.
 
-## Roadmap, in priority order
-
-### Do first (low cost, high impact) [1 to 3 DONE]
-1. [DONE] **Wave and boss moments.** Cinematic boss entrance: short camera push,
-   name banner, screen shake. Finales are what players remember.
-2. [DONE] **Living world.** Birds, butterflies, drifting clouds and moving cloud
-   shadows across the ground. Nothing on screen should be static.
-3. [DONE] **Painted title and world map art.** Hand-illustrated backdrop, animated
-   parallax layers, logo treatment. First impressions get the highest bar.
-
-### Then
-4. [DONE] **Camera and screen polish.** Slow camera drift on the title screen, zoom
-   punch on boss deaths, gentle depth-of-field look through fog.
-5. [DONE] **Unit readability.** Soft team-colored rim glow on enemies, health bars
-   that appear only after a hit.
-6. **Sound tied to visuals.** Layered music that shifts between prep and
+1. **Camera and screen polish.** DONE. Title drift, boss-death zoom punch.
+   The "depth of field" is only a desktop-only tilt-shift edge blur (no true
+   depth of field beyond the existing fog).
+2. **Wave and boss moments.** DONE. Boss entrance camera push, ribbon name
+   banner, dark screen edges and an arrival shake.
+3. **Unit readability.** DONE. Enemy-only rim glow and health bars that show
+   for about 2 seconds after a hit (bosses keep their own bar).
+4. **Living world.** DONE. Birds, butterflies, cloud shadows on the ground and
+   drifting clouds above the valley edges.
+5. **Sound tied to visuals.** OPEN. Layered music that shifts between prep and
    combat (audio is synthesized, see js/audio.js).
-7. **Ability effects.** M6 spells (Call the Burrow Guard and Bramble Burst)
-   were never built. They would be the biggest visual set pieces.
-8. **Per-limb enemy animation.** Only if limbs are merged into a small set
-   of shared skinned meshes. Each live part currently costs draw calls per
-   enemy, which is why walk cycles are body-level only today.
+6. **Painted title and world map art.** PARTLY DONE. Done: SVG crest, sun
+   rays, drifting clouds, fireflies on the title; compass, ripples and cloud
+   shadows on the map. Not done: a hand-illustrated backdrop and animated
+   parallax layers that respond to the pointer or tilt.
+7. **Per-limb enemy animation.** OPEN. Real arm and leg movement. Only do it
+   if limbs are merged into a small set of shared skinned meshes: each live
+   part costs draw calls per enemy, which is why walk cycles are body-level
+   only today.
+8. **Ability effects.** OPEN. The M6 spells, Call the Burrow Guard and Bramble
+   Burst, were never built. They would be the biggest visual set pieces.
+9. **Real shadow maps and true bloom.** OPEN, desktop only. Must sit behind a
+   quality setting because of the mobile frame-rate risk.
+10. **Full PBR materials and post-processing stacks.** AVOID. They would break
+    the illustrated toon and ink-outline identity.
 
-### Quality setting (build alongside the above)
-9. **Phone quality tier.** Automatic drop when frame rate falls below 30:
-   for example remove outline hulls on distant units and thin the grass.
-   Desktop-only optional shadow maps and bloom can sit behind the same setting.
-
-### Avoid
-10. Full PBR materials and post-processing stacks. They break the
-    illustrated toon and ink-outline identity.
+Companion item (added by Claude, not on the user's original list): a **phone
+quality tier** that drops detail automatically when frame rate falls below 30,
+for example removing outline hulls on distant units and thinning the grass.
+The desktop-only shadow and bloom options in item 9 would sit behind the same
+setting.
 
 ## Test status (as of this file)
 - `node tools/playtest.js` needs three.js locally. Set

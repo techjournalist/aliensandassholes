@@ -1135,4 +1135,5 @@ scene 270 calls and 196.8k triangles (259 and 198.8k before any of this pass).
 
 **Graphics roadmap**: see `GRAPHICS-ROADMAP.md` for the approved list of
 further graphics work, its priority order, the performance budget and the
-current test status. Read it before starting any graphics task.
+current test status. Read it before starting any graphics task. Its numbered list is the one the
+user was given in chat and is authoritative.
