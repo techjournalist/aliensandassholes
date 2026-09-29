@@ -1096,3 +1096,7 @@ versus 259 and 198.8k on the committed code before this pass. Real-phone frame
 rate has not been measured. Harness note: untouched `main` in this
 environment also loses Level 6's mixed-bot check (the documented unseeded-RNG
 flake), which locks Levels 7 and 8 and fails about 19 checks by cascade.
+
+**Graphics roadmap**: see `GRAPHICS-ROADMAP.md` for the approved list of
+further graphics work, its priority order, the performance budget and the
+current test status. Read it before starting any graphics task.
