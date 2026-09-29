@@ -252,10 +252,31 @@ const Renderer = (() => {
     return new THREE.Matrix4().compose(_p, _q, _s);
   }
 
+  // Terrain height: the play grid stays perfectly flat (picking and gameplay
+  // never see it); the forest rim outside it steps up into low hills, so the
+  // board reads as a valley. Everything placed outside the grid follows it.
+  function rimHeight(c, r) {
+    if (GameState.inGrid(c, r)) return 0;
+    if (c === GameState.currentLevel().chokepoint.streamCol) return 0;
+    const dc = Math.max(-c, c - (cols - 1), 0), dr = Math.max(-r, r - (rows - 1), 0);
+    const d = Math.max(dc, dr);
+    const base = d <= 1 ? 0.1 : d === 2 ? 0.22 : 0.32;
+    return base + (RendererFX.fbm(c * 0.45 + 11.3, r * 0.45 + 4.7) - 0.4) * 0.16;
+  }
+  function groundYAt(x, z) {
+    const c = Math.round(x + cols / 2 - 0.5), r = Math.round(z + rows / 2 - 0.5);
+    return Math.max(0, rimHeight(c, r));
+  }
+
   // Static batcher: props that never move are merged per material into a
   // handful of draw calls (one per color, one for every outline).
   const batch = { groups: new Map(), outlines: [], decals: [] };
   function batchPart(part, worldMatrix) {
+    if (worldMatrix) {
+      const e = worldMatrix.elements;
+      worldMatrix = worldMatrix.clone();
+      worldMatrix.elements[13] += groundYAt(e[12], e[14]);
+    }
     const m = worldMatrix ? worldMatrix.clone().multiply(part.m) : part.m;
     const g = part.geo.clone().applyMatrix4(m);
     const matKey = (part.unlit ? 'u' : 't') + part.color;
@@ -266,7 +287,9 @@ const Renderer = (() => {
     if (part.outline) batch.outlines.push(smoothedForOutline(part.geo).clone().applyMatrix4(m));
   }
   function batchDecal(x, z, radius) {
-    batch.decals.push(GEO.shadowDisc.clone().applyMatrix4(M(x, 0.012, z, { s: radius })));
+    // shadow falls away from the sun (upper left): pushed and stretched along that line
+    batch.decals.push(GEO.shadowDisc.clone().applyMatrix4(M(x + radius * 0.3, groundYAt(x, z) + 0.012, z - radius * 0.34,
+      { sx: radius * 0.95, sy: 1, sz: radius * 1.4, ry: Math.atan2(0.3, -0.34) })));
   }
   function flushBatch() {
     for (const grp of batch.groups.values()) {
@@ -300,7 +323,7 @@ const Renderer = (() => {
   }
   function liveProp(parts, x, y, z, opts = {}) {
     const g = new THREE.Group();
-    g.position.set(x, y, z);
+    g.position.set(x, y + groundYAt(x, z), z);
     const ao = opts.ao !== false;
     const toonGeos = [], unlitGeos = [], outlineGeos = [];
     for (const p of parts) {
@@ -658,6 +681,7 @@ const Renderer = (() => {
         const kind = inGrid ? GameState.cellKind(c, r) : (c === GameState.currentLevel().chokepoint.streamCol ? 'stream' : 'ground');
         const h = GameState.zoneFalloff(c, r);
         let top, side, height = tileHeight, yTop = 0;
+        if (!inGrid && kind === 'ground') { yTop = rimHeight(c, r); height = tileHeight + yTop; }
         if (kind === 'stream') {
           height = 0.12; yTop = -0.2;
           topColor.set(PALETTE.streamBed); sideColor.set(PALETTE.streamBed);
@@ -790,6 +814,21 @@ const Renderer = (() => {
         geos.push(g);
       }
     }
+    // worn road: dark trampled mud and the odd puddle on the dirt stretches
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+      if (GameState.cellKind(c, r) !== 'path' || GameState.isCobble(c, r)) continue;
+      if (rng() > 0.5) continue;
+      const hz = GameState.zoneFalloff(c, r), puddle = rng() < 0.22;
+      if (puddle) col.copy(lerpColor(PALETTE.streamBed, PALETTE.path, 0.35)); else col.copy(lerpColor(PALETTE.path, PALETTE.earth, 0.42));
+      col.lerp(new THREE.Color(PALETTE.hollowPath), hz * 0.8);
+      const g = GEO.circle.clone().applyMatrix4(M(worldX(c) + (rng() - 0.5) * 0.4, 0.011, worldZ(r) + (rng() - 0.5) * 0.4,
+        { sx: puddle ? 0.2 : 0.14 + rng() * 0.16, sy: 1, sz: puddle ? 0.12 : 0.08 + rng() * 0.1, ry: rng() * 3.14 }));
+      const colors = new Float32Array(g.attributes.position.count * 3);
+      for (let k = 0; k < g.attributes.position.count; k++) { colors[k * 3] = col.r; colors[k * 3 + 1] = col.g; colors[k * 3 + 2] = col.b; }
+      g.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+      g.deleteAttribute('uv');
+      geos.push(g);
+    }
     if (!geos.length) return;
     const mesh = new THREE.Mesh(mergeGeoms(geos), new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap, vertexColors: true }));
     mesh.name = 'groundPatches';
@@ -879,7 +918,7 @@ const Renderer = (() => {
     const mesh = new THREE.InstancedMesh(RendererFX.grassBladeGeometry(), RendererFX.grassMaterial(fxTime), blades.length);
     const dummy = new THREE.Object3D();
     blades.forEach((b, i) => {
-      dummy.position.set(b.x, 0, b.z);
+      dummy.position.set(b.x, groundYAt(b.x, b.z), b.z);
       dummy.rotation.set(b.lean * 0.4, b.ry, b.lean);
       dummy.scale.set(1, b.h, 1);
       dummy.updateMatrix();
@@ -1838,6 +1877,13 @@ const Renderer = (() => {
       g.rotation.y = Math.atan2(e.dirX, e.dirZ);
       g.rotation.x = w.lean;
       g.rotation.z = Math.sin(cycle) * w.sway + struggle * 4;
+      if (!e.rooted) g.rotation.y += Math.sin(cycle) * w.sway * 0.9;   // shoulders twist against the stride
+      // a footfall: the moment the hop lands, the heavy walkers kick up dust
+      const step = Math.floor(cycle / Math.PI);
+      if (v.lastStep !== undefined && step !== v.lastStep && !e.rooted && e.age > 0.4 && (e.type === 'troll' || e.type === 'grunt')) {
+        puff(e.x, 0.05, e.z, { count: e.type === 'troll' ? 3 : 1, color: PALETTE.path, speed: 0.6, size: e.type === 'troll' ? 0.09 : 0.06, up: 0.5, ttl: 0.4 });
+      }
+      v.lastStep = step;
       const stretch = 0.9 + 0.22 * bounce;
       v.pop = Math.max(0, v.pop - dt * 5);
       const popK = Math.sin(Math.min(1, v.pop) * Math.PI) * 0.35;   // scale-pop when hit

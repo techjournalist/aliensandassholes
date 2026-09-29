@@ -1060,3 +1060,39 @@ they've already confirmed are solid. `tools/level-fixtures.js`'s
 future full harness run picks up the new wave automatically. A full
 `tools/playtest.js` run has not been done since this change; recommended
 before the next release-quality checkpoint, not required now.
+
+**P3-V3 — Graphics pass 2: presence, terrain, effects, UI** *(on branch
+`graphics-pass-units-tiers`, not yet merged)*. The user asked for the game
+to look closer to AAA and to make upgrades visually distinct, with frame rate
+protected. Measured first: the world was strong but units were tiny beside the
+scenery (about 20px tall at 1280x720). Changes, all render-side (`GameState`
+untouched): towers display 1.25x and ground enemies and bats 1.4x (multiplier
+in the update loop only, ranges and hit logic unchanged); bats got a scalloped
+extruded wing geometry and a lighter `batWing` palette entry; each tower has a
+distinct tier-2 accessory set (`TIER2_PARTS`) and each tier stands 6% taller,
+with tier 3 keeping its branch parts on top; trees come in three species
+(broadleaf, conifer, poplar) that use only the three meadow greens so the
+per-level retints still work, and the two new species are cheaper than the
+broadleaf; build plots stand on low stone plinths; flat moss, earth and clover
+patches dot the meadow and mud and puddles wear the dirt roads (merged, one
+draw call each); the forest rim outside the grid steps up into low hills
+(`rimHeight`/`groundYAt`, the playable grid stays perfectly flat, and props,
+grass and shadows follow the rim height); batched shadows are now stretched
+and pushed away from the sun instead of round; shockwave rings are one
+`InstancedMesh` (additive, fades by darkening) fired on impacts, kills and
+upgrades, plus tiny sparks and a muzzle flash from the existing particle pool;
+enemies twist against their stride and trolls and grunts kick up footfall dust;
+the UI is repainted (wood gradient panels, rivets, trim, glossy buttons, a
+glow on the ready wave button) with CSS only, so no layout or touch target
+changed. Deliberately not done: real shadow maps and full-screen bloom (both
+excluded above for mobile frame rate), and skeletal or per-limb enemy walk
+cycles (each live part costs draw calls per enemy; tower attacks already had
+wind-up and recoil).
+
+Perf, measured with the debug overlay under software rendering: Level 1 title
+view 113 calls and 167.7k triangles (budget 158 and 189k, was 110 and 172.6k);
+a mid-wave scene with 13 goblins and 5 towers 262 calls and 193.9k triangles
+versus 259 and 198.8k on the committed code before this pass. Real-phone frame
+rate has not been measured. Harness note: untouched `main` in this
+environment also loses Level 6's mixed-bot check (the documented unseeded-RNG
+flake), which locks Levels 7 and 8 and fails about 19 checks by cascade.
