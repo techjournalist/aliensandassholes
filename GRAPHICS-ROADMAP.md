@@ -64,8 +64,14 @@ Already done (logged as P3-V3 in AGENTS.md):
 - Untouched `main` fails Level 6's mixed-bot check in this environment (the
   documented unseeded-RNG flake), which locks Levels 7 and 8 and fails about
   19 checks by cascade. Treat that pattern as known, not as a regression.
-- The Warden branch-balance duel sits near its 10% threshold and can flip
-  between runs. Re-run before blaming a change.
+- The Warden branch-balance duel (Thicket vs Briarstorm) is sensitive to the
+  random stream. Render effects used to consume `Math.random`, which the duel
+  seeds, so its result depended on how many puffs the renderer spawned. The
+  renderer now has its own stream (`fxRand`). With gameplay randomness
+  isolated, Thicket ties Briarstorm in the armored scenario and the check
+  fails (each branch must win somewhere by 10%). On untouched `main` it
+  passes only because of that accidental coupling. It needs a real balance
+  look (try several seeds) or a fixture tweak, not a graphics fix.
 - AGENTS.md says never commit before the playtest passes. This branch was
   committed anyway on the user's stop-hook request, so it stays off `main`
   until a clean run is confirmed.

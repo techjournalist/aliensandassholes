@@ -1562,6 +1562,12 @@ const Renderer = (() => {
       },
     });
   }
+  // Effects draw from their own random stream, never Math.random: gameplay
+  // (lane jitter) uses Math.random, and how many sparks or puffs the renderer
+  // happens to spawn must never change what an enemy does.
+  let _fxSeed = 20260929;
+  const fxRand = () => ((_fxSeed = (_fxSeed * 16807) % 2147483647) / 2147483647);
+
   // Shockwave rings: one InstancedMesh, so any number of them is one draw call.
   // Additive blending, so fading the instance color to black fades the ring out.
   const RINGS = 20;
@@ -1613,8 +1619,8 @@ const Renderer = (() => {
     let n = 0;
     for (const u of particles) {
       if (u.alive) continue;
-      const a = Math.random() * Math.PI * 2, s = speed * (0.5 + Math.random() * 0.5);
-      Object.assign(u, { alive: true, life: 0, ttl: ttl * (0.7 + Math.random() * 0.5), x, y, z, vx: Math.cos(a) * s, vy: up * (0.4 + Math.random() * 0.6), vz: Math.sin(a) * s, size: size * (0.6 + Math.random() * 0.8) });
+      const a = fxRand() * Math.PI * 2, s = speed * (0.5 + fxRand() * 0.5);
+      Object.assign(u, { alive: true, life: 0, ttl: ttl * (0.7 + fxRand() * 0.5), x, y, z, vx: Math.cos(a) * s, vy: up * (0.4 + fxRand() * 0.6), vz: Math.sin(a) * s, size: size * (0.6 + fxRand() * 0.8) });
       u.color.setHex(color);
       if (++n >= count) break;
     }
@@ -2345,8 +2351,8 @@ const Renderer = (() => {
     updateProjectileViews();
     if (shake.amp > 0) {
       shake.amp = Math.max(0, shake.amp - shake.decay * dt);
-      shake.x = (Math.random() - 0.5) * 2 * shake.amp;
-      shake.y = (Math.random() - 0.5) * 2 * shake.amp;
+      shake.x = (fxRand() - 0.5) * 2 * shake.amp;
+      shake.y = (fxRand() - 0.5) * 2 * shake.amp;
     } else { shake.x = shake.y = 0; }
     camera.position.copy(camBase).addScaledVector(camRight, shake.x).addScaledVector(camUp, shake.y);
     renderer.render(scene, camera);
