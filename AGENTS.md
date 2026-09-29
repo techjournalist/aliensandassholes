@@ -1133,6 +1133,26 @@ software rendering can take seconds per frame, so timing-based checks must use
 1x. Level 1 title view 119 calls and 170.7k triangles; the mid-wave reference
 scene 270 calls and 196.8k triangles (259 and 198.8k before any of this pass).
 
+**P3-V5 — Per-limb enemy animation (roadmap item 7)** *(on branch
+`graphics-pass-units-tiers`)*. Grunts, tricksters, trolls and bats now animate
+arms, legs, ears (and the trickster's leaf) individually, and it cost fewer
+draw calls, not more. The technique: every limb stays inside the enemy's one
+merged mesh but each vertex carries an `aLimb` slot id; a shared GLSL chunk
+(`RIG_GLSL`, injected with `onBeforeCompile` into three per-enemy materials:
+toon plus rim glow, unlit, and the ink outline) rotates a slot about its pivot
+by per-frame uniform angles (`makeRig`, `RIG_PIVOTS`). Materials are per enemy
+so uniforms are per enemy, while constant `customProgramCacheKey`s share the
+compiled programs, and the outline hull shares one `thickness` uniform object
+with the global outline so it follows zoom and resize. Poses: arms counter-swing
+against legs, the grunt carries its club up and chops, trolls knuckle-walk with
+long slow swings, tricksters pump their arms, legs lift on the up-stroke, ears
+flap, rooted enemies flail, bat wings beat through the rig. Bosses keep their
+own rig. Before this, each limb was a separate mesh plus an outline mesh, so a
+troll cost 15 draw calls and a grunt 11; now an enemy is 4 (merged toon,
+unlit, outline, contact shadow). Mid-wave reference scene: 212 calls and
+197.1k triangles (was 270 and 196.8k). Full harness: 382 pass, the 19 failures
+match untouched `main`.
+
 **Graphics roadmap**: see `GRAPHICS-ROADMAP.md` for the approved list of
 further graphics work, its priority order, the performance budget and the
 current test status. Read it before starting any graphics task. Its numbered list is the one the

@@ -44,10 +44,10 @@ file reordered it, which caused confusion; this numbering is authoritative.
    rays, drifting clouds, fireflies on the title; compass, ripples and cloud
    shadows on the map. Not done: a hand-illustrated backdrop and animated
    parallax layers that respond to the pointer or tilt.
-7. **Per-limb enemy animation.** OPEN. Real arm and leg movement. Only do it
-   if limbs are merged into a small set of shared skinned meshes: each live
-   part costs draw calls per enemy, which is why walk cycles are body-level
-   only today.
+7. **Per-limb enemy animation.** DONE. Vertex-shader rig inside each enemy's
+   merged mesh (see P3-V5 in AGENTS.md): arms, legs, ears and wings animate
+   individually and a busy wave draws 21% fewer calls (270 to 212). Bosses
+   keep their own rig.
 8. **Ability effects.** OPEN. The M6 spells, Call the Burrow Guard and Bramble
    Burst, were never built. They would be the biggest visual set pieces.
 9. **Real shadow maps and true bloom.** OPEN, desktop only. Must sit behind a

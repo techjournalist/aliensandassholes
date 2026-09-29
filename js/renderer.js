@@ -228,6 +228,85 @@ const Renderer = (() => {
     });
   }
 
+  // ---- per-limb rig: shared GLSL plus three material factories ----
+  // One rig object per enemy: pivots (constant per type) and per-slot angles
+  // (updated every frame). All three materials of an enemy read the same
+  // arrays, and programs are shared across enemies through constant cache keys.
+  const RIG_GLSL = `
+    attribute float aLimb;
+    uniform vec3 uPiv[${9}];
+    uniform vec4 uAng[${9}];
+    vec3 rigRot(vec3 v, vec4 a) {
+      float c = cos(a.x), s = sin(a.x);
+      v = vec3(v.x, c * v.y - s * v.z, s * v.y + c * v.z);
+      c = cos(a.y); s = sin(a.y);
+      return vec3(c * v.x - s * v.y, s * v.x + c * v.y, v.z);
+    }
+    vec3 rigP(vec3 p) {
+      int id = int(aLimb + 0.5);
+      if (id == 0) return p;
+      vec4 a = uAng[id]; vec3 pv = uPiv[id];
+      return rigRot(p - pv, a) + pv + vec3(0.0, a.z, a.w);
+    }
+    vec3 rigN(vec3 n) {
+      int id = int(aLimb + 0.5);
+      return id == 0 ? n : rigRot(n, uAng[id]);
+    }`;
+  function makeRig(type) {
+    const piv = [], ang = [];
+    for (let i = 0; i < RIG_SLOTS; i++) {
+      const pv = (RIG_PIVOTS[type] || {})[i] || [0, 0, 0];
+      piv.push(new THREE.Vector3(pv[0], pv[1], pv[2]));
+      ang.push(new THREE.Vector4(0, 0, 0, 0));
+    }
+    return { piv, ang };
+  }
+  function rigInject(sh, rig) {
+    sh.uniforms.uPiv = { value: rig.piv };
+    sh.uniforms.uAng = { value: rig.ang };
+    sh.vertexShader = sh.vertexShader
+      .replace('void main() {', RIG_GLSL + '\nvoid main() {')
+      .replace('#include <beginnormal_vertex>', '#include <beginnormal_vertex>\n  objectNormal = rigN(objectNormal);')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\n  transformed = rigP(transformed);');
+  }
+  function makeRigMats(rig) {
+    const toonM = new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap, vertexColors: true });
+    toonM.onBeforeCompile = (sh) => {
+      rigInject(sh, rig);
+      sh.uniforms.uRim = { value: RIM_COLOR };
+      sh.fragmentShader = 'uniform vec3 uRim;\n' + sh.fragmentShader.replace('#include <output_fragment>',
+        `float rimK = pow(1.0 - clamp(dot(normalize(vNormal), normalize(vViewPosition)), 0.0, 1.0), 2.2);
+         outgoingLight += uRim * rimK * 0.75;
+         #include <output_fragment>`);
+    };
+    toonM.customProgramCacheKey = () => 'rig-toon-rim';
+    const unlitM = new THREE.MeshBasicMaterial({ vertexColors: true });
+    unlitM.onBeforeCompile = (sh) => rigInject(sh, rig);
+    unlitM.customProgramCacheKey = () => 'rig-unlit';
+    // the ink outline must follow the limbs or it would be left standing behind them
+    const outM = new THREE.ShaderMaterial({
+      uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { color: { value: new THREE.Color(PALETTE.outline) } }]),
+      vertexShader: `
+        uniform float thickness;
+        ${RIG_GLSL}
+        #include <fog_pars_vertex>
+        void main() {
+          vec3 n = normalize(normalMatrix * rigN(normal));
+          vec4 mvPosition = modelViewMatrix * vec4(rigP(position), 1.0);
+          mvPosition.xyz += n * thickness;
+          gl_Position = projectionMatrix * mvPosition;
+          #include <fog_vertex>
+        }`,
+      fragmentShader: outlineMat.fragmentShader,
+      side: THREE.BackSide, fog: true,
+    });
+    outM.uniforms.thickness = outlineMat.uniforms.thickness;   // one shared width, follows zoom and resize
+    outM.uniforms.uPiv = { value: rig.piv };
+    outM.uniforms.uAng = { value: rig.ang };
+    outM.customProgramCacheKey = () => 'rig-outline';
+    return { toon: toonM, unlit: unlitM, outline: outM };
+  }
+
   function addOutline(mesh) {
     const o = new THREE.Mesh(smoothedForOutline(mesh.geometry), outlineMat);
     o.name = 'outline';
@@ -241,6 +320,8 @@ const Renderer = (() => {
     geos.forEach((g) => { count += g.attributes.position.count; });
     const withColor = geos.length > 0 && geos.every((g) => g.attributes.color);
     const withUv = geos.length > 0 && geos.every((g) => g.attributes.uv);
+    const withLimb = geos.length > 0 && geos.every((g) => g.attributes.aLimb);
+    const limb = withLimb ? new Float32Array(count) : null;
     const pos = new Float32Array(count * 3), nor = new Float32Array(count * 3);
     const col = withColor ? new Float32Array(count * 3) : null;
     const uv = withUv ? new Float32Array(count * 2) : null;
@@ -250,6 +331,7 @@ const Renderer = (() => {
       nor.set(g.attributes.normal.array, off * 3);
       if (col) col.set(g.attributes.color.array, off * 3);
       if (uv) uv.set(g.attributes.uv.array, off * 2);
+      if (limb) limb.set(g.attributes.aLimb.array, off);
       off += g.attributes.position.count;
     }
     const out = new THREE.BufferGeometry();
@@ -257,6 +339,7 @@ const Renderer = (() => {
     out.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
     if (col) out.setAttribute('color', new THREE.BufferAttribute(col, 3));
     if (uv) out.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    if (limb) out.setAttribute('aLimb', new THREE.BufferAttribute(limb, 1));
     return out;
   }
 
@@ -356,16 +439,21 @@ const Renderer = (() => {
         continue;
       }
       const geo = colored(p.geo.clone().applyMatrix4(p.m), p.color);
+      if (opts.rig) geo.setAttribute('aLimb', new THREE.BufferAttribute(new Float32Array(geo.attributes.position.count).fill(p.limb || 0), 1));
       if (ao && !p.unlit) {
         const c = geo.attributes.color, a = aoColors(geo);
         for (let i = 0; i < c.array.length; i++) c.array[i] *= a.array[i];
       }
       (p.unlit ? unlitGeos : toonGeos).push(geo);
-      if (p.outline) outlineGeos.push(smoothedForOutline(p.geo).clone().applyMatrix4(p.m));
+      if (p.outline) {
+        const og = smoothedForOutline(p.geo).clone().applyMatrix4(p.m);
+        if (opts.rig) og.setAttribute('aLimb', new THREE.BufferAttribute(new Float32Array(og.attributes.position.count).fill(p.limb || 0), 1));
+        outlineGeos.push(og);
+      }
     }
-    if (toonGeos.length) { const m = new THREE.Mesh(mergeGeoms(toonGeos), opts.rim ? rimMat() : toon(0xffffff, { vc: true })); m.name = 'merged'; g.add(m); }
-    if (unlitGeos.length) { const m = new THREE.Mesh(mergeGeoms(unlitGeos), unlitVC()); m.name = 'mergedUnlit'; g.add(m); }
-    if (outlineGeos.length) { const m = new THREE.Mesh(mergeGeoms(outlineGeos), outlineMat); m.name = 'mergedOutline'; g.add(m); }
+    if (toonGeos.length) { const m = new THREE.Mesh(mergeGeoms(toonGeos), opts.rig ? opts.rig.mats.toon : opts.rim ? rimMat() : toon(0xffffff, { vc: true })); m.name = 'merged'; g.add(m); }
+    if (unlitGeos.length) { const m = new THREE.Mesh(mergeGeoms(unlitGeos), opts.rig ? opts.rig.mats.unlit : unlitVC()); m.name = 'mergedUnlit'; g.add(m); }
+    if (outlineGeos.length) { const m = new THREE.Mesh(mergeGeoms(outlineGeos), opts.rig ? opts.rig.mats.outline : outlineMat); m.name = 'mergedOutline'; g.add(m); }
     scene.add(g);
     return g;
   }
@@ -1047,28 +1135,28 @@ const Renderer = (() => {
     return [
       P(GEO.sphereLo, g, M(0, 0.2, 0, { sx: 0.2, sy: 0.17, sz: 0.18 }), true, { name: 'body' }),
       P(GEO.box, PALETTE.acornCap, M(0, 0.16, 0, { sx: 0.42, sy: 0.06, sz: 0.38 }), false, { name: 'belt' }),
-      P(GEO.sphereLo, gd, M(0.1, 0.05, 0.02, { sx: 0.09, sy: 0.05, sz: 0.11 }), true, { name: 'footL', live: true }),
-      P(GEO.sphereLo, gd, M(-0.1, 0.05, 0.02, { sx: 0.09, sy: 0.05, sz: 0.11 }), true, { name: 'footR', live: true }),
+      P(GEO.sphereLo, gd, M(0.1, 0.05, 0.02, { sx: 0.09, sy: 0.05, sz: 0.11 }), true, { limb: 3 }),
+      P(GEO.sphereLo, gd, M(-0.1, 0.05, 0.02, { sx: 0.09, sy: 0.05, sz: 0.11 }), true, { limb: 4 }),
       P(GEO.sphere, g, M(0, 0.5, 0, { sx: 0.25, sy: 0.23, sz: 0.24 }), true, { name: 'head' }),
-      P(GEO.cone, g, pivotMatrix(0.2, 0.56, 0, 0, 0, -1.2, 0, 0.13, 0, 0.07, 0.26, 0.05), true, { name: 'earL', live: true }),
-      P(GEO.cone, g, pivotMatrix(-0.2, 0.56, 0, 0, 0, 1.2, 0, 0.13, 0, 0.07, 0.26, 0.05), true, { name: 'earR', live: true }),
+      P(GEO.cone, g, pivotMatrix(0.2, 0.56, 0, 0, 0, -1.2, 0, 0.13, 0, 0.07, 0.26, 0.05), true, { limb: 5 }),
+      P(GEO.cone, g, pivotMatrix(-0.2, 0.56, 0, 0, 0, 1.2, 0, 0.13, 0, 0.07, 0.26, 0.05), true, { limb: 6 }),
       P(GEO.sphereLo, PALETTE.cream, M(0.09, 0.54, 0.2, { s: 0.055 }), false, { unlit: true }),
       P(GEO.sphereLo, PALETTE.cream, M(-0.09, 0.54, 0.2, { s: 0.055 }), false, { unlit: true }),
       P(GEO.bead, PALETTE.outline, M(0.1, 0.54, 0.245, { s: 0.025 }), false, { unlit: true }),
       P(GEO.bead, PALETTE.outline, M(-0.08, 0.54, 0.245, { s: 0.025 }), false, { unlit: true }),
       P(GEO.cone, gd, M(0, 0.47, 0.3, { sx: 0.05, sy: 0.18, sz: 0.05, rx: Math.PI / 2 }), true, { name: 'nose' }),
       P(GEO.box, PALETTE.cream, M(0.05, 0.4, 0.21, { sx: 0.04, sy: 0.05, sz: 0.02 }), false, { unlit: true }),
-      P(GEO.sphereLo, g, M(0.2, 0.26, 0.06, { s: 0.06 }), true, { name: 'armL' }),
-      P(GEO.sphereLo, g, M(-0.2, 0.26, 0.06, { s: 0.06 }), true, { name: 'armR' }),
-      P(GEO.cyl, PALETTE.wood, pivotMatrix(-0.22, 0.26, 0.06, 0.5, 0, 0.35, 0, 0.14, 0, 0.03, 0.3, 0.03), true, { name: 'club' }),
-      P(GEO.sphereLo, PALETTE.woodLight, pivotMatrix(-0.22, 0.26, 0.06, 0.5, 0, 0.35, 0, 0.3, 0, 0.06, 0.06, 0.06), true, { name: 'clubHead' }),
+      P(GEO.sphereLo, g, M(0.2, 0.26, 0.06, { s: 0.06 }), true, { limb: 1 }),
+      P(GEO.sphereLo, g, M(-0.2, 0.26, 0.06, { s: 0.06 }), true, { limb: 2 }),
+      P(GEO.cyl, PALETTE.wood, pivotMatrix(-0.22, 0.26, 0.06, 0.5, 0, 0.35, 0, 0.14, 0, 0.03, 0.3, 0.03), true, { limb: 2 }),
+      P(GEO.sphereLo, PALETTE.woodLight, pivotMatrix(-0.22, 0.26, 0.06, 0.5, 0, 0.35, 0, 0.3, 0, 0.06, 0.06, 0.06), true, { limb: 2 }),
       // eye glints, a buckle and loincloth, a leather wrap on the club grip
       P(GEO.bead, PALETTE.cream, M(0.108, 0.556, 0.262, { s: 0.009 }), false, { unlit: true }),
       P(GEO.bead, PALETTE.cream, M(-0.072, 0.556, 0.262, { s: 0.009 }), false, { unlit: true }),
       P(GEO.box, PALETTE.gold, M(0, 0.16, 0.195, { sx: 0.06, sy: 0.05, sz: 0.02 }), false),
       P(GEO.box, PALETTE.capBrown, M(0.02, 0.1, 0.17, { sx: 0.12, sy: 0.09, sz: 0.02, rz: 0.08 }), false),
-      P(GEO.cyl, PALETTE.capBrown, pivotMatrix(-0.22, 0.26, 0.06, 0.5, 0, 0.35, 0, 0.08, 0, 0.038, 0.06, 0.038), false),
-      P(GEO.cone, PALETTE.cream, pivotMatrix(-0.22, 0.26, 0.06, 0.5, 0, 0.35, 0.05, 0.33, 0, 0.018, 0.05, 0.018), false),
+      P(GEO.cyl, PALETTE.capBrown, pivotMatrix(-0.22, 0.26, 0.06, 0.5, 0, 0.35, 0, 0.08, 0, 0.038, 0.06, 0.038), false, { limb: 2 }),
+      P(GEO.cone, PALETTE.cream, pivotMatrix(-0.22, 0.26, 0.06, 0.5, 0, 0.35, 0.05, 0.33, 0, 0.018, 0.05, 0.018), false, { limb: 2 }),
     ];
   }
 
@@ -1357,8 +1445,8 @@ const Renderer = (() => {
       P(GEO.sphereLo, PALETTE.bat, M(0, -0.06, 0.08, { sx: 0.1, sy: 0.08, sz: 0.1 }), false),
       P(GEO.bead, PALETTE.outline, M(0.065, 0.035, 0.195, { s: 0.015 }), false, { unlit: true }),
       P(GEO.bead, PALETTE.outline, M(-0.055, 0.035, 0.195, { s: 0.015 }), false, { unlit: true }),
-      P(GEO.wingL, PALETTE.batWing, pivotMatrix(0.12, 0.02, 0, 0, 0, 0, 0.3, 0, 0, 0.6, 0.025, 0.36), true, { name: 'wingL', live: true }),
-      P(GEO.wingR, PALETTE.batWing, pivotMatrix(-0.12, 0.02, 0, 0, 0, 0, -0.3, 0, 0, 0.6, 0.025, 0.36), true, { name: 'wingR', live: true }),
+      P(GEO.wingL, PALETTE.batWing, pivotMatrix(0.12, 0.02, 0, 0, 0, 0, 0.3, 0, 0, 0.6, 0.025, 0.36), true, { limb: 1 }),
+      P(GEO.wingR, PALETTE.batWing, pivotMatrix(-0.12, 0.02, 0, 0, 0, 0, -0.3, 0, 0, 0.6, 0.025, 0.36), true, { limb: 2 }),
     ];
   }
 
@@ -1368,20 +1456,25 @@ const Renderer = (() => {
     const g = PALETTE.trickster, gd = PALETTE.tricksterDark;
     return [
       P(GEO.sphereLo, g, M(0, 0.28, 0, { sx: 0.12, sy: 0.2, sz: 0.11 }), true, { name: 'body' }),
-      P(GEO.sphereLo, gd, M(0.09, 0.05, 0.04, { sx: 0.1, sy: 0.04, sz: 0.15 }), true, { name: 'footL', live: true }),
-      P(GEO.sphereLo, gd, M(-0.09, 0.05, 0.04, { sx: 0.1, sy: 0.04, sz: 0.15 }), true, { name: 'footR', live: true }),
-      P(GEO.cyl, g, M(0.08, 0.14, 0.02, { sx: 0.03, sy: 0.16, sz: 0.03 }), false),
-      P(GEO.cyl, g, M(-0.08, 0.14, 0.02, { sx: 0.03, sy: 0.16, sz: 0.03 }), false),
+      P(GEO.sphereLo, gd, M(0.09, 0.05, 0.04, { sx: 0.1, sy: 0.04, sz: 0.15 }), true, { limb: 3 }),
+      P(GEO.sphereLo, gd, M(-0.09, 0.05, 0.04, { sx: 0.1, sy: 0.04, sz: 0.15 }), true, { limb: 4 }),
+      P(GEO.cyl, g, M(0.08, 0.14, 0.02, { sx: 0.03, sy: 0.16, sz: 0.03 }), false, { limb: 3 }),
+      P(GEO.cyl, g, M(-0.08, 0.14, 0.02, { sx: 0.03, sy: 0.16, sz: 0.03 }), false, { limb: 4 }),
+      // thin arms that swing against the legs
+      P(GEO.cyl, g, M(0.14, 0.34, 0.03, { sx: 0.025, sy: 0.2, sz: 0.025, rz: -0.35 }), false, { limb: 1 }),
+      P(GEO.sphereLo, gd, M(0.18, 0.24, 0.04, { s: 0.04 }), true, { limb: 1 }),
+      P(GEO.cyl, g, M(-0.14, 0.34, 0.03, { sx: 0.025, sy: 0.2, sz: 0.025, rz: 0.35 }), false, { limb: 2 }),
+      P(GEO.sphereLo, gd, M(-0.18, 0.24, 0.04, { s: 0.04 }), true, { limb: 2 }),
       P(GEO.sphere, g, M(0, 0.56, 0, { sx: 0.17, sy: 0.19, sz: 0.16 }), true, { name: 'head' }),
-      P(GEO.cone, g, pivotMatrix(0.13, 0.62, 0, 0, 0, -1.4, 0, 0.12, 0, 0.05, 0.24, 0.04), true, { name: 'earL', live: true }),
-      P(GEO.cone, g, pivotMatrix(-0.13, 0.62, 0, 0, 0, 1.4, 0, 0.12, 0, 0.05, 0.24, 0.04), true, { name: 'earR', live: true }),
+      P(GEO.cone, g, pivotMatrix(0.13, 0.62, 0, 0, 0, -1.4, 0, 0.12, 0, 0.05, 0.24, 0.04), true, { limb: 5 }),
+      P(GEO.cone, g, pivotMatrix(-0.13, 0.62, 0, 0, 0, 1.4, 0, 0.12, 0, 0.05, 0.24, 0.04), true, { limb: 6 }),
       P(GEO.sphereLo, PALETTE.cream, M(0.07, 0.6, 0.13, { s: 0.045 }), false, { unlit: true }),
       P(GEO.sphereLo, PALETTE.cream, M(-0.07, 0.6, 0.13, { s: 0.045 }), false, { unlit: true }),
       P(GEO.bead, PALETTE.outline, M(0.08, 0.6, 0.17, { s: 0.02 }), false, { unlit: true }),
       P(GEO.bead, PALETTE.outline, M(-0.06, 0.6, 0.17, { s: 0.02 }), false, { unlit: true }),
       P(GEO.cone, gd, M(0, 0.54, 0.3, { sx: 0.035, sy: 0.3, sz: 0.035, rx: Math.PI / 2 }), true, { name: 'nose' }),
-      P(GEO.sphereLo, PALETTE.meadowLight, M(0.04, 0.78, -0.04, { sx: 0.16, sy: 0.05, sz: 0.24, rz: -0.3, ry: 0.4 }), true, { name: 'leaf', live: true }),
-      P(GEO.cyl, PALETTE.meadowDark, M(0, 0.74, 0, { sx: 0.02, sy: 0.1, sz: 0.02 }), false),
+      P(GEO.sphereLo, PALETTE.meadowLight, M(0.04, 0.78, -0.04, { sx: 0.16, sy: 0.05, sz: 0.24, rz: -0.3, ry: 0.4 }), true, { limb: 8 }),
+      P(GEO.cyl, PALETTE.meadowDark, M(0, 0.74, 0, { sx: 0.02, sy: 0.1, sz: 0.02 }), false, { limb: 8 }),
       // eye glints, freckle spots on its back, a pale belly
       P(GEO.bead, PALETTE.cream, M(0.086, 0.605, 0.184, { s: 0.008 }), false, { unlit: true }),
       P(GEO.bead, PALETTE.cream, M(-0.054, 0.605, 0.184, { s: 0.008 }), false, { unlit: true }),
@@ -1409,12 +1502,12 @@ const Renderer = (() => {
       P(GEO.sphereLo, PALETTE.cream, M(-0.08, 0.56, 0.46, { s: 0.04 }), false, { unlit: true }),
       P(GEO.bead, PALETTE.outline, M(0.08, 0.56, 0.49, { s: 0.02 }), false, { unlit: true }),
       P(GEO.bead, PALETTE.outline, M(-0.08, 0.56, 0.49, { s: 0.02 }), false, { unlit: true }),
-      P(GEO.cyl, t, M(0.36, 0.3, 0.14, { sx: 0.1, sy: 0.4, sz: 0.1, rz: -0.25 }), true, { name: 'armL', live: true }),
-      P(GEO.cyl, t, M(-0.36, 0.3, 0.14, { sx: 0.1, sy: 0.4, sz: 0.1, rz: 0.25 }), true, { name: 'armR', live: true }),
-      P(GEO.sphereLo, td, M(0.42, 0.08, 0.2, { sx: 0.14, sy: 0.09, sz: 0.14 }), true, { name: 'fistL', live: true }),
-      P(GEO.sphereLo, td, M(-0.42, 0.08, 0.2, { sx: 0.14, sy: 0.09, sz: 0.14 }), true, { name: 'fistR', live: true }),
-      P(GEO.sphereLo, td, M(0.14, 0.06, -0.02, { sx: 0.13, sy: 0.07, sz: 0.16 }), true, { name: 'footL', live: true }),
-      P(GEO.sphereLo, td, M(-0.14, 0.06, -0.02, { sx: 0.13, sy: 0.07, sz: 0.16 }), true, { name: 'footR', live: true }),
+      P(GEO.cyl, t, M(0.36, 0.3, 0.14, { sx: 0.1, sy: 0.4, sz: 0.1, rz: -0.25 }), true, { limb: 1 }),
+      P(GEO.cyl, t, M(-0.36, 0.3, 0.14, { sx: 0.1, sy: 0.4, sz: 0.1, rz: 0.25 }), true, { limb: 2 }),
+      P(GEO.sphereLo, td, M(0.42, 0.08, 0.2, { sx: 0.14, sy: 0.09, sz: 0.14 }), true, { limb: 1 }),
+      P(GEO.sphereLo, td, M(-0.42, 0.08, 0.2, { sx: 0.14, sy: 0.09, sz: 0.14 }), true, { limb: 2 }),
+      P(GEO.sphereLo, td, M(0.14, 0.06, -0.02, { sx: 0.13, sy: 0.07, sz: 0.16 }), true, { limb: 3 }),
+      P(GEO.sphereLo, td, M(-0.14, 0.06, -0.02, { sx: 0.13, sy: 0.07, sz: 0.16 }), true, { limb: 4 }),
       // eye glints, a lichen-crusted rock and a second toadstool on its back, brow ridge
       P(GEO.bead, PALETTE.cream, M(0.088, 0.568, 0.505, { s: 0.009 }), false, { unlit: true }),
       P(GEO.bead, PALETTE.cream, M(-0.072, 0.568, 0.505, { s: 0.009 }), false, { unlit: true }),
@@ -1517,6 +1610,19 @@ const Renderer = (() => {
     grunt:     { freq: 7.5, bounce: 0.09, lean: 0.1, sway: 0.08 },
     trickster: { freq: 12,  bounce: 0.15, lean: 0.25, sway: 0.16 },
     troll:     { freq: 3.6, bounce: 0.05, lean: 0.06, sway: 0.05 },
+  };
+  // Per-limb rigging. Every walker's limbs live in its one merged mesh, tagged
+  // with a limb slot (aLimb); a vertex shader swings each slot about its
+  // pivot. Slots: 1 armL, 2 armR, 3 legL, 4 legR, 5 earL, 6 earR, 8 extra
+  // (leaf). This replaces separate live meshes (each cost a mesh plus an
+  // outline mesh per limb per enemy), so an enemy now draws in 4 calls
+  // instead of 8 to 15, and every limb still animates.
+  const RIG_SLOTS = 9;
+  const RIG_PIVOTS = {
+    grunt:     { 1: [0.2, 0.28, 0.06], 2: [-0.2, 0.28, 0.06], 3: [0.1, 0.2, 0.02], 4: [-0.1, 0.2, 0.02], 5: [0.2, 0.56, 0], 6: [-0.2, 0.56, 0] },
+    trickster: { 1: [0.12, 0.4, 0.03], 2: [-0.12, 0.4, 0.03], 3: [0.08, 0.26, 0.02], 4: [-0.08, 0.26, 0.02], 5: [0.13, 0.62, 0], 6: [-0.13, 0.62, 0], 8: [0.04, 0.74, -0.04] },
+    troll:     { 1: [0.34, 0.5, 0.14], 2: [-0.34, 0.5, 0.14], 3: [0.14, 0.14, -0.02], 4: [-0.14, 0.14, -0.02] },
+    bat:       { 1: [0.12, 0.02, 0], 2: [-0.12, 0.02, 0] },
   };
   const ENEMY_RECIPES = { grunt: gruntParts, trickster: tricksterParts, troll: trollParts, bat: batParts, boss: bossParts, tideworm: tidewormParts, matriarch: matriarchParts, rime: rimeParts };
 
@@ -2077,21 +2183,18 @@ const Renderer = (() => {
   // display-only size boost: units read as characters beside the oversized scenery
   const TOWER_K = 1.25, ENEMY_K = 1.4;
   function addEnemyView(e) {
-    const g = liveProp(ENEMY_RECIPES[e.type](), e.x, 0, e.z, { ao: !e.flying, rim: true });
+    // walkers and bats are rigged (limbs animated in the shader); bosses keep their own rig
+    let rig = null;
+    if (!e.boss && RIG_PIVOTS[e.type]) { rig = makeRig(e.type); rig.mats = makeRigMats(rig); }
+    const g = liveProp(ENEMY_RECIPES[e.type](), e.x, 0, e.z, { ao: !e.flying, rim: true, rig });
     g.name = `enemy-${e.id}`;
-    const v = { group: g, e, decal: decal(0, 0, e.type === 'troll' ? 0.45 : 0.3, g), pop: 0, live: {} };
+    const v = { group: g, e, rig, decal: decal(0, 0, e.type === 'troll' ? 0.45 : 0.3, g), pop: 0, live: {} };
     g.traverse((o) => { if (o.name && o !== g) v.live[o.name] = o; });
     if (e.boss) {
       v.decal.scale.setScalar(0.7);
     } else if (e.flying) {
-      v.wingL = v.live.wingL; v.wingR = v.live.wingR;
-      v.wingL.matrixAutoUpdate = false; v.wingR.matrixAutoUpdate = false;
       v.decal.scale.setScalar(0.22);
     } else {
-      v.earL = v.live.earL; v.earR = v.live.earR;
-      v.footL = v.live.footL; v.footR = v.live.footR;
-      if (v.earL) { v.earL.matrixAutoUpdate = false; v.earR.matrixAutoUpdate = false; }
-      v.baseFootY = v.footL.position.y;
       v.walk = WALK[e.type];
     }
     // status effect dressing: frost crystals when chilled, a thorn ring when rooted
@@ -2141,24 +2244,32 @@ const Renderer = (() => {
       const s = born * (1 - (1 - born) * 0.5);
       g.scale.set(s * (1.06 - 0.1 * bounce + popK), s * (stretch - popK * 0.6), s * (1.06 - 0.1 * bounce + popK)).multiplyScalar(ENEMY_K);
       const flap = 0.35 + 0.45 * bounce;
-      if (e.type === 'grunt') {
-        pivotMatrix(0.2, 0.56, 0, 0, 0, -1.2 + flap, 0, 0.13, 0, 0.07, 0.26, 0.05, v.earL.matrix);
-        pivotMatrix(-0.2, 0.56, 0, 0, 0, 1.2 - flap, 0, 0.13, 0, 0.07, 0.26, 0.05, v.earR.matrix);
-      } else if (e.type === 'trickster') {
-        pivotMatrix(0.13, 0.62, 0, 0, 0, -1.4 + flap * 0.8, 0, 0.12, 0, 0.05, 0.24, 0.04, v.earL.matrix);
-        pivotMatrix(-0.13, 0.62, 0, 0, 0, 1.4 - flap * 0.8, 0, 0.12, 0, 0.05, 0.24, 0.04, v.earR.matrix);
-        v.live.leaf.rotation.z = -0.3 + Math.sin(cycle) * 0.2;
+      // per-limb pose: arms swing against the legs, legs swing and lift, ears flap.
+      // Angles are (about X, about Z, lift Y, shift Z) at each limb's pivot.
+      const sn = Math.sin(cycle), rig = v.rig.ang;
+      if (e.rooted) {
+        // stuck in the brambles: everything flails
+        const f = Math.sin(t * 26 + e.id);
+        rig[1].set(f * 1.1, 0.3, 0, 0); rig[2].set(-f * 1.1, -0.3, 0, 0);
+        rig[3].set(-f * 0.4, 0, 0, 0); rig[4].set(f * 0.4, 0, 0, 0);
       } else if (e.type === 'troll') {
-        // knuckle-walk: fists swing opposite the feet
-        v.live.fistL.position.z = 0.2 - Math.sin(cycle) * 0.16;
-        v.live.fistR.position.z = 0.2 + Math.sin(cycle) * 0.16;
-        v.live.armL.rotation.x = -Math.sin(cycle) * 0.3; v.live.armR.rotation.x = Math.sin(cycle) * 0.3;
+        // heavy knuckle-walk: long slow swings, fists dragging forward
+        rig[1].set(-sn * 0.6, 0, 0, 0); rig[2].set(sn * 0.6, 0, 0, 0);
+        rig[3].set(sn * 0.5, 0, Math.max(0, sn) * 0.04, 0); rig[4].set(-sn * 0.5, 0, Math.max(0, -sn) * 0.04, 0);
+      } else if (e.type === 'trickster') {
+        rig[1].set(-sn * 1.0, 0.15, 0, 0); rig[2].set(sn * 1.0, -0.15, 0, 0);
+        rig[3].set(sn * 0.95, 0, Math.max(0, sn) * 0.07, 0); rig[4].set(-sn * 0.95, 0, Math.max(0, -sn) * 0.07, 0);
+        rig[8].set(0, sn * 0.25, 0, 0);
+      } else {
+        // grunt: the club arm carries its club up and chops, the other arm counter-swings
+        rig[1].set(-sn * 0.9, 0.1, 0, 0);
+        rig[2].set(sn * 0.55 - 0.35, -0.1, 0, 0);
+        rig[3].set(sn * 0.8, 0, Math.max(0, sn) * 0.05, 0); rig[4].set(-sn * 0.8, 0, Math.max(0, -sn) * 0.05, 0);
       }
-      const stride = e.type === 'troll' ? 0.1 : 0.12;
-      v.footL.position.z = 0.02 + Math.sin(cycle) * stride;
-      v.footR.position.z = 0.02 - Math.sin(cycle) * stride;
-      v.footL.position.y = v.baseFootY + Math.max(0, Math.sin(cycle)) * 0.06 - w.bounce * bounce;
-      v.footR.position.y = v.baseFootY + Math.max(0, -Math.sin(cycle)) * 0.06 - w.bounce * bounce;
+      if (e.type !== 'troll') {
+        const k = e.type === 'trickster' ? 0.8 : 1;
+        rig[5].set(0, flap * k, 0, 0); rig[6].set(0, -flap * k, 0, 0);
+      }
       v.decal.scale.setScalar((e.type === 'troll' ? 0.45 : 0.3) * (1 - 0.3 * bounce));
       v.decal.position.y = 0.012 - w.bounce * bounce;   // keep the shadow flat on the ground while the body hops
     }
@@ -2210,8 +2321,8 @@ const Renderer = (() => {
     g.rotation.y = Math.atan2(e.dirX, e.dirZ);
     g.rotation.z = Math.sin(t * 2.5 + e.id) * 0.15;
     g.scale.set(born * (1 + popK), born * (1 - popK * 0.5), born * (1 + popK)).multiplyScalar(ENEMY_K);
-    pivotMatrix(0.12, 0.02, 0, 0, 0, flap, 0.3, 0, 0, 0.6, 0.025, 0.36, v.wingL.matrix);
-    pivotMatrix(-0.12, 0.02, 0, 0, 0, -flap, -0.3, 0, 0, 0.6, 0.025, 0.36, v.wingR.matrix);
+    v.rig.ang[1].set(0, flap, 0, 0);
+    v.rig.ang[2].set(0, -flap, 0, 0);
     v.decal.position.y = -(BAT_HEIGHT + bob) + 0.012;   // shadow stays on the ground
   }
   // Exit animations are capped: if more than this many are playing at once
