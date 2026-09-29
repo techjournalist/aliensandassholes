@@ -1116,6 +1116,23 @@ which the balance duel seeds (visuals had been changing gameplay-adjacent
 random draws). Level 1 title view is now 118 draw calls and 167.8k triangles
 (budget 158 and 189k); a boss scene reads about 155 to 158 calls.
 
+**P3-V4 addendum — gaps closed after the user's checklist review.** The
+user's own numbered list (camera polish, boss moments, unit readability,
+living world) was compared against what P3-V4 built and three things were
+missing, so they were added: a screen shake on the boss's arrival (0.14 for
+about 1.1s, alongside the push-in); unit readability (an enemy-only rim glow,
+a shared toon material patched to add a pink-red edge light where a surface
+turns from the camera, no extra draw calls; and health bars that appear on a
+hit and shrink away about 2.2s later, two InstancedMeshes drawn on top,
+bosses keep their own bar); and visible clouds in the game view (instanced
+puffs riding above the far and near edges of the valley, never over the
+towers). A bug found while building the bars: `InstancedMesh.setColorAt`
+sizes its buffer from the current `count`, so `count = 0` must be set after it
+or every color is silently black. Testing note: at 2x device pixel ratio
+software rendering can take seconds per frame, so timing-based checks must use
+1x. Level 1 title view 119 calls and 170.7k triangles; the mid-wave reference
+scene 270 calls and 196.8k triangles (259 and 198.8k before any of this pass).
+
 **Graphics roadmap**: see `GRAPHICS-ROADMAP.md` for the approved list of
 further graphics work, its priority order, the performance budget and the
 current test status. Read it before starting any graphics task.

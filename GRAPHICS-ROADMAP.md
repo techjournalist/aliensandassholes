@@ -26,8 +26,8 @@ Already done (logged as P3-V3 in AGENTS.md):
   only). Test on a device before claiming the 30 fps target.
 
 ## Roadmap status
-Items 1 to 4 below are BUILT on this branch (see P3-V4 in AGENTS.md). Items 5
-to 10 are still open, in the same order.
+Items 1 to 5 below are BUILT on this branch (see P3-V4 and its addendum in
+AGENTS.md). Items 6 to 10 are still open, in the same order.
 
 ## Roadmap, in priority order
 
@@ -42,7 +42,7 @@ to 10 are still open, in the same order.
 ### Then
 4. [DONE] **Camera and screen polish.** Slow camera drift on the title screen, zoom
    punch on boss deaths, gentle depth-of-field look through fog.
-5. **Unit readability.** Soft team-colored rim glow on enemies, health bars
+5. [DONE] **Unit readability.** Soft team-colored rim glow on enemies, health bars
    that appear only after a hit.
 6. **Sound tied to visuals.** Layered music that shifts between prep and
    combat (audio is synthesized, see js/audio.js).

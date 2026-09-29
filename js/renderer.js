@@ -88,6 +88,25 @@ const Renderer = (() => {
     materialCache.set(k, m);
     return m;
   }
+  // Enemy rim glow: one shared toon material that adds a hot pink-red edge
+  // light where a surface turns away from the camera. Only enemies use it (a
+  // single extra shader program, no extra draw calls), so a crowd of hostile
+  // silhouettes pops off the meadow while the towers keep their own colors.
+  let _rimMat = null;
+  const RIM_COLOR = new THREE.Color(0xff4f7a);
+  function rimMat() {
+    if (_rimMat) return _rimMat;
+    const m = new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap, vertexColors: true });
+    m.onBeforeCompile = (sh) => {
+      sh.uniforms.uRim = { value: RIM_COLOR };
+      sh.fragmentShader = 'uniform vec3 uRim;\n' + sh.fragmentShader.replace('#include <output_fragment>',
+        `float rimK = pow(1.0 - clamp(dot(normalize(vNormal), normalize(vViewPosition)), 0.0, 1.0), 2.2);
+         outgoingLight += uRim * rimK * 0.75;
+         #include <output_fragment>`);
+    };
+    m.customProgramCacheKey = () => 'enemy-rim';
+    return (_rimMat = m);
+  }
   function unlit(color, opts = {}) {
     const k = `u${color}${opts.opacity ?? 1}${opts.side || ''}`;
     if (materialCache.has(k)) return materialCache.get(k);
@@ -344,7 +363,7 @@ const Renderer = (() => {
       (p.unlit ? unlitGeos : toonGeos).push(geo);
       if (p.outline) outlineGeos.push(smoothedForOutline(p.geo).clone().applyMatrix4(p.m));
     }
-    if (toonGeos.length) { const m = new THREE.Mesh(mergeGeoms(toonGeos), toon(0xffffff, { vc: true })); m.name = 'merged'; g.add(m); }
+    if (toonGeos.length) { const m = new THREE.Mesh(mergeGeoms(toonGeos), opts.rim ? rimMat() : toon(0xffffff, { vc: true })); m.name = 'merged'; g.add(m); }
     if (unlitGeos.length) { const m = new THREE.Mesh(mergeGeoms(unlitGeos), unlitVC()); m.name = 'mergedUnlit'; g.add(m); }
     if (outlineGeos.length) { const m = new THREE.Mesh(mergeGeoms(outlineGeos), outlineMat); m.name = 'mergedOutline'; g.add(m); }
     scene.add(g);
@@ -1714,6 +1733,12 @@ const Renderer = (() => {
     g.computeVertexNormals();
     return g;
   }
+  // average corruption of the play grid: 0 is a bright meadow, 1 is all blight
+  function levelMood() {
+    let sum = 0, n = 0;
+    for (let r = 0; r < rows; r += 2) for (let c = 0; c < cols; c += 2) { sum += GameState.zoneFalloff(c, r); n++; }
+    return sum / Math.max(1, n);
+  }
   function buildLife() {
     const vt = levelTheme();
     let sum = 0, n = 0;
@@ -1784,6 +1809,98 @@ const Renderer = (() => {
     const cloud = new THREE.Mesh(new THREE.PlaneGeometry(w + 8, h + 8), cloudMat);
     cloud.rotation.x = -Math.PI / 2; cloud.position.y = 0.045; cloud.renderOrder = 0; cloud.name = 'cloudShadows';
     if (corrupt < 0.72) scene.add(cloud);
+  }
+
+  // -------- hit-triggered health bars --------
+  // A bar appears above an enemy when it is hit and shrinks away about two
+  // seconds later, so a big wave stays clean and only the fights that matter
+  // show numbers. Two InstancedMeshes (dark backing, colored fill), drawn on
+  // top of the scene and oriented to the fixed camera. Bosses keep their own bar.
+  const BAR_POOL = 36, BAR_SHOW = 2.2;
+  const BAR_LIFT = { grunt: 1.35, trickster: 1.55, troll: 2.0, bat: 0.55 };
+  const BAR_W = { grunt: 0.62, trickster: 0.6, troll: 0.95, bat: 0.55 };
+  let barBack = null, barFill = null;
+  const _bq = new THREE.Quaternion(), _bp = new THREE.Vector3(), _bs = new THREE.Vector3(), _bm = new THREE.Matrix4(), _bc = new THREE.Color();
+  function buildHealthBars() {
+    const geo = new THREE.PlaneGeometry(1, 1);
+    const mk = (color, order) => {
+      const m = new THREE.InstancedMesh(geo, new THREE.MeshBasicMaterial({ color, depthTest: false, depthWrite: false, transparent: true, fog: false }), BAR_POOL);
+      m.frustumCulled = false; m.renderOrder = order;
+      m.setColorAt(0, _bc.set(0xffffff));   // creates the color buffer at full pool size...
+      m.count = 0;                          // ...so shrink the drawn count only afterwards
+      scene.add(m);
+      return m;
+    };
+    barBack = mk(0x1b1410, 5);
+    barFill = mk(0xffffff, 6);
+  }
+  function updateHealthBars(dt) {
+    if (!barBack) return;
+    _bq.copy(camera.quaternion);
+    let n = 0;
+    for (const v of enemyViews.values()) {
+      if (v.barT === undefined || v.barT <= 0) continue;
+      v.barT -= dt;
+      const e = v.e;
+      if (e.boss || n >= BAR_POOL) continue;
+      const w = BAR_W[e.type] || 0.6, hgt = 0.11;
+      const frac = Math.max(0, Math.min(1, e.hp / e.maxHp));
+      const open = Math.min(1, v.barT / 0.35, (BAR_SHOW - v.barT) / 0.12 + 0.2);   // grows in fast, shrinks out at the end
+      const k = Math.max(0.001, Math.min(1, open));
+      const lift = BAR_LIFT[e.type] || 1.4;
+      _bp.set(v.group.position.x, (e.flying ? BAT_HEIGHT : 0) + lift, v.group.position.z);
+      _bs.set((w + 0.06) * k, (hgt + 0.05) * k, 1);
+      _bm.compose(_bp, _bq, _bs); barBack.setMatrixAt(n, _bm);
+      // fill is left-anchored: shift it along the camera's right axis
+      const off = -(w * (1 - frac)) / 2;
+      _bp.addScaledVector(camRight, off * k);
+      _bs.set(Math.max(0.001, w * frac * k), hgt * k, 1);
+      _bm.compose(_bp, _bq, _bs); barFill.setMatrixAt(n, _bm);
+      barFill.setColorAt(n, _bc.setHex(frac > 0.6 ? 0x6fd15a : frac > 0.3 ? 0xf2c14e : 0xe0503e));
+      n++;
+    }
+    barBack.count = barFill.count = n;
+    if (n) {
+      barBack.instanceMatrix.needsUpdate = barFill.instanceMatrix.needsUpdate = true;
+      if (barFill.instanceColor) barFill.instanceColor.needsUpdate = true;
+    }
+  }
+
+  // -------- drifting clouds --------
+  // Soft flat-shaded puffs riding high above the far and near edges of the
+  // valley (never over the towers, so play stays readable). One instanced
+  // mesh; they also give the cloud shadows on the ground something to belong to.
+  function buildClouds() {
+    let sum = 0, cnt = 0;
+    for (let r = 0; r < rows; r += 2) for (let c = 0; c < cols; c += 2) { sum += GameState.zoneFalloff(c, r); cnt++; }
+    const corrupt = sum / Math.max(1, cnt);
+    const vt = levelTheme();
+    const rng = srand(31337);
+    const clouds = [], PUFFS_PER = 6, N = Math.max(3, Math.round(5 * QUALITY + 0.5));
+    for (let i = 0; i < N; i++) {
+      const far = i % 2 === 0;
+      const puffs = [];
+      for (let k = 0; k < PUFFS_PER; k++) puffs.push({ dx: (k - 2.5) * 0.9 + (rng() - 0.5) * 0.4, dy: (rng() - 0.3) * 0.35, dz: (rng() - 0.5) * 0.7, r: 0.85 + rng() * 0.7 - Math.abs(k - 2.5) * 0.12 });
+      clouds.push({ x: -cols / 2 - 12 + rng() * (cols + 24), z: far ? -(rows / 2 + 3 + rng() * 2.5) : (rows / 2 + 6 + rng() * 2), y: 4.6 + rng() * 1.2, sp: 0.16 + rng() * 0.12, puffs });
+    }
+    const total = N * PUFFS_PER;
+    const tint = lerpColor(0xf6f9ff, vt.backdrop, Math.min(0.5, corrupt * 0.6));
+    const mat = new THREE.MeshBasicMaterial({ color: tint, transparent: true, opacity: 0.7, depthWrite: false, fog: false });
+    const mesh = new THREE.InstancedMesh(GEO.sphereLo, mat, total);
+    mesh.frustumCulled = false; mesh.renderOrder = 4; mesh.name = 'clouds';
+    scene.add(mesh);
+    const span = cols + 26, m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new THREE.Vector3(), sc = new THREE.Vector3();
+    animated.push({ update(t) {
+      let i = 0;
+      for (const c of clouds) {
+        const cx = ((c.x + t * c.sp + span / 2) % span + span) % span - span / 2;
+        for (const pf of c.puffs) {
+          p.set(cx + pf.dx, c.y + pf.dy, c.z + pf.dz); sc.set(pf.r * 1.25, pf.r * 0.75, pf.r * 0.9);
+          m4.compose(p, q, sc); mesh.setMatrixAt(i++, m4);
+        }
+      }
+      mesh.instanceMatrix.needsUpdate = true;
+    } });
   }
 
   // -------- camera director --------
@@ -1960,7 +2077,7 @@ const Renderer = (() => {
   // display-only size boost: units read as characters beside the oversized scenery
   const TOWER_K = 1.25, ENEMY_K = 1.4;
   function addEnemyView(e) {
-    const g = liveProp(ENEMY_RECIPES[e.type](), e.x, 0, e.z, { ao: !e.flying });
+    const g = liveProp(ENEMY_RECIPES[e.type](), e.x, 0, e.z, { ao: !e.flying, rim: true });
     g.name = `enemy-${e.id}`;
     const v = { group: g, e, decal: decal(0, 0, e.type === 'troll' ? 0.45 : 0.3, g), pop: 0, live: {} };
     g.traverse((o) => { if (o.name && o !== g) v.live[o.name] = o; });
@@ -2220,10 +2337,10 @@ const Renderer = (() => {
     GameState.on('enemySpawned', addEnemyView);
     GameState.on('enemyLeaked', (e) => removeEnemyView(e, leakExit));
     GameState.on('enemyKilled', (e) => { removeEnemyView(e, deathExit); if (e.boss) zoomPunch(0.16, 0.8); });
-    GameState.on('enemySpawned', (e) => { if (e.boss) bossShot(e); });
+    GameState.on('enemySpawned', (e) => { if (e.boss) { bossShot(e); shakeCamera(0.14, 1.1); } });
     GameState.on('enemyHit', ({ enemy, x, z }) => {
       const v = enemyViews.get(enemy.id);
-      if (v) v.pop = 1;
+      if (v) { v.pop = 1; v.barT = BAR_SHOW; }
       puff(x, 0.45, z, { count: 3, color: PALETTE.cream, speed: 1.0, size: 0.06, up: 1.0, ttl: 0.35 });
       spark(x, 0.5, z, PALETTE.gold, 2);
     });
@@ -2459,6 +2576,8 @@ const Renderer = (() => {
     buildParticles();
     buildRings();
     buildLife();
+    if (levelMood() < 0.72) buildClouds();
+    buildHealthBars();
     buildSelection();
     flushBatch();
     flushGlow();
@@ -2485,6 +2604,7 @@ const Renderer = (() => {
       shake.x = (fxRand() - 0.5) * 2 * shake.amp;
       shake.y = (fxRand() - 0.5) * 2 * shake.amp;
     } else { shake.x = shake.y = 0; }
+    updateHealthBars(dirDt);
     updateCameraDirector(dirDt);
     camera.position.copy(camBase).addScaledVector(camRight, shake.x + camState.px).addScaledVector(camUp, shake.y + camState.py);
     renderer.render(scene, camera);
@@ -2495,5 +2615,5 @@ const Renderer = (() => {
     return { calls: r.calls, triangles: r.triangles };
   }
 
-  return { init, render, resize, screenToCell, worldToScreen, stats, shakeCamera, puff, debugScene: () => scene, debugViews: () => ({ enemyViews: enemyViews.size, dying: dying.map((d) => [+d.t.toFixed(3), d.dur]), towerViews: towerViews.size }) };
+  return { init, render, resize, screenToCell, worldToScreen, stats, shakeCamera, puff, debugScene: () => scene, debugViews: () => ({ bars: barBack ? barBack.count : -1, enemyViews: enemyViews.size, dying: dying.map((d) => [+d.t.toFixed(3), d.dur]), towerViews: towerViews.size }) };
 })();
