@@ -548,6 +548,7 @@ const UI = (() => {
     GameState.on('waveStarted', (w) => { updateHud(); waveBanner(w); });
     GameState.on('enemySpawned', (e) => { if (e.boss) bossIntro(e.name); });
     seedFireflies();
+    if (typeof TitleArt !== 'undefined') TitleArt.init();
     GameState.on('waveEnded', ({ wave }) => { updateHud(); if (wave < GameState.totalWaves()) toast('The road is quiet. Build, upgrade, breathe.'); });
   }
 

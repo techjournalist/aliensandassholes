@@ -40,10 +40,9 @@ file reordered it, which caused confusion; this numbering is authoritative.
    drifting clouds above the valley edges.
 5. **Sound tied to visuals.** OPEN. Layered music that shifts between prep and
    combat (audio is synthesized, see js/audio.js).
-6. **Painted title and world map art.** PARTLY DONE. Done: SVG crest, sun
-   rays, drifting clouds, fireflies on the title; compass, ripples and cloud
-   shadows on the map. Not done: a hand-illustrated backdrop and animated
-   parallax layers that respond to the pointer or tilt.
+6. **Painted title and world map art.** DONE. Illustrated dawn backdrop with
+   six parallax layers (`js/title-art.js`), gold logotype with ribbon and vine
+   flourishes, painted map sea and frame with a desktop tilt. See P3-V6.
 7. **Per-limb enemy animation.** DONE. Vertex-shader rig inside each enemy's
    merged mesh (see P3-V5 in AGENTS.md): arms, legs, ears and wings animate
    individually and a busy wave draws 21% fewer calls (270 to 212). Bosses

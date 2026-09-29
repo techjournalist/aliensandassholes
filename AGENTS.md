@@ -1153,6 +1153,25 @@ unlit, outline, contact shadow). Mid-wave reference scene: 212 calls and
 197.1k triangles (was 270 and 196.8k). Full harness: 382 pass, the 19 failures
 match untouched `main`.
 
+**P3-V6 — Painted title and world map art (roadmap item 6)** *(on branch
+`graphics-pass-units-tiers`)*. New `js/title-art.js` (`TitleArt`, loaded before
+`ui.js`) paints the title backdrop as layered SVG generated from the game's
+own palette: a dawn sky with a sun, rays and drifting clouds, hazy purple
+mountains, rolling hills with a tree line, the blighted Shadow Hollow (a
+cracked glowing stump and dead trees) on the left, the lit Bastion (warm stone,
+red mushroom-cap roofs, glowing windows, a fluttering banner) on the right, a
+road winding between them and a flower-and-mushroom meadow in front, framed by
+dark foreground leaves. Six layers translate by different amounts (`data-d`
+depth) following the pointer with smoothing plus a slow automatic sway, and it
+only runs while the title is showing (reduced motion turns it off). The logo is
+a gold gradient logotype with a dark outline, a ribbon banner for the tagline
+and vine flourishes; the wider title card keeps it on one line. The world map
+gained a painted sea gradient, swells, a gold frame with corner ornaments and a
+small pointer-driven tilt of the map card on desktop. Static SVG plus CSS
+transforms only: no extra WebGL work, Level 1 title view unchanged at 119 calls
+and 170.7k triangles. Full harness: 382 pass, the 19 failures match untouched
+`main`.
+
 **Graphics roadmap**: see `GRAPHICS-ROADMAP.md` for the approved list of
 further graphics work, its priority order, the performance budget and the
 current test status. Read it before starting any graphics task. Its numbered list is the one the

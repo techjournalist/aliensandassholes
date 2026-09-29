@@ -484,6 +484,53 @@
     .crest, .t-rays, .t-clouds i, .t-flies i, .wm-cloudshadows, .wm-ripples path { animation: none; }
     #boss-intro.go, #boss-vig.go { animation-duration: 0.01s; }
   }
+
+  /* ---- painted title: illustrated backdrop, parallax layers, gold logotype ---- */
+  #title { background: none; overflow: hidden; }
+  #t-scene { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
+  #t-scene .tl { will-change: transform; }
+  .t-vignette { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at center, transparent 48%, rgba(12, 8, 18, 0.55) 100%); }
+  @keyframes ts-drift { from { transform: translateX(-420px); } to { transform: translateX(1950px); } }
+  .ts-cloud.c1 { animation: ts-drift 150s linear infinite; }
+  .ts-cloud.c2 { animation: ts-drift 210s linear infinite; animation-delay: -90s; }
+  .ts-cloud.c3 { animation: ts-drift 180s linear infinite; animation-delay: -40s; }
+  .ts-rays { transform-origin: 1120px 560px; animation: ts-rays 14s ease-in-out infinite; }
+  @keyframes ts-rays { 0%, 100% { opacity: 0.6; transform: rotate(-2deg); } 50% { opacity: 1; transform: rotate(2deg); } }
+  #title .card { background-color: rgba(34, 23, 16, 0.9); }
+  #title h1 {
+    position: relative; display: inline-block; margin: 8px 0 14px; padding: 0 6px;
+    background: linear-gradient(180deg, #fff0b0 0%, #f2c14e 52%, #c98a1d 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    -webkit-text-stroke: 2px #1b1410; paint-order: stroke fill; text-shadow: none;
+    filter: drop-shadow(0 3px 0 #7a5316) drop-shadow(0 6px 0 #1b1410) drop-shadow(0 12px 14px rgba(0, 0, 0, 0.55));
+    letter-spacing: 1px; white-space: nowrap; font-size: clamp(28px, 4.2vw, 44px);
+  }
+  #title .card { max-width: 560px; }
+  #title h1 .amp { -webkit-text-fill-color: #f6ecd4; text-shadow: none; font-style: italic; }
+  #title h1::before, #title h1::after {
+    content: ""; position: absolute; top: 50%; width: 56px; height: 34px; margin-top: -17px;
+    background: no-repeat center / contain url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 56 34'><path d='M2 17 C14 17 20 8 30 6 C28 14 24 18 18 20 C26 20 32 24 38 30 C28 30 20 26 14 20 C10 18 6 18 2 17 Z' fill='%236fae4a' stroke='%231b1410' stroke-width='2' stroke-linejoin='round'/><circle cx='44' cy='17' r='5' fill='%23f2c14e' stroke='%231b1410' stroke-width='2'/></svg>");
+  }
+  #title h1::before { left: -58px; }
+  #title h1::after { right: -58px; transform: scaleX(-1); }
+  #title .eyebrow {
+    display: inline-block; padding: 5px 30px 6px; margin: 0 0 2px; color: #eaf5d2; text-shadow: 0 1px 0 #1b1410;
+    background: linear-gradient(180deg, #3c6a3f, #24422a);
+    clip-path: polygon(0 0, 100% 0, calc(100% - 14px) 50%, 100% 100%, 0 100%, 14px 50%);
+    box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.18);
+  }
+  @media (max-width: 640px) { #title h1::before, #title h1::after { display: none; } }
+  @media (max-height: 460px) { .crest { display: none; } #title .card { padding-top: 16px; } }
+
+  /* ---- painted world map: sea, gold frame, corner ornaments, a gentle tilt ---- */
+  .wm-sea { fill: url(#wm-sea-grad); }
+  .wm-frame { fill: none; stroke: var(--gold); stroke-width: 3; }
+  .wm-corners path, .wm-corners circle { fill: none; stroke: var(--gold); stroke-width: 3; stroke-linecap: round; }
+  .wm-corners circle { fill: var(--gold); stroke: #1b1410; stroke-width: 1.5; }
+  .wm-swell path { fill: none; stroke: rgba(191, 230, 255, 0.28); stroke-width: 2.4; stroke-linecap: round; animation: wm-ripple 5s ease-in-out infinite; }
+  .wm-swell path:nth-child(2) { animation-delay: -1.5s; } .wm-swell path:nth-child(3) { animation-delay: -3s; } .wm-swell path:nth-child(4) { animation-delay: -4s; }
+  #worldmap .card.wide { transition: transform 0.25s ease-out; transform: perspective(1400px) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg)); }
+  @media (prefers-reduced-motion: reduce) { .ts-cloud, .ts-rays, .wm-swell path { animation: none; } #worldmap .card.wide { transform: none; } }
 </style>
 </head>
 <body>
@@ -514,6 +561,8 @@
 </div>
 
 <div id="title" class="screen">
+  <svg id="t-scene" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true"></svg>
+  <div class="t-vignette"></div>
   <div class="t-rays"></div><div class="t-clouds"><i></i><i></i><i></i></div><div class="t-flies" id="t-flies"></div>
   <div class="card">
     <svg class="crest" viewBox="0 0 64 72" aria-hidden="true">
@@ -542,6 +591,7 @@
     <h1>Choose your ground</h1>
     <svg id="wm-svg" viewBox="0 0 800 320" role="img" aria-label="Map of the Briar kingdom and its battle sites">
       <defs>
+        <linearGradient id="wm-sea-grad" x1="0" y1="0" x2="0.4" y2="1"><stop offset="0" stop-color="#1f4a63"/><stop offset="0.55" stop-color="#2a6580"/><stop offset="1" stop-color="#1b3f56"/></linearGradient>
         <radialGradient id="wm-soft">
           <stop offset="0" stop-color="#000" stop-opacity="1"></stop>
           <stop offset="0.6" stop-color="#000" stop-opacity="1"></stop>
@@ -558,6 +608,11 @@
           <g id="wm-cuts"></g>
         </mask>
       </defs>
+      <!-- painted sea and a gold frame -->
+      <rect class="wm-sea" x="-8" y="-8" width="816" height="336" rx="18"></rect>
+      <g class="wm-swell"><path d="M 20 150 q 20 -8 40 0 t 40 0 t 40 0"></path><path d="M 700 250 q 20 -8 40 0 t 40 0"></path><path d="M 300 314 q 20 -8 40 0 t 40 0 t 40 0"></path><path d="M 610 8 q 20 -8 40 0 t 40 0"></path></g>
+      <rect class="wm-frame" x="-8" y="-8" width="816" height="336" rx="18"></rect>
+      <g class="wm-corners"><path d="M -8 26 V 10 a 18 18 0 0 1 18 -18 H 26"></path><path d="M 808 26 V 10 a 18 18 0 0 0 -18 -18 H 774"></path><path d="M -8 294 V 310 a 18 18 0 0 0 18 18 H 26"></path><path d="M 808 294 V 310 a 18 18 0 0 1 -18 18 H 774"></path><circle cx="-8" cy="-8" r="5"></circle><circle cx="808" cy="-8" r="5"></circle><circle cx="-8" cy="328" r="5"></circle><circle cx="808" cy="328" r="5"></circle></g>
       <!-- the kingdom: home in the south-east, the Hollow's heart in the far north-west -->
       <path class="wm-coast" d="M 60 40 C 150 10, 300 22, 420 18 C 540 14, 660 30, 740 52 C 790 70, 786 140, 772 200 C 760 260, 730 300, 640 304 C 520 310, 380 300, 260 304 C 150 308, 60 296, 34 250 C 12 200, 20 120, 30 80 C 36 58, 44 46, 60 40 Z"></path>
       <path class="wm-land" d="M 60 40 C 150 10, 300 22, 420 18 C 540 14, 660 30, 740 52 C 790 70, 786 140, 772 200 C 760 260, 730 300, 640 304 C 520 310, 380 300, 260 304 C 150 308, 60 296, 34 250 C 12 200, 20 120, 30 80 C 36 58, 44 46, 60 40 Z"></path>
@@ -662,6 +717,7 @@
 <script src="js/renderer-fx.js"></script>
 <script src="js/renderer.js"></script>
 <script src="js/input.js"></script>
+<script src="js/title-art.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/boot.js"></script>
