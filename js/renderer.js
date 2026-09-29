@@ -122,6 +122,23 @@ const Renderer = (() => {
     }
     GEO.petals = new THREE.ShapeGeometry(petal);
     GEO.petals.rotateX(-Math.PI / 2);
+    // bat wing: shoulder on the hinge edge, a scalloped trailing edge, thin solid so the ink outline closes
+    const wingShape = (m) => {
+      const sh = new THREE.Shape();
+      const pt = (x, z) => [m * x, -z];
+      sh.moveTo(...pt(-0.5, 0.3));
+      sh.quadraticCurveTo(...pt(-0.1, 0.5), ...pt(0.5, 0.12));
+      sh.quadraticCurveTo(...pt(0.36, -0.1), ...pt(0.3, -0.34));
+      sh.quadraticCurveTo(...pt(0.16, -0.16), ...pt(0.02, -0.4));
+      sh.quadraticCurveTo(...pt(-0.1, -0.2), ...pt(-0.26, -0.36));
+      sh.quadraticCurveTo(...pt(-0.36, -0.2), ...pt(-0.5, -0.12));
+      sh.lineTo(...pt(-0.5, 0.3));
+      const g = new THREE.ExtrudeGeometry(sh, { depth: 1, bevelEnabled: false, curveSegments: 5 });
+      g.rotateX(-Math.PI / 2); g.translate(0, -0.5, 0);   // y thickness centred, shape lies in XZ
+      return g;
+    };
+    GEO.wingL = wingShape(1);
+    GEO.wingR = wingShape(-1);
     GEO.circle = new THREE.CircleGeometry(1, 18);
     for (const k in GEO) { if (GEO[k].index) GEO[k] = GEO[k].toNonIndexed(); }
     // circle should lie flat on the ground
@@ -1097,12 +1114,63 @@ const Renderer = (() => {
   };
   const BRANCH_PENNANT = { marksman: PALETTE.capRed, bloom: PALETTE.flowerPink, thicket: PALETTE.cloak, briarstorm: PALETTE.magic,
     hoarfrost: PALETTE.frost, seer: PALETTE.cream, earthshaker: PALETTE.stoneDark, mountainheart: PALETTE.gold, oakfall: PALETTE.acorn, squirrel: PALETTE.woodLight };
-  function tierParts(tier, branch) {
+  // Tier-2 dressing, one per tower: each upgrade changes the silhouette in
+  // that character's own way, so the step from tier 1 to 2 reads at a glance.
+  const TIER2_PARTS = {
+    // a feathered cap, a bandolier of acorns and a stack of spare ammo
+    slinger: () => [
+      P(GEO.cone, PALETTE.cream, M(-0.12, 1.32, -0.06, { sx: 0.04, sy: 0.3, sz: 0.03, rz: 0.7, rx: -0.2 }), true),
+      P(GEO.cone, PALETTE.flowerPink, M(-0.16, 1.3, -0.06, { sx: 0.03, sy: 0.2, sz: 0.02, rz: 0.9 }), false),
+      P(GEO.box, PALETTE.capBrown, M(0, 0.5, 0.15, { sx: 0.5, sy: 0.05, sz: 0.03, rz: 0.75 }), false),
+      P(GEO.bead, PALETTE.gold, M(-0.1, 0.4, 0.17, { s: 0.03 }), false),
+      P(GEO.bead, PALETTE.gold, M(0.1, 0.6, 0.17, { s: 0.03 }), false),
+      P(GEO.sphereLo, PALETTE.acorn, M(0.28, 0.2, 0.3, { sx: 0.07, sy: 0.085, sz: 0.07 }), true),
+      P(GEO.sphereLo, PALETTE.acorn, M(0.38, 0.2, 0.22, { sx: 0.07, sy: 0.085, sz: 0.07 }), true),
+      P(GEO.sphereLo, PALETTE.acorn, M(0.32, 0.32, 0.26, { sx: 0.07, sy: 0.085, sz: 0.07 }), true),
+    ],
+    // a gold-trimmed hem, glowing thorn crystals round the pad and a taller hood tip
+    warden: () => [
+      P(GEO.torus, PALETTE.gold, M(0, 0.2, 0, { sx: 0.3, sy: 0.3, sz: 0.3, rx: Math.PI / 2 }), false),
+      ...ring5(4, 0.42, 0.24, (x, y, z, a) => P(GEO.cone, PALETTE.magic, M(x, y, z, { sx: 0.06, sy: 0.24, sz: 0.06, rz: -Math.cos(a) * 0.3, rx: Math.sin(a) * 0.3 }), true)),
+      P(GEO.cone, PALETTE.cloakDark, M(0, 1.42, -0.06, { sx: 0.1, sy: 0.3, sz: 0.1, rx: 0.5 }), true),
+      P(GEO.bead, PALETTE.gold, M(0, 1.6, -0.2, { s: 0.04 }), false, { unlit: true }),
+    ],
+    // a taller antler crown hung with frost, and a longer moss cloak
+    druid: () => [
+      P(GEO.cyl, PALETTE.wood, M(0.06, 1.38, -0.02, { sx: 0.02, sy: 0.3, sz: 0.02, rz: -0.15 }), true),
+      P(GEO.cyl, PALETTE.wood, M(-0.06, 1.38, -0.02, { sx: 0.02, sy: 0.3, sz: 0.02, rz: 0.15 }), true),
+      P(GEO.cone, PALETTE.frost, M(0.1, 1.22, 0.0, { sx: 0.03, sy: 0.12, sz: 0.03, rz: Math.PI }), false, { unlit: true }),
+      P(GEO.cone, PALETTE.frost, M(-0.1, 1.22, 0.0, { sx: 0.03, sy: 0.12, sz: 0.03, rz: Math.PI }), false, { unlit: true }),
+      P(GEO.cone, PALETTE.moss, M(0, 0.4, -0.16, { sx: 0.3, sy: 0.62, sz: 0.08 }), true),
+      ...ring5(5, 0.34, 0.2, (x, y, z) => P(GEO.cone, PALETTE.frost, M(x, y, z, { sx: 0.04, sy: 0.18, sz: 0.04 }), false)),
+    ],
+    // shoulder spikes, a gold rune on the chest and a bushy moss beard
+    golem: () => [
+      P(GEO.cone, PALETTE.stone, M(0.26, 0.84, 0, { sx: 0.09, sy: 0.24, sz: 0.09, rz: -0.35 }), true),
+      P(GEO.cone, PALETTE.stone, M(-0.26, 0.84, 0, { sx: 0.09, sy: 0.24, sz: 0.09, rz: 0.35 }), true),
+      P(GEO.box, PALETTE.gold, M(0, 0.4, 0.29, { sx: 0.1, sy: 0.1, sz: 0.02, rz: Math.PI / 4 }), false, { unlit: true }),
+      P(GEO.sphereLo, PALETTE.moss, M(0, 0.7, 0.2, { sx: 0.16, sy: 0.08, sz: 0.06 }), false),
+      P(GEO.rock, PALETTE.stoneDark, M(0.44, 0.12, -0.2, { s: 0.1 }), true),
+      P(GEO.rock, PALETTE.stone, M(-0.4, 0.1, -0.24, { s: 0.09 }), true),
+    ],
+    // an iron-banded barrel, a lookout flag and a second ammo pile
+    artillery: () => [
+      P(GEO.cyl, PALETTE.stoneDark, M(0, 0.58, 0.16, { sx: 0.17, sy: 0.05, sz: 0.17, rx: -0.85 }), true),
+      P(GEO.cyl, PALETTE.stoneDark, M(0, 0.7, 0.28, { sx: 0.16, sy: 0.05, sz: 0.16, rx: -0.85 }), false),
+      P(GEO.cyl, PALETTE.wood, M(0.2, 0.55, -0.16, { sx: 0.02, sy: 0.6, sz: 0.02 }), false),
+      P(GEO.box, PALETTE.capRed, M(0.28, 0.78, -0.16, { sx: 0.14, sy: 0.1, sz: 0.01 }), false, { unlit: true }),
+      P(GEO.sphereLo, PALETTE.acorn, M(0.3, 0.3, 0.22, { sx: 0.09, sy: 0.11, sz: 0.09 }), true),
+      P(GEO.sphereLo, PALETTE.acorn, M(0.2, 0.3, 0.3, { sx: 0.09, sy: 0.11, sz: 0.09 }), true),
+    ],
+  };
+
+  function tierParts(tier, branch, type) {
     const parts = [];
     if (tier >= 2) {
       parts.push(P(GEO.torus, PALETTE.stone, M(0, 0.05, 0, { sx: 0.42, sy: 0.42, sz: 0.42, rx: Math.PI / 2 }), true, { name: 'tierRing' }));
       parts.push(P(GEO.cyl, PALETTE.wood, M(-0.36, 0.42, -0.3, { sx: 0.02, sy: 0.7, sz: 0.02 }), false, { name: 'pennantPole' }));
       parts.push(P(GEO.box, PALETTE.gold, M(-0.3, 0.68, -0.3, { sx: 0.14, sy: 0.1, sz: 0.01 }), false, { name: 'pennant', live: true, unlit: true }));
+      if (TIER2_PARTS[type]) parts.push(...TIER2_PARTS[type]());
     }
     if (tier >= 3) {
       parts.push(P(GEO.torus, PALETTE.gold, M(0, 0.06, 0, { sx: 0.46, sy: 0.46, sz: 0.46, rx: Math.PI / 2 }), false, { name: 'tierRingGold', unlit: true }));
@@ -1131,8 +1199,8 @@ const Renderer = (() => {
       P(GEO.sphereLo, PALETTE.bat, M(0, -0.06, 0.08, { sx: 0.1, sy: 0.08, sz: 0.1 }), false),
       P(GEO.bead, PALETTE.outline, M(0.065, 0.035, 0.195, { s: 0.015 }), false, { unlit: true }),
       P(GEO.bead, PALETTE.outline, M(-0.055, 0.035, 0.195, { s: 0.015 }), false, { unlit: true }),
-      P(GEO.box, dark, pivotMatrix(0.12, 0.02, 0, 0, 0, 0, 0.26, 0, 0, 0.52, 0.02, 0.3), true, { name: 'wingL', live: true }),
-      P(GEO.box, dark, pivotMatrix(-0.12, 0.02, 0, 0, 0, 0, -0.26, 0, 0, 0.52, 0.02, 0.3), true, { name: 'wingR', live: true }),
+      P(GEO.wingL, PALETTE.batWing, pivotMatrix(0.12, 0.02, 0, 0, 0, 0, 0.3, 0, 0, 0.6, 0.025, 0.36), true, { name: 'wingL', live: true }),
+      P(GEO.wingR, PALETTE.batWing, pivotMatrix(-0.12, 0.02, 0, 0, 0, 0, -0.3, 0, 0, 0.6, 0.025, 0.36), true, { name: 'wingR', live: true }),
     ];
   }
 
@@ -1452,7 +1520,7 @@ const Renderer = (() => {
   // -------- tower views --------
   const towerViews = new Map();
   function addTowerView(tower, quiet) {
-    const parts = TOWER_RECIPES[tower.type]().concat(tierParts(tower.tier, tower.branch));
+    const parts = TOWER_RECIPES[tower.type]().concat(tierParts(tower.tier, tower.branch, tower.type));
     const g = liveProp(parts, tower.x, 0, tower.z);
     g.name = `tower-${tower.id}`;
     decal(0, 0, 0.36, g);
@@ -1561,6 +1629,7 @@ const Renderer = (() => {
         const sq = 1 + v.recoil * 0.12;
         v.group.scale.x *= sq; v.group.scale.z *= sq; v.group.scale.y /= sq;
       }
+      v.group.scale.multiplyScalar(TOWER_K * (1 + 0.06 * (v.tower.tier - 1)));   // each tier stands a little taller
     }
   }
 
@@ -1568,6 +1637,8 @@ const Renderer = (() => {
   const enemyViews = new Map();
   const dying = [];   // views playing an exit animation before removal
   const BAT_HEIGHT = 0.95, BOSS_HEIGHT = 1.25;
+  // display-only size boost: units read as characters beside the oversized scenery
+  const TOWER_K = 1.25, ENEMY_K = 1.4;
   function addEnemyView(e) {
     const g = liveProp(ENEMY_RECIPES[e.type](), e.x, 0, e.z, { ao: !e.flying });
     g.name = `enemy-${e.id}`;
@@ -1624,7 +1695,7 @@ const Renderer = (() => {
       v.pop = Math.max(0, v.pop - dt * 5);
       const popK = Math.sin(Math.min(1, v.pop) * Math.PI) * 0.35;   // scale-pop when hit
       const s = born * (1 - (1 - born) * 0.5);
-      g.scale.set(s * (1.06 - 0.1 * bounce + popK), s * (stretch - popK * 0.6), s * (1.06 - 0.1 * bounce + popK));
+      g.scale.set(s * (1.06 - 0.1 * bounce + popK), s * (stretch - popK * 0.6), s * (1.06 - 0.1 * bounce + popK)).multiplyScalar(ENEMY_K);
       const flap = 0.35 + 0.45 * bounce;
       if (e.type === 'grunt') {
         pivotMatrix(0.2, 0.56, 0, 0, 0, -1.2 + flap, 0, 0.13, 0, 0.07, 0.26, 0.05, v.earL.matrix);
@@ -1694,9 +1765,9 @@ const Renderer = (() => {
     g.position.set(e.x, BAT_HEIGHT + bob, e.z);
     g.rotation.y = Math.atan2(e.dirX, e.dirZ);
     g.rotation.z = Math.sin(t * 2.5 + e.id) * 0.15;
-    g.scale.set(born * (1 + popK), born * (1 - popK * 0.5), born * (1 + popK));
-    pivotMatrix(0.12, 0.02, 0, 0, 0, flap, 0.26, 0, 0, 0.52, 0.02, 0.3, v.wingL.matrix);
-    pivotMatrix(-0.12, 0.02, 0, 0, 0, -flap, -0.26, 0, 0, 0.52, 0.02, 0.3, v.wingR.matrix);
+    g.scale.set(born * (1 + popK), born * (1 - popK * 0.5), born * (1 + popK)).multiplyScalar(ENEMY_K);
+    pivotMatrix(0.12, 0.02, 0, 0, 0, flap, 0.3, 0, 0, 0.6, 0.025, 0.36, v.wingL.matrix);
+    pivotMatrix(-0.12, 0.02, 0, 0, 0, -flap, -0.3, 0, 0, 0.6, 0.025, 0.36, v.wingR.matrix);
     v.decal.position.y = -(BAT_HEIGHT + bob) + 0.012;   // shadow stays on the ground
   }
   // Exit animations are capped: if more than this many are playing at once

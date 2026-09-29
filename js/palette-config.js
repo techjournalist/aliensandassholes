@@ -44,6 +44,7 @@ const PALETTE = {
   goblinDark:   0x5f7d2a,
   bat:          0x5b3d7a,
   batDark:      0x3a2650,
+  batWing:      0x7a55a3,
   trickster:    0x5fb8a0,
   tricksterDark: 0x3d8a74,
   troll:        0x7a8f5a,
