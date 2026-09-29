@@ -368,6 +368,57 @@
   .wm-node.locked .wm-node-badge { stroke: #6d6e66; }
   #wm-blurb { min-height: 44px; }
   #wm-blurb .wm-name { display: block; color: var(--gold); font-weight: 800; }
+
+  /* ---- painted UI pass: carved wood panels, gold trim, glossy buttons ----
+     Overrides only paint (backgrounds, shadows, text-shadow). No sizes or
+     layout change, so touch targets and the phone layout are untouched. */
+  :root {
+    --wood-hi: #4a3323; --wood-lo: #2a1d14; --gold-hi: #ffe08a; --gold-lo: #d49a2a;
+    --moss-hi: #46704a; --moss-lo: #2a4530;
+    --trim: inset 0 0 0 2px rgba(18, 12, 8, 0.9), inset 0 3px 0 2px rgba(255, 224, 150, 0.16);
+  }
+  .pill, #toast, #panel {
+    background: linear-gradient(180deg, rgba(74, 51, 35, 0.95), rgba(42, 29, 20, 0.95));
+    box-shadow: 0 3px 0 rgba(0, 0, 0, 0.5), var(--trim);
+  }
+  .pill.gold { text-shadow: 0 1px 0 #1b1410; }
+  #panel, .screen .card {
+    background:
+      radial-gradient(circle at 12px 12px, var(--gold-hi) 0 2px, #8a6420 3px 4px, transparent 5px),
+      radial-gradient(circle at calc(100% - 12px) 12px, var(--gold-hi) 0 2px, #8a6420 3px 4px, transparent 5px),
+      radial-gradient(circle at 12px calc(100% - 12px), var(--gold-hi) 0 2px, #8a6420 3px 4px, transparent 5px),
+      radial-gradient(circle at calc(100% - 12px) calc(100% - 12px), var(--gold-hi) 0 2px, #8a6420 3px 4px, transparent 5px),
+      linear-gradient(180deg, rgba(74, 51, 35, 0.96), rgba(38, 26, 18, 0.97));
+  }
+  .screen .card { box-shadow: 0 8px 0 rgba(0, 0, 0, 0.45), var(--trim), 0 0 60px rgba(242, 193, 78, 0.12); }
+  .screen h1 { text-shadow: 0 2px 0 #8a6420, 0 5px 0 #1b1410, 0 10px 18px rgba(0, 0, 0, 0.5); }
+  .screen h1 .amp { text-shadow: 0 2px 0 #7a6b4a, 0 5px 0 #1b1410, 0 10px 18px rgba(0, 0, 0, 0.5); }
+  .screen .eyebrow { text-shadow: 0 1px 0 #1b1410; }
+  #wave-btn, .screen button {
+    background: linear-gradient(180deg, var(--gold-hi), var(--gold) 55%, var(--gold-lo));
+    box-shadow: 0 4px 0 var(--ink), inset 0 2px 0 rgba(255, 255, 255, 0.55);
+  }
+  .screen button { box-shadow: 0 5px 0 var(--ink), inset 0 2px 0 rgba(255, 255, 255, 0.55); }
+  #wave-btn:active { box-shadow: 0 1px 0 var(--ink), inset 0 2px 0 rgba(255, 255, 255, 0.4); }
+  .screen button:active { box-shadow: 0 1px 0 var(--ink), inset 0 2px 0 rgba(255, 255, 255, 0.4); }
+  #wave-btn:disabled { background: linear-gradient(180deg, rgba(74, 51, 35, 0.95), rgba(42, 29, 20, 0.95)); box-shadow: 0 3px 0 rgba(0, 0, 0, 0.5), var(--trim); }
+  .screen button.secondary { background: linear-gradient(180deg, var(--wood-hi), var(--wood-lo)); box-shadow: 0 5px 0 rgba(0, 0, 0, 0.55), inset 0 2px 0 rgba(255, 224, 150, 0.18); }
+  #wave-btn:not(:disabled) { animation: ready-glow 1.8s ease-in-out infinite; }
+  @keyframes ready-glow {
+    0%, 100% { filter: none; }
+    50% { filter: drop-shadow(0 0 10px rgba(255, 224, 138, 0.75)); }
+  }
+  .build-btn, .act-btn, .branch-btn {
+    background: linear-gradient(180deg, var(--moss-hi), var(--moss-lo));
+    box-shadow: 0 2px 0 rgba(0, 0, 0, 0.45), inset 0 2px 0 rgba(255, 255, 255, 0.14);
+  }
+  .build-btn:active, .act-btn:active, .branch-btn:active { box-shadow: 0 0 0 rgba(0, 0, 0, 0.45), inset 0 2px 0 rgba(255, 255, 255, 0.08); }
+  .build-btn.previewing { background: linear-gradient(180deg, #57835a, #33553a); }
+  .branch-btn.armed { background: linear-gradient(180deg, #5f8a5b, #3a5a3f); }
+  .build-btn:disabled, .act-btn:disabled, .branch-btn:disabled { filter: saturate(0.5) brightness(0.85); }
+  .build-name, .panel-title { text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6); }
+  .build-icon { filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.4)); }
+  @media (prefers-reduced-motion: reduce) { #wave-btn:not(:disabled) { animation: none; } }
 </style>
 </head>
 <body>

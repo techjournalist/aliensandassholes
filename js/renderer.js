@@ -486,19 +486,53 @@ const Renderer = (() => {
   // -------- prop recipes (each returns a parts list in local space) --------
   const P = (geo, color, m, outline = true, extra = {}) => ({ geo, color, m, outline, ...extra });
 
+  // Three species keep a grove from reading as one tree repeated: a round
+  // broadleaf, a stacked-cone conifer and a tall slender poplar. The last two
+  // are cheaper than the broadleaf, so variety costs nothing in triangles.
+  // They only use the three meadow greens, so each level's retint still works.
   function treeParts(rng) {
+    const kind = rng();
+    if (kind < 0.26) return coniferParts(rng);
+    if (kind < 0.44) return poplarParts(rng);
+    return broadleafParts(rng);
+  }
+  function rootFlares(parts, rng, n, ry, len) {
+    const ra = rng() * 6;
+    for (let i = 0; i < n; i++) {
+      const a = ra + i * (Math.PI * 2 / n);
+      parts.push(P(GEO.cone, PALETTE.wood, M(Math.cos(a) * 0.1, 0.05, Math.sin(a) * 0.1,
+        { sx: 0.06, sy: len, sz: 0.05, rz: -Math.cos(a) * 1.25, rx: Math.sin(a) * 1.25 }), false));
+    }
+  }
+  function coniferParts(rng) {
+    const h = 0.95 + rng() * 0.6, r = 0.3 + rng() * 0.14;
+    const parts = [P(GEO.cylTaper, PALETTE.wood, M(0, 0.18, 0, { sx: 0.09, sy: 0.36, sz: 0.09 }))];
+    rootFlares(parts, rng, 3, 0.05, 0.18);
+    const tiers = 3, cols = [PALETTE.meadowDark, PALETTE.meadow, PALETTE.meadowLight];
+    for (let i = 0; i < tiers; i++) {
+      const k = i / (tiers - 1), tr = r * (1.15 - k * 0.5), th = h * (0.42 - k * 0.06);
+      parts.push(P(GEO.cone, cols[i], M((rng() - 0.5) * 0.03, 0.3 + k * h * 0.34 + th / 2, (rng() - 0.5) * 0.03, { sx: tr, sy: th, sz: tr, ry: rng() * 6 })));
+    }
+    if (rng() < 0.3) parts.push(P(GEO.bead, PALETTE.capRed, M(0.02, 0.3 + h * 0.34 + h * 0.4, 0, { s: 0.05 }), false));
+    return { parts, radius: r * 0.85 };
+  }
+  function poplarParts(rng) {
+    const h = 1.0 + rng() * 0.55, r = 0.24 + rng() * 0.1;
+    const parts = [P(GEO.cylTaper, PALETTE.woodLight, M(0, 0.3, 0, { sx: 0.075, sy: 0.6, sz: 0.075 }))];
+    rootFlares(parts, rng, 3, 0.05, 0.16);
+    parts.push(P(GEO.sphereMid, PALETTE.meadowDark, M(0, 0.55 + h * 0.4, 0, { sx: r, sy: h * 0.45, sz: r })));
+    parts.push(P(GEO.sphereLo, PALETTE.meadow, M(r * 0.3, 0.7 + h * 0.5, r * 0.15, { sx: r * 0.7, sy: h * 0.3, sz: r * 0.65 })));
+    parts.push(P(GEO.sphereLo, PALETTE.meadowLight, M(-r * 0.3, 0.85 + h * 0.5, -r * 0.05, { sx: r * 0.55, sy: h * 0.24, sz: r * 0.5 })));
+    return { parts, radius: r * 0.9 };
+  }
+  function broadleafParts(rng) {
     const h = 0.7 + rng() * 0.5, r = 0.42 + rng() * 0.28;
     const top = h * 0.62;
     const parts = [
       P(GEO.cylTaper, PALETTE.wood, M(0, h * 0.35, 0, { sx: 0.11, sy: h * 0.7, sz: 0.11 })),
     ];
     // root flares splay out where the trunk meets the ground
-    const roots = 3 + Math.floor(rng() * 2), ra = rng() * 6;
-    for (let i = 0; i < roots; i++) {
-      const a = ra + i * (Math.PI * 2 / roots);
-      parts.push(P(GEO.cone, PALETTE.wood, M(Math.cos(a) * 0.1, 0.05, Math.sin(a) * 0.1,
-        { sx: 0.06, sy: 0.22, sz: 0.05, rz: -Math.cos(a) * 1.25, rx: Math.sin(a) * 1.25 }), false));
-    }
+    rootFlares(parts, rng, 3 + Math.floor(rng() * 2), 0.05, 0.22);
     // canopy: a dark core, then lighter lobes toward the sun (upper left)
     parts.push(P(GEO.sphereMid, PALETTE.meadowDark, M(0, top + r * 0.7, 0, { sx: r, sy: r * 0.9, sz: r })));
     const lobes = 3, la = rng() * 6;
@@ -682,7 +716,7 @@ const Renderer = (() => {
       const h = GameState.zoneFalloff(c, r);
       const fill = lerpColor(PALETTE.meadowLight, 0x8f86a3, h).offsetHSL(0, 0, 0.08);
       const rim = fill.clone().offsetHSL(0, -0.08, -0.16);
-      for (const [shape, col, y] of [[plotRim, rim, 0.005], [plotFill, fill, 0.007]]) {
+      for (const [shape, col, y] of [[plotRim, rim, 0.058], [plotFill, fill, 0.06]]) {
         const g = shape.clone().applyMatrix4(M(worldX(c), y, worldZ(r)));
         const colors = new Float32Array(g.attributes.position.count * 3);
         for (let i = 0; i < g.attributes.position.count; i++) { colors[i * 3] = col.r; colors[i * 3 + 1] = col.g; colors[i * 3 + 2] = col.b; }
@@ -690,11 +724,77 @@ const Renderer = (() => {
         markers.push(g);
       }
     }
+    buildPlinths();
+    buildGroundPatches(vt);
     const markerMesh = new THREE.Mesh(mergeGeoms(markers), new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.5, depthWrite: false }));
     markerMesh.name = 'buildableMarkers';
     markerMesh.matrixAutoUpdate = false;
     scene.add(markerMesh);
     animated.push({ update(t) { markerMesh.material.opacity = 0.42 + Math.sin(t * 1.6) * 0.1; } });
+  }
+
+  // Each buildable cell stands on a low stone plinth: a real step up from the
+  // meadow, so the plots read as places with depth. One merged mesh.
+  const PLINTH_H = 0.05;
+  function buildPlinths() {
+    const shape = new THREE.Shape(), w = 0.86, h = w / 2, rad = 0.14;
+    shape.moveTo(-h + rad, -h); shape.lineTo(h - rad, -h); shape.quadraticCurveTo(h, -h, h, -h + rad);
+    shape.lineTo(h, h - rad); shape.quadraticCurveTo(h, h, h - rad, h);
+    shape.lineTo(-h + rad, h); shape.quadraticCurveTo(-h, h, -h, h - rad);
+    shape.lineTo(-h, -h + rad); shape.quadraticCurveTo(-h, -h, -h + rad, -h);
+    const base = new THREE.ExtrudeGeometry(shape, { depth: PLINTH_H, bevelEnabled: false, curveSegments: 2 });
+    base.rotateX(-Math.PI / 2);
+    const geos = [], top = new THREE.Color(), side = new THREE.Color();
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+      if (!GameState.isBuildable(c, r)) continue;
+      const hz = GameState.zoneFalloff(c, r);
+      top.copy(lerpColor(PALETTE.meadow, PALETTE.cobble, 0.4)).lerp(new THREE.Color(PALETTE.hollowGround), hz);
+      side.copy(lerpColor(PALETTE.earth, PALETTE.hollowEarth, hz));
+      const g = base.clone().applyMatrix4(M(worldX(c), 0, worldZ(r)));
+      const n = g.attributes.normal, colors = new Float32Array(n.count * 3);
+      for (let i = 0; i < n.count; i++) {
+        const col = n.getY(i) > 0.5 ? top : side;
+        colors[i * 3] = col.r; colors[i * 3 + 1] = col.g; colors[i * 3 + 2] = col.b;
+      }
+      g.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+      g.deleteAttribute('uv');
+      geos.push(g);
+    }
+    if (!geos.length) return;
+    const mesh = new THREE.Mesh(mergeGeoms(geos), new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap, vertexColors: true }));
+    mesh.name = 'plinths';
+    mesh.matrixAutoUpdate = false;
+    scene.add(mesh);
+  }
+
+  // Flat patches of moss, bare earth and clover on open meadow, so the ground
+  // between the roads has hand-painted variety. Flat, merged, one draw call.
+  function buildGroundPatches(vt) {
+    const rng = srand(919), geos = [], col = new THREE.Color();
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+      if (GameState.cellKind(c, r) !== 'ground' || GameState.isBuildable(c, r)) continue;
+      const hz = GameState.zoneFalloff(c, r);
+      const n = rng() < 0.55 ? 1 : 0;
+      for (let i = 0; i < n; i++) {
+        const roll = rng();
+        if (roll < 0.45) col.copy(lerpColor(vt.meadowDark, 0x000000, 0.12));          // deep moss
+        else if (roll < 0.75) col.copy(lerpColor(vt.meadow, PALETTE.path, 0.4));        // bare earth
+        else col.copy(lerpColor(vt.meadow, PALETTE.meadowLight, 0.6));                  // clover
+        col.lerp(new THREE.Color(PALETTE.hollowGround), hz);
+        const g = GEO.circle.clone().applyMatrix4(M(worldX(c) + (rng() - 0.5) * 0.6, 0.008 + rng() * 0.004, worldZ(r) + (rng() - 0.5) * 0.6,
+          { sx: 0.16 + rng() * 0.2, sy: 1, sz: 0.1 + rng() * 0.14, ry: rng() * 3.14 }));
+        const colors = new Float32Array(g.attributes.position.count * 3);
+        for (let k = 0; k < g.attributes.position.count; k++) { colors[k * 3] = col.r; colors[k * 3 + 1] = col.g; colors[k * 3 + 2] = col.b; }
+        g.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        g.deleteAttribute('uv');
+        geos.push(g);
+      }
+    }
+    if (!geos.length) return;
+    const mesh = new THREE.Mesh(mergeGeoms(geos), new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap, vertexColors: true }));
+    mesh.name = 'groundPatches';
+    mesh.matrixAutoUpdate = false;
+    scene.add(mesh);
   }
 
   function roundedRectGeo(w, rad) {
@@ -1423,6 +1523,53 @@ const Renderer = (() => {
       },
     });
   }
+  // Shockwave rings: one InstancedMesh, so any number of them is one draw call.
+  // Additive blending, so fading the instance color to black fades the ring out.
+  const RINGS = 20;
+  const rings = [];
+  let ringMesh = null;
+  const _ringM = new THREE.Matrix4(), _ringC = new THREE.Color(), _ringQ = new THREE.Quaternion(), _ringP = new THREE.Vector3(), _ringS = new THREE.Vector3();
+  function buildRings() {
+    const geo = new THREE.RingGeometry(0.7, 1, 28, 1);
+    geo.rotateX(-Math.PI / 2);
+    const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+    ringMesh = new THREE.InstancedMesh(geo, mat, RINGS);
+    ringMesh.name = 'rings';
+    ringMesh.frustumCulled = false;
+    ringMesh.renderOrder = 3;
+    for (let i = 0; i < RINGS; i++) {
+      rings.push({ alive: false, life: 0, ttl: 0.4, x: 0, y: 0, z: 0, r: 1, color: new THREE.Color() });
+      ringMesh.setColorAt(i, _ringC.setRGB(0, 0, 0));
+      ringMesh.setMatrixAt(i, _ringM.makeScale(0, 0, 0));
+    }
+    scene.add(ringMesh);
+    animated.push({
+      update(t, dt) {
+        for (let i = 0; i < RINGS; i++) {
+          const u = rings[i];
+          if (u.alive) { u.life += dt; if (u.life >= u.ttl) u.alive = false; }
+          if (!u.alive) { ringMesh.setMatrixAt(i, _ringM.makeScale(0, 0, 0)); continue; }
+          const k = u.life / u.ttl, e = 1 - (1 - k) * (1 - k);
+          const sc = Math.max(0.01, u.r * (0.25 + 0.75 * e));
+          _ringM.compose(_ringP.set(u.x, u.y, u.z), _ringQ.identity(), _ringS.set(sc, 1, sc));
+          ringMesh.setMatrixAt(i, _ringM);
+          ringMesh.setColorAt(i, _ringC.copy(u.color).multiplyScalar(0.9 * (1 - k) * (1 - k)));
+        }
+        ringMesh.instanceMatrix.needsUpdate = true;
+        if (ringMesh.instanceColor) ringMesh.instanceColor.needsUpdate = true;
+      },
+    });
+  }
+  function ring(x, y, z, { color = PALETTE.cream, radius = 0.8, ttl = 0.4 } = {}) {
+    // reuse a free slot, else steal the oldest so a burst of impacts never drops the newest
+    let pick = rings.find((u) => !u.alive);
+    if (!pick) pick = rings.reduce((a, b) => (a.life / a.ttl > b.life / b.ttl ? a : b));
+    Object.assign(pick, { alive: true, life: 0, ttl, x, y: Math.max(0.03, y), z, r: radius });
+    pick.color.setHex(color);
+  }
+  function spark(x, y, z, color = PALETTE.gold, count = 3) {
+    puff(x, y, z, { count, color, speed: 2.6, size: 0.045, up: 1.8, ttl: 0.28 });
+  }
   function puff(x, y, z, { count = 8, color = PALETTE.cream, speed = 1.2, size = 0.1, up = 1.4, ttl = 0.6 } = {}) {
     let n = 0;
     for (const u of particles) {
@@ -1800,6 +1947,8 @@ const Renderer = (() => {
           const big = v.e.boss ? 3 : 1;
           puff(g.position.x, 0.45, g.position.z, { count: 12 * big, color: PALETTE.cream, speed: 1.6 * big, size: 0.13, up: 1.2, ttl: 0.7 });
           puff(g.position.x, 0.4, g.position.z, { count: 6 * big, color: v.e.flying ? PALETTE.batDark : PALETTE.goblin, speed: 2.2, size: 0.08, up: 2.2, ttl: 0.6 });
+          ring(g.position.x, 0.06, g.position.z, { color: v.e.boss ? PALETTE.magic : PALETTE.cream, radius: v.e.boss ? 2.2 : 0.7, ttl: v.e.boss ? 0.9 : 0.45 });
+          spark(g.position.x, 0.5, g.position.z, PALETTE.gold, v.e.boss ? 8 : 3);
           if (v.e.boss) { puff(g.position.x, 0.6, g.position.z, { count: 16, color: PALETTE.magic, speed: 3, size: 0.1, up: 2.5, ttl: 0.9 }); shakeCamera(0.16, 0.6); }
         }
       },
@@ -1895,17 +2044,23 @@ const Renderer = (() => {
       const v = enemyViews.get(enemy.id);
       if (v) v.pop = 1;
       puff(x, 0.45, z, { count: 3, color: PALETTE.cream, speed: 1.0, size: 0.06, up: 1.0, ttl: 0.35 });
+      spark(x, 0.5, z, PALETTE.gold, 2);
     });
     GameState.on('towerFired', ({ tower }) => {
       const v = towerViews.get(tower.id);
       if (v) v.recoil = 1;
       if (tower.type === 'golem') shakeCamera(0.04, 0.2);
+      // muzzle flash: a tiny bright burst at the tower's business end
+      const fx = tower.x + Math.sin(tower.facing) * 0.3, fz = tower.z + Math.cos(tower.facing) * 0.3;
+      spark(fx, tower.type === 'artillery' ? 0.75 : 0.85, fz, tower.type === 'druid' ? PALETTE.frost : tower.type === 'warden' ? PALETTE.magic : PALETTE.cream, 2);
     });
     GameState.on('towerUpgraded', (tower) => {
       removeTowerView(tower.id);
       addTowerView(tower, true);
       puff(tower.x, 0.5, tower.z, { count: 14, color: PALETTE.gold, speed: 1.4, size: 0.09, up: 2.0, ttl: 0.8 });
+      ring(tower.x, 0.06, tower.z, { color: PALETTE.gold, radius: 0.9, ttl: 0.6 });
       if (tower.branch) {
+        ring(tower.x, 0.08, tower.z, { color: PALETTE.magic, radius: 1.5, ttl: 0.8 });
         // a specialization is a bigger moment: a second, magic burst and a thump
         puff(tower.x, 0.9, tower.z, { count: 18, color: PALETTE.magic, speed: 2.2, size: 0.1, up: 2.6, ttl: 1.0 });
         shakeCamera(0.06, 0.25);
@@ -1921,14 +2076,21 @@ const Renderer = (() => {
       if (p.kind === 'thorn') {
         puff(x, 0.2, z, { count: 14, color: PALETTE.magic, speed: 2.4, size: 0.08, up: 0.9, ttl: 0.5 });
         puff(x, 0.2, z, { count: 8, color: PALETTE.cloak, speed: 1.6, size: 0.1, up: 1.4, ttl: 0.6 });
+        ring(x, 0.06, z, { color: PALETTE.magic, radius: 0.9, ttl: 0.45 });
+        spark(x, 0.3, z, PALETTE.flowerPink, 4);
       } else if (p.kind === 'wisp') {
         puff(x, y, z, { count: 6, color: PALETTE.frost, speed: 1.2, size: 0.07, up: 0.6, ttl: 0.45 });
+        ring(x, flying ? BAT_HEIGHT : 0.1, z, { color: PALETTE.frost, radius: 0.45, ttl: 0.35 });
       } else if (p.kind === 'boulder') {
         puff(x, 0.2, z, { count: 12, color: PALETTE.stone, speed: 2.0, size: 0.11, up: 1.6, ttl: 0.6 });
+        ring(x, 0.06, z, { color: PALETTE.cream, radius: 1.1, ttl: 0.5 });
+        spark(x, 0.3, z, PALETTE.gold, 5);
         shakeCamera(0.1, 0.3);
       } else if (p.kind === 'bigacorn') {
         puff(x, y, z, { count: 12, color: PALETTE.acorn, speed: 2.6, size: 0.1, up: 1.8, ttl: 0.6 });
         puff(x, y, z, { count: 8, color: PALETTE.cream, speed: 1.4, size: 0.12, up: 1.0, ttl: 0.7 });
+        ring(x, flying ? BAT_HEIGHT : 0.06, z, { color: PALETTE.gold, radius: 0.85, ttl: 0.45 });
+        spark(x, y, z, PALETTE.gold, 4);
         shakeCamera(0.06, 0.25);
       }
     });
@@ -2114,6 +2276,7 @@ const Renderer = (() => {
     buildGrass();
     buildMotes();
     buildParticles();
+    buildRings();
     buildSelection();
     flushBatch();
     flushGlow();
