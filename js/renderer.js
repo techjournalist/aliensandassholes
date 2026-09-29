@@ -56,7 +56,7 @@ const Renderer = (() => {
   // Ambient effects (water, grass, motes) run on wall-clock time so the
   // world keeps breathing on the title screen and while paused.
   const fxTime = { value: 0 }, moteScale = { value: 1 };
-  let fxLast = 0, fxT = 0;
+  let fxLast = 0, fxT = 0, dirLast = 0, dirDt = 0;
 
   // Baked ambient occlusion: vertex shade darkens where geometry meets the
   // ground, less so on upward faces (a plank lying flat isn't a crevice).
@@ -1702,6 +1702,134 @@ const Renderer = (() => {
     }
   }
 
+  // -------- living world: birds, butterflies, drifting cloud shadows --------
+  // Birds and butterflies are instanced wing triangles (two draw calls each
+  // species, however many there are) flapped by rewriting instance matrices.
+  // Cloud shadows are one big soft-noise quad. Levels that are mostly blight
+  // get fewer or none, so the mood stays right.
+  function wingGeo(len, front, back, sign) {
+    const g = new THREE.BufferGeometry();
+    const v = new Float32Array([0, 0, front, 0, 0, -back, sign * len, 0, -back * 0.25]);
+    g.setAttribute('position', new THREE.BufferAttribute(v, 3));
+    g.computeVertexNormals();
+    return g;
+  }
+  function buildLife() {
+    const vt = levelTheme();
+    let sum = 0, n = 0;
+    for (let r = 0; r < rows; r += 2) for (let c = 0; c < cols; c += 2) { sum += GameState.zoneFalloff(c, r); n++; }
+    const corrupt = sum / Math.max(1, n);
+    const rng = srand(2468);
+    const _q = new THREE.Quaternion(), _qf = new THREE.Quaternion(), _p = new THREE.Vector3(), _sc = new THREE.Vector3(1, 1, 1), _m = new THREE.Matrix4();
+    const yAxis = new THREE.Vector3(0, 1, 0), zAxis = new THREE.Vector3(0, 0, 1);
+    const flock = (count, len, front, back, color, colored) => {
+      if (count < 1) return null;
+      const mat = new THREE.MeshBasicMaterial({ color: colored ? 0xffffff : color, side: THREE.DoubleSide });
+      const L = new THREE.InstancedMesh(wingGeo(len, front, back, 1), mat, count);
+      const R = new THREE.InstancedMesh(wingGeo(len, front, back, -1), mat, count);
+      for (const m of [L, R]) { m.frustumCulled = false; scene.add(m); }
+      const tints = [PALETTE.flowerPink, PALETTE.flowerYellow, 0xf6f0e0, PALETTE.magic];
+      const items = [];
+      for (let i = 0; i < count; i++) {
+        items.push({ cx: (rng() - 0.5) * cols * 0.8, cz: (rng() - 0.5) * rows * 0.8, rx: 1.5 + rng() * 3.5, rz: 1 + rng() * 2.5, sp: 0.25 + rng() * 0.3, ph: rng() * 6.28, h: 0.5 + rng() });
+        if (colored) { const c = new THREE.Color(tints[i % tints.length]); L.setColorAt(i, c); R.setColorAt(i, c); }
+      }
+      if (colored) { L.instanceColor.needsUpdate = true; R.instanceColor.needsUpdate = true; }
+      return { L, R, items };
+    };
+    const place = (fl, i, x, y, z, yaw, flap, s) => {
+      _q.setFromAxisAngle(yAxis, yaw);
+      _sc.set(s, s, s); _p.set(x, y, z);
+      _qf.setFromAxisAngle(zAxis, -flap); _m.compose(_p, _q.clone().multiply(_qf), _sc); fl.L.setMatrixAt(i, _m);
+      _qf.setFromAxisAngle(zAxis, flap); _m.compose(_p, _q.clone().multiply(_qf), _sc); fl.R.setMatrixAt(i, _m);
+    };
+    if (corrupt < 0.72) {
+      const birds = flock(Math.round(5 * QUALITY + 0.5), 0.34, 0.11, 0.11, 0x2a2233, false);
+      if (birds) animated.push({ update(t) {
+        birds.items.forEach((b, i) => {
+          const a = t * b.sp + b.ph, x = b.cx + Math.cos(a) * b.rx * 2.4, z = b.cz + Math.sin(a) * b.rz * 2.4;
+          const yaw = Math.atan2(-Math.sin(a) * b.rx, Math.cos(a) * b.rz);
+          place(birds, i, x, 3.2 + b.h + Math.sin(t * 1.1 + b.ph) * 0.2, z, yaw, Math.sin(t * 9 + b.ph * 3) * 0.6, 1.6);
+        });
+        birds.L.instanceMatrix.needsUpdate = birds.R.instanceMatrix.needsUpdate = true;
+      } });
+    }
+    if (corrupt < 0.45) {
+      const flies = flock(Math.round(9 * QUALITY), 0.13, 0.08, 0.08, 0xffffff, true);
+      if (flies) animated.push({ update(t) {
+        flies.items.forEach((b, i) => {
+          const a = t * (0.5 + b.sp) + b.ph;
+          const x = b.cx * 0.6 + Math.sin(a * 0.9) * b.rx * 0.5, z = b.cz * 0.6 + Math.cos(a * 0.7) * b.rz * 0.5;
+          const yaw = Math.atan2(Math.cos(a * 0.9) * b.rx * 0.45, -Math.sin(a * 0.7) * b.rz * 0.35);
+          place(flies, i, x, 0.42 + Math.sin(a * 1.9) * 0.14, z, yaw, 0.15 + (Math.sin(t * 22 + b.ph * 5) * 0.5 + 0.5) * 1.1, 1.4);
+        });
+        flies.L.instanceMatrix.needsUpdate = flies.R.instanceMatrix.needsUpdate = true;
+      } });
+    }
+    // cloud shadows: soft noise scrolling over the ground, under every unit
+    const w = cols + border * 2, h = rows + border * 2;
+    const cloudMat = new THREE.ShaderMaterial({
+      uniforms: { uTime: fxTime },
+      transparent: true, depthWrite: false,
+      vertexShader: 'varying vec2 vP; void main(){ vP = position.xz; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      fragmentShader: `varying vec2 vP; uniform float uTime;
+        float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+        float vn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+          return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y); }
+        void main(){ vec2 q = vP * 0.11 + vec2(uTime * 0.018, uTime * 0.007);
+          float n = vn(q) * 0.62 + vn(q * 2.3 + 7.0) * 0.38;
+          float a = smoothstep(0.5, 0.72, n) * 0.25;
+          gl_FragColor = vec4(0.06, 0.09, 0.16, a); }`,
+    });
+    const cloud = new THREE.Mesh(new THREE.PlaneGeometry(w + 8, h + 8), cloudMat);
+    cloud.rotation.x = -Math.PI / 2; cloud.position.y = 0.045; cloud.renderOrder = 0; cloud.name = 'cloudShadows';
+    if (corrupt < 0.72) scene.add(cloud);
+  }
+
+  // -------- camera director --------
+  // Everything the camera does beyond shake: a slow drift on the title
+  // screen, a push-in on a boss entrance and a punch on a boss death. It moves
+  // by panning along the camera's own axes and zooming the ortho frustum, so
+  // picking and outlines follow automatically. Runs on wall-clock time.
+  const dir = { shot: null, punch: 0, punchDur: 1, punchAmt: 0 };
+  const _cv = new THREE.Vector3();
+  const easeS = (x) => x * x * (3 - 2 * x);
+  function bossShot(e) { dir.shot = { e, t: 0, dur: 2.8, zoom: 1.34 }; }
+  function zoomPunch(amt, dur = 0.7) { dir.punchAmt = amt; dir.punchDur = dur; dir.punch = dur; }
+  const camState = { zoom: 1, px: 0, py: 0 };
+  function updateCameraDirector(dt) {
+    let zoom = 1, px = 0, py = 0;
+    if (GameState.state.phase === 'title') {
+      zoom = 1.035 + Math.sin(fxT * 0.13) * 0.018;
+      px = Math.sin(fxT * 0.11) * 0.8; py = Math.sin(fxT * 0.083 + 1) * 0.35;
+    }
+    const sh = dir.shot;
+    if (sh) {
+      sh.t += dt;
+      const k = sh.t / sh.dur;
+      if (k >= 1) dir.shot = null;
+      else {
+        const env = k < 0.3 ? easeS(k / 0.3) : k < 0.62 ? 1 : 1 - easeS((k - 0.62) / 0.38);
+        zoom += (sh.zoom - 1) * env;
+        _cv.set(sh.e.x, 0.9, sh.e.z).applyMatrix4(camera.matrixWorldInverse);
+        px += (_cv.x - (camera.left + camera.right) / 2) * env * 0.8;
+        py += (_cv.y - (camera.top + camera.bottom) / 2) * env * 0.8;
+      }
+    }
+    if (dir.punch > 0) {
+      dir.punch = Math.max(0, dir.punch - dt);
+      const k = dir.punch / dir.punchDur;
+      zoom += dir.punchAmt * k * k;
+    }
+    // ease toward the target so nothing snaps when a shot starts or ends
+    const f = 1 - Math.exp(-dt * 9);
+    camState.zoom += (zoom - camState.zoom) * f; camState.px += (px - camState.px) * f; camState.py += (py - camState.py) * f;
+    if (Math.abs(camera.zoom - camState.zoom) > 1e-4) {
+      camera.zoom = camState.zoom; camera.updateProjectionMatrix();
+      outlineMat.uniforms.thickness.value = CONFIG.outlinePx * unitsPerPixel / camState.zoom;
+    }
+  }
+
   // -------- camera shake --------
   const shake = { amp: 0, decay: 0, x: 0, y: 0 };
   function shakeCamera(amp, dur = 0.3) {
@@ -2091,7 +2219,8 @@ const Renderer = (() => {
     GameState.on('towerPlaced', addTowerView);
     GameState.on('enemySpawned', addEnemyView);
     GameState.on('enemyLeaked', (e) => removeEnemyView(e, leakExit));
-    GameState.on('enemyKilled', (e) => removeEnemyView(e, deathExit));
+    GameState.on('enemyKilled', (e) => { removeEnemyView(e, deathExit); if (e.boss) zoomPunch(0.16, 0.8); });
+    GameState.on('enemySpawned', (e) => { if (e.boss) bossShot(e); });
     GameState.on('enemyHit', ({ enemy, x, z }) => {
       const v = enemyViews.get(enemy.id);
       if (v) v.pop = 1;
@@ -2329,6 +2458,7 @@ const Renderer = (() => {
     buildMotes();
     buildParticles();
     buildRings();
+    buildLife();
     buildSelection();
     flushBatch();
     flushGlow();
@@ -2343,6 +2473,7 @@ const Renderer = (() => {
     // motes keep moving on the title screen and through a pause
     const now = performance.now() / 1000;
     const fxDt = fxLast ? Math.min(0.05, now - fxLast) : 0;
+    dirDt = dirLast ? Math.min(0.25, now - dirLast) : 0; dirLast = now;   // camera moves in real time, even on a slow frame
     fxLast = now; fxT += fxDt;
     fxTime.value = fxT;
     for (const a of animated) a.update(fxT, fxDt);
@@ -2354,7 +2485,8 @@ const Renderer = (() => {
       shake.x = (fxRand() - 0.5) * 2 * shake.amp;
       shake.y = (fxRand() - 0.5) * 2 * shake.amp;
     } else { shake.x = shake.y = 0; }
-    camera.position.copy(camBase).addScaledVector(camRight, shake.x).addScaledVector(camUp, shake.y);
+    updateCameraDirector(dirDt);
+    camera.position.copy(camBase).addScaledVector(camRight, shake.x + camState.px).addScaledVector(camUp, shake.y + camState.py);
     renderer.render(scene, camera);
   }
 

@@ -390,6 +390,22 @@ const UI = (() => {
     location.reload();
   }
 
+  // The boss entrance: a ribbon banner and dark screen edges. Restarting the
+  // CSS animation needs a forced reflow between removing and adding the class.
+  function bossIntro(name) {
+    const b = $('boss-intro'), v = $('boss-vig');
+    $('boss-intro-name').textContent = name || 'The Boss';
+    for (const el of [b, v]) { el.classList.remove('go'); void el.offsetWidth; el.classList.add('go'); }
+  }
+  function seedFireflies() {
+    const host = $('t-flies');
+    if (!host || host.childElementCount) return;
+    for (let i = 0; i < 16; i++) {
+      const f = document.createElement('i');
+      f.style.cssText = `left:${Math.round(Math.random() * 100)}%;top:${Math.round(20 + Math.random() * 70)}%;--dur:${(6 + Math.random() * 6).toFixed(1)}s;--tw:${(2 + Math.random() * 3).toFixed(1)}s;--dl:-${(Math.random() * 8).toFixed(1)}s`;
+      host.appendChild(f);
+    }
+  }
   function init() {
     debugOn = /[?&]debug\b/.test(location.search);
     $('debug').classList.toggle('show', debugOn);
@@ -530,6 +546,8 @@ const UI = (() => {
     GameState.on('placeRejected', (res) => toast(res.reason, true));
     GameState.on('enemyLeaked', (e) => { flash('leak'); toast(`A ${e.name} slipped into ${GameState.currentLevel().endpoint.name}!`, true); });
     GameState.on('waveStarted', (w) => { updateHud(); waveBanner(w); });
+    GameState.on('enemySpawned', (e) => { if (e.boss) bossIntro(e.name); });
+    seedFireflies();
     GameState.on('waveEnded', ({ wave }) => { updateHud(); if (wave < GameState.totalWaves()) toast('The road is quiet. Build, upgrade, breathe.'); });
   }
 

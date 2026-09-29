@@ -419,10 +419,76 @@
   .build-name, .panel-title { text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6); }
   .build-icon { filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.4)); }
   @media (prefers-reduced-motion: reduce) { #wave-btn:not(:disabled) { animation: none; } }
+
+  /* ---- first-impression art: title crest, sun rays, clouds, fireflies ---- */
+  .crest { width: 56px; height: 63px; display: block; margin: -6px auto 4px; filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.5)); animation: crest-bob 4s ease-in-out infinite; }
+  @keyframes crest-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+  #title .card { position: relative; z-index: 1; }
+  .t-rays, .t-clouds, .t-flies { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+  .t-rays {
+    background:
+      linear-gradient(115deg, rgba(255, 214, 130, 0.16), transparent 50%),
+      radial-gradient(ellipse at 12% -10%, rgba(255, 232, 170, 0.22), transparent 55%);
+    animation: rays 9s ease-in-out infinite; mix-blend-mode: screen;
+  }
+  @keyframes rays { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+  .t-clouds i { position: absolute; left: -320px; width: 300px; height: 80px; border-radius: 50%; background: radial-gradient(ellipse at center, rgba(255, 246, 220, 0.22), transparent 70%); animation: cloud-drift 80s linear infinite; }
+  .t-clouds i:nth-child(1) { top: 9%; }
+  .t-clouds i:nth-child(2) { top: 62%; width: 380px; animation-duration: 110s; animation-delay: -40s; }
+  .t-clouds i:nth-child(3) { top: 33%; width: 240px; animation-duration: 95s; animation-delay: -70s; opacity: 0.7; }
+  @keyframes cloud-drift { to { transform: translateX(calc(100vw + 700px)); } }
+  .t-flies i { position: absolute; width: 5px; height: 5px; border-radius: 50%; background: #ffe9a0; box-shadow: 0 0 10px 3px rgba(255, 224, 138, 0.7); animation: fly-float var(--dur) ease-in-out infinite, fly-twinkle var(--tw) ease-in-out infinite; animation-delay: var(--dl), var(--dl); }
+  @keyframes fly-float { 0%, 100% { transform: translate(0, 0); } 33% { transform: translate(28px, -22px); } 66% { transform: translate(-20px, -38px); } }
+  @keyframes fly-twinkle { 0%, 100% { opacity: 0.15; } 50% { opacity: 1; } }
+
+  /* ---- boss entrance: dark edges and a ribbon banner ---- */
+  #boss-vig { position: absolute; inset: 0; pointer-events: none; opacity: 0; background: radial-gradient(ellipse at center, transparent 45%, rgba(46, 12, 66, 0.72) 100%); }
+  #boss-vig.go { animation: boss-vig 3.2s ease-out; }
+  @keyframes boss-vig { 0% { opacity: 0; } 12% { opacity: 1; } 70% { opacity: 0.85; } 100% { opacity: 0; } }
+  #boss-intro { position: absolute; left: 50%; top: 24%; transform: translate(-50%, 0); pointer-events: none; opacity: 0; text-align: center; padding: 12px 64px 14px;
+    background: linear-gradient(180deg, #4b2a63, #2a1638); border-top: 3px solid var(--gold); border-bottom: 3px solid var(--gold);
+    clip-path: polygon(0 0, 100% 0, calc(100% - 26px) 50%, 100% 100%, 0 100%, 26px 50%); box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5); }
+  #boss-intro.go { animation: boss-intro 3.2s cubic-bezier(0.2, 0.8, 0.2, 1); }
+  .bi-kicker { font-size: 13px; letter-spacing: 4px; text-transform: uppercase; color: #e6b8ff; font-weight: 800; }
+  .bi-name { font-size: clamp(26px, 5vw, 44px); font-weight: 900; color: var(--gold); text-shadow: 0 2px 0 #7a5316, 0 4px 0 #1b1410; white-space: nowrap; }
+  @keyframes boss-intro {
+    0% { opacity: 0; transform: translate(-50%, -14px) scale(0.86); letter-spacing: 0.4em; }
+    14% { opacity: 1; transform: translate(-50%, 0) scale(1.04); }
+    22% { transform: translate(-50%, 0) scale(1); }
+    78% { opacity: 1; }
+    100% { opacity: 0; transform: translate(-50%, 8px) scale(1); }
+  }
+
+  /* ---- world map extras ---- */
+  .wm-cloudshadows ellipse { fill: #0a1420; opacity: 0.14; }
+  .wm-cloudshadows { animation: wm-clouds 70s linear infinite; }
+  @keyframes wm-clouds { to { transform: translateX(1500px); } }
+  .wm-ripples path { fill: none; stroke: rgba(191, 230, 255, 0.4); stroke-width: 2; stroke-linecap: round; animation: wm-ripple 4s ease-in-out infinite; }
+  .wm-ripples path:nth-child(2) { animation-delay: -1s; } .wm-ripples path:nth-child(3) { animation-delay: -2s; } .wm-ripples path:nth-child(4) { animation-delay: -3s; }
+  @keyframes wm-ripple { 0%, 100% { opacity: 0.2; transform: translateX(0); } 50% { opacity: 0.9; transform: translateX(4px); } }
+  .wm-compass circle { fill: rgba(27, 20, 16, 0.6); stroke: var(--gold); stroke-width: 2; }
+  .wm-compass-n { fill: #d94f3a; stroke: #1b1410; stroke-width: 1; } .wm-compass-e { fill: var(--cream); opacity: 0.55; }
+  .wm-compass text { fill: var(--gold); font: 800 11px "Trebuchet MS", sans-serif; }
+  #wm-svg { filter: drop-shadow(0 4px 0 rgba(0, 0, 0, 0.35)); }
+
+  /* ---- tilt-shift: a soft focus falloff at the top and bottom edges. Desktop
+     only: a blur over a live WebGL canvas is the sort of cost phones should not pay. ---- */
+  #tiltshift { display: none; }
+  @media (pointer: fine) and (min-width: 900px) {
+    #tiltshift { display: block; position: fixed; inset: 0; pointer-events: none; }
+    #tiltshift::before, #tiltshift::after { content: ""; position: absolute; left: 0; right: 0; height: 13vh; backdrop-filter: blur(2.5px); -webkit-backdrop-filter: blur(2.5px); }
+    #tiltshift::before { top: 0; -webkit-mask-image: linear-gradient(#000, transparent); mask-image: linear-gradient(#000, transparent); }
+    #tiltshift::after { bottom: 0; -webkit-mask-image: linear-gradient(transparent, #000); mask-image: linear-gradient(transparent, #000); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .crest, .t-rays, .t-clouds i, .t-flies i, .wm-cloudshadows, .wm-ripples path { animation: none; }
+    #boss-intro.go, #boss-vig.go { animation-duration: 0.01s; }
+  }
 </style>
 </head>
 <body>
 <canvas id="game" aria-label="Briar and Bastion game view"></canvas>
+<div id="tiltshift" aria-hidden="true"></div>
 <div id="vignette" aria-hidden="true"></div>
 
 <div id="ui">
@@ -442,11 +508,22 @@
   <div id="floaters"></div>
   <div id="toast"></div>
   <div id="flash"></div>
+  <div id="boss-vig"></div>
+  <div id="boss-intro" aria-live="polite"><div class="bi-kicker">A boss approaches</div><div class="bi-name" id="boss-intro-name"></div></div>
   <div id="debug"></div>
 </div>
 
 <div id="title" class="screen">
+  <div class="t-rays"></div><div class="t-clouds"><i></i><i></i><i></i></div><div class="t-flies" id="t-flies"></div>
   <div class="card">
+    <svg class="crest" viewBox="0 0 64 72" aria-hidden="true">
+      <path d="M32 3 L58 12 V36 C58 52 46 63 32 69 C18 63 6 52 6 36 V12 Z" fill="#4a3323" stroke="#f2c14e" stroke-width="3"></path>
+      <path d="M32 9 L52 16 V36 C52 48 43 57 32 62 C21 57 12 48 12 36 V16 Z" fill="#2a4530"></path>
+      <path d="M22 50 V30 H26 V26 H30 V30 H34 V26 H38 V30 H42 V50 Z" fill="#c9c2b0" stroke="#1b1410" stroke-width="1.5"></path>
+      <path d="M20 30 L32 18 L44 30 Z" fill="#d94f3a" stroke="#1b1410" stroke-width="1.5"></path>
+      <rect x="29" y="40" width="6" height="10" rx="3" fill="#1b1410"></rect>
+      <path d="M12 56 C18 50 24 52 26 58 M52 56 C46 50 40 52 38 58" fill="none" stroke="#6fae4a" stroke-width="2.5" stroke-linecap="round"></path>
+    </svg>
     <div class="eyebrow">A woodland tower defense</div>
     <h1>Briar <span class="amp">&amp;</span> Bastion</h1>
     <p class="stakes">Corruption is spreading through the valley. Choose your ground, then send it back where it came from.</p>
@@ -517,6 +594,9 @@
         <path class="wm-crack" d="M -4 10 L 0 -2 L 4 6"></path>
         <text class="wm-heart-label" x="26" y="-10">the Heart of the Hollow</text>
       </g>
+      <g class="wm-cloudshadows" clip-path="url(#wm-land-clip)"><ellipse cx="-120" cy="90" rx="110" ry="46"></ellipse><ellipse cx="-380" cy="220" rx="150" ry="52"></ellipse><ellipse cx="-620" cy="150" rx="90" ry="38"></ellipse></g>
+      <g class="wm-ripples"><path d="M 8 24 q 8 -5 16 0 t 16 0"></path><path d="M 762 20 q 8 -5 16 0 t 16 0"></path><path d="M 6 300 q 8 -5 16 0 t 16 0"></path><path d="M 690 314 q 8 -5 16 0 t 16 0"></path></g>
+      <g class="wm-compass" transform="translate(772 292)"><circle r="17"></circle><path class="wm-compass-n" d="M 0 -14 L 4 0 L 0 14 L -4 0 Z"></path><path class="wm-compass-e" d="M -14 0 L 0 4 L 14 0 L 0 -4 Z"></path><text y="-21" text-anchor="middle">N</text></g>
       <g id="wm-roads"></g>
       <g id="wm-fx"></g>
     </svg>

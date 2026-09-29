@@ -25,18 +25,22 @@ Already done (logged as P3-V3 in AGENTS.md):
 - Real-phone frame rate has never been measured (headless software rendering
   only). Test on a device before claiming the 30 fps target.
 
+## Roadmap status
+Items 1 to 4 below are BUILT on this branch (see P3-V4 in AGENTS.md). Items 5
+to 10 are still open, in the same order.
+
 ## Roadmap, in priority order
 
-### Do first (low cost, high impact)
-1. **Wave and boss moments.** Cinematic boss entrance: short camera push,
+### Do first (low cost, high impact) [1 to 3 DONE]
+1. [DONE] **Wave and boss moments.** Cinematic boss entrance: short camera push,
    name banner, screen shake. Finales are what players remember.
-2. **Living world.** Birds, butterflies, drifting clouds and moving cloud
+2. [DONE] **Living world.** Birds, butterflies, drifting clouds and moving cloud
    shadows across the ground. Nothing on screen should be static.
-3. **Painted title and world map art.** Hand-illustrated backdrop, animated
+3. [DONE] **Painted title and world map art.** Hand-illustrated backdrop, animated
    parallax layers, logo treatment. First impressions get the highest bar.
 
 ### Then
-4. **Camera and screen polish.** Slow camera drift on the title screen, zoom
+4. [DONE] **Camera and screen polish.** Slow camera drift on the title screen, zoom
    punch on boss deaths, gentle depth-of-field look through fog.
 5. **Unit readability.** Soft team-colored rim glow on enemies, health bars
    that appear only after a hit.

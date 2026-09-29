@@ -1097,6 +1097,25 @@ rate has not been measured. Harness note: untouched `main` in this
 environment also loses Level 6's mixed-bot check (the documented unseeded-RNG
 flake), which locks Levels 7 and 8 and fails about 19 checks by cascade.
 
+**P3-V4 — Graphics roadmap items 1 to 4** *(on branch
+`graphics-pass-units-tiers`)*. (1) Boss entrance: a camera director in
+`renderer.js` (`updateCameraDirector`, wall-clock time so a slow frame cannot
+stall it) pans and zooms the ortho frustum toward the boss for about 2.8s,
+and a DOM ribbon banner plus dark purple screen edges play from `ui.js`
+(`bossIntro`). A boss death gives a zoom punch. Picking and outline thickness
+follow the zoom. (2) Living world: instanced birds and butterflies (two draw
+calls each species, flapped by rewriting instance matrices), plus scrolling
+cloud shadows on one quad; mostly-blighted levels get fewer or none. (3) Title
+and map art: an SVG crest, soft sun rays, drifting clouds and CSS fireflies on
+the title; a compass, sea ripples and drifting cloud shadows on the world map.
+(4) Camera polish: a slow drift on the title screen, plus a desktop-only
+tilt-shift blur strip at the top and bottom edges (`pointer: fine`, min width
+900px, so phones never pay for a blur over the canvas). Also fixed: renderer
+effects now draw from their own `fxRand` stream instead of `Math.random`,
+which the balance duel seeds (visuals had been changing gameplay-adjacent
+random draws). Level 1 title view is now 118 draw calls and 167.8k triangles
+(budget 158 and 189k); a boss scene reads about 155 to 158 calls.
+
 **Graphics roadmap**: see `GRAPHICS-ROADMAP.md` for the approved list of
 further graphics work, its priority order, the performance budget and the
 current test status. Read it before starting any graphics task.
