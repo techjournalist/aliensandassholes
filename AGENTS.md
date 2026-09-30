@@ -1193,6 +1193,36 @@ either level, and the failures match untouched `main`. Test labels for
 Levels 3, 4, 6, 7 and 8 now say 13 waves. Level 2 still has no boss (it was not
 part of the request).
 
+**P3-V8 — Layered music (roadmap item 5)** *(on branch
+`graphics-pass-units-tiers`)*. A generative, fully synthesized score lives in
+`js/audio.js` beside the sound effects (no audio files). Five layers, each its
+own gain node on one bus: a soft pad, a plucked lute-like arpeggio, bass, drums
+and a reedy lead. Four mixes crossfade with game state (`musicTarget`): calm
+while on the title, the map and in build time (84 bpm, pad and arpeggio);
+combat once a wave is live (112 bpm, bass, war drums and the lead join, the
+chord order flips to a darker one); boss while a boss is alive (128 bpm, four
+on the floor, sawtooth lead and bass); end, which fades everything out so the
+win and lose stingers play alone. Notes are scheduled on the audio clock about
+0.35s ahead by a 50ms timer (`musicTick`), never from the frame loop, so a slow
+frame cannot make it stutter, and a tab that was hidden skips the gap instead
+of bursting. Each level has its own key and mood (`MUSIC_KEYS`: Hollow in D
+major, Millbrook in G, Cairnwatch in A minor, Splintered Vale in E minor,
+Elderroot in D minor, Sunken Market in F, Amber Terraces in C, Frostpine in B
+minor), and the arpeggio and lead are built once from a seed hashed from the
+level id, so each level has a fixed tune that repeats every four bars. The
+music bus sits at 0.32 so it stays well under the effects (checked against the
+soundboard: music RMS about 0.010 to 0.020, versus 0.004 to 0.05 for effects).
+Music starts on the first user gesture like everything else, follows the mute
+button through the master gain, pauses with the game (the context is
+suspended) and uses no `Math.random`, since the balance tests seed it. Since
+there is no way to listen in this environment, verification is numeric:
+`Audio.renderMusic(state, seconds, levelId)` renders a mix offline; it was
+checked for NaN, clipping and level, and its envelope autocorrelation shows
+the rhythm sits on the beat (strong repeat every bar, four-on-the-floor in the
+boss mix). Four harness checks now cover it, and a live-game run confirmed the
+state sequence calm, combat, boss, combat, end. A real ear should still judge
+taste; the mix constants are all in `MIX` and `MUSIC_KEYS`.
+
 **Graphics roadmap**: see `GRAPHICS-ROADMAP.md` for the approved list of
 further graphics work, its priority order, the performance budget and the
 current test status. Read it before starting any graphics task. Its numbered list is the one the

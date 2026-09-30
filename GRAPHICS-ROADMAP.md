@@ -38,8 +38,10 @@ file reordered it, which caused confusion; this numbering is authoritative.
    for about 2 seconds after a hit (bosses keep their own bar).
 4. **Living world.** DONE. Birds, butterflies, cloud shadows on the ground and
    drifting clouds above the valley edges.
-5. **Sound tied to visuals.** OPEN. Layered music that shifts between prep and
-   combat (audio is synthesized, see js/audio.js).
+5. **Sound tied to visuals.** DONE. Layered generative music (pad, arpeggio,
+   bass, drums, lead) that crossfades between calm, combat and boss, with a
+   key per level. See P3-V8 in AGENTS.md. Verified numerically only; a human
+   ear should judge the taste and the mix constants in `js/audio.js`.
 6. **Painted title and world map art.** DONE. Illustrated dawn backdrop with
    six parallax layers (`js/title-art.js`), gold logotype with ribbon and vine
    flourishes, painted map sea and frame with a desktop tilt. See P3-V6.

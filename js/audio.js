@@ -27,6 +27,7 @@ const Audio = (() => {
       try { muted = localStorage.getItem('bb-muted') === '1'; } catch (e) { /* storage may be blocked */ }
       master.gain.value = muted ? 0 : 0.6;
       startAmbience();
+      startMusic();
     }
     if (ctx.state === 'suspended') ctx.resume();
   }
@@ -343,5 +344,196 @@ const Audio = (() => {
     GameState.on('speedChanged', () => sfx.select());
   }
 
-  return { init, unlock, update, sfx, setMuted, isMuted, renderBoard };
+
+  // ===================================================================
+  // Music: layered, generative, synthesized. A pastoral pad and plucked arpeggio
+  // while the player builds, then bass, war drums and a lead fade in when a wave
+  // is live, and a faster, heavier mix for a boss. Five layers (pad, arp, bass,
+  // drums, lead) crossfade with game state. Notes are scheduled on the audio
+  // clock a short way ahead (never on the frame loop), each level has its own
+  // key, and the melody is seeded so it repeats like a tune instead of wandering.
+  // ===================================================================
+  const MUSIC_KEYS = {
+    'shadow-hollow':   { root: 38, minor: false },
+    'millbrook-watch': { root: 43, minor: false },
+    'cairnwatch':      { root: 45, minor: true },
+    'splintered-vale': { root: 40, minor: true },
+    'elderroot-ward':  { root: 38, minor: true },
+    'sunken-market':   { root: 41, minor: false },
+    'amber-terraces':  { root: 36, minor: false },
+    'frostpine-camp':  { root: 47, minor: true },
+  };
+  // chord = [semitones above the key root, 'maj' | 'min']; one chord per bar
+  const PROG = {
+    major: { calm: [[0, 'maj'], [9, 'min'], [5, 'maj'], [7, 'maj']], war: [[9, 'min'], [5, 'maj'], [0, 'maj'], [7, 'maj']] },
+    minor: { calm: [[0, 'min'], [8, 'maj'], [3, 'maj'], [10, 'maj']], war: [[0, 'min'], [5, 'min'], [8, 'maj'], [10, 'maj']] },
+  };
+  const PENTA = { major: [0, 2, 4, 7, 9], minor: [0, 3, 5, 7, 10] };
+  const TRIAD = { maj: [0, 4, 7], min: [0, 3, 7] };
+  // per-state mix: layer gains, tempo and which chord order to play
+  const MIX = {
+    calm:   { pad: 0.55, arp: 0.55, bass: 0.22, drums: 0,    lead: 0,    bpm: 84,  prog: 'calm' },
+    combat: { pad: 0.34, arp: 0.3,  bass: 0.55, drums: 0.65, lead: 0.36, bpm: 112, prog: 'war' },
+    boss:   { pad: 0.4,  arp: 0.22, bass: 0.72, drums: 1,    lead: 0.6,  bpm: 128, prog: 'war' },
+    end:    { pad: 0,    arp: 0,    bass: 0,    drums: 0,    lead: 0,    bpm: 84,  prog: 'calm' },
+  };
+  const mus = { bus: null, layers: null, timer: null, step: 0, nextTime: 0, state: 'calm', key: null, plan: null };
+  const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);
+
+  function seededRand(seed) { let s = seed >>> 0 || 1; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
+  function hashStr(str) { let h = 2166136261; for (let i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 16777619); return h >>> 0; }
+
+  // the tune for one level: a fixed 4-bar arpeggio and lead phrase, built once from a seed
+  function buildPlan(levelId) {
+    const key = MUSIC_KEYS[levelId] || { root: 38, minor: false };
+    const mode = key.minor ? 'minor' : 'major', scale = PENTA[mode];
+    const r = seededRand(hashStr(levelId || 'x'));
+    const arp = [], lead = [];
+    for (let bar = 0; bar < 4; bar++) {
+      const a = [], l = [];
+      for (let i = 0; i < 8; i++) a.push(r() < 0.14 ? -1 : [0, 1, 2, 3, 2, 1, 2, 3][i]);       // -1 is a rest
+      let deg = 5 + Math.floor(r() * 3);
+      for (let i = 0; i < 16; i++) {
+        const weight = i % 8 === 0 ? 0.95 : i % 4 === 0 ? 0.6 : i % 2 === 0 ? 0.28 : 0;
+        if (r() < weight) { deg = Math.max(2, Math.min(11, deg + [-2, -1, -1, 0, 1, 1, 2][Math.floor(r() * 7)])); l.push(deg); } else l.push(-1);
+      }
+      arp.push(a); lead.push(l);
+    }
+    return { key, mode, scale, arp, lead };
+  }
+
+  function makeMusicGraph(c, dest) {
+    const bus = c.createGain(); bus.gain.value = 0.32; bus.connect(dest);   // kept well under the sound effects so hits and clinks stay audible
+    const layers = {};
+    for (const n of ['pad', 'arp', 'bass', 'drums', 'lead']) { const g = c.createGain(); g.gain.value = 0; g.connect(bus); layers[n] = g; }
+    return { bus, layers };
+  }
+  function mTone(dest, type, freq, t, dur, vol, o = {}) {
+    const osc = ctx.createOscillator(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+    osc.type = type; osc.frequency.setValueAtTime(freq, t);
+    if (o.detune) osc.detune.value = o.detune;
+    f.type = 'lowpass'; f.frequency.setValueAtTime(o.cutoff || 2400, t);
+    if (o.cutTo) f.frequency.exponentialRampToValueAtTime(o.cutTo, t + dur);
+    const a = o.attack || 0.006;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + a);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    osc.connect(f); f.connect(g); g.connect(dest);
+    osc.start(t); osc.stop(t + dur + 0.05);
+  }
+  function mNoise(dest, t, dur, vol, freq, filter = 'bandpass', q = 1) {
+    const src = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+    src.buffer = noiseBuf; f.type = filter; f.frequency.value = freq; f.Q.value = q;
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(f); f.connect(g); g.connect(dest);
+    src.start(t, (t * 7.31) % 1.5, dur + 0.05);   // a moving read point, so no Math.random (the balance tests seed it)
+  }
+  function mKick(dest, t, vol) {
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = 'sine'; o.frequency.setValueAtTime(130, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.14);
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.26);
+    o.connect(g); g.connect(dest); o.start(t); o.stop(t + 0.3);
+  }
+
+  // One 16th-note step of the score. `step` counts up forever; a bar is 16 steps.
+  function scheduleStep(step, t, stateName, graph, plan) {
+    const mix = MIX[stateName], L = graph.layers;
+    const bar = Math.floor(step / 16), i = step % 16, sd = 60 / mix.bpm / 4;
+    const chord = PROG[plan.mode][mix.prog][bar % 4], root = plan.key.root + chord[0], tri = TRIAD[chord[1]];
+    const war = stateName !== 'calm', boss = stateName === 'boss';
+    // pad: one soft chord per bar, long attack and release
+    if (i === 0 && mix.pad > 0) {
+      for (const semi of [tri[0], tri[1], tri[2]]) {
+        mTone(L.pad, 'sine', mtof(root + 12 + semi), t, sd * 16 + 0.6, 0.14, { attack: 0.7, cutoff: 1800, detune: -4 });
+        mTone(L.pad, 'triangle', mtof(root + 12 + semi), t, sd * 16 + 0.6, 0.06, { attack: 0.9, cutoff: 1400, detune: 5 });
+      }
+    }
+    // bass: long roots when calm, an eighth-note drive in a fight, a 16th pulse for a boss
+    if (mix.bass > 0) {
+      if (!war && (i === 0 || i === 8)) mTone(L.bass, 'triangle', mtof(root), t, sd * 7, 0.24, { attack: 0.02, cutoff: 500 });
+      else if (war && !boss && i % 2 === 0) mTone(L.bass, 'triangle', mtof(root + (i % 8 === 6 ? 7 : 0)), t, sd * 1.7, 0.26, { attack: 0.008, cutoff: 650 });
+      else if (boss && (i % 4 === 0 || i % 4 === 2 || i === 15)) mTone(L.bass, 'sawtooth', mtof(root - (i === 15 ? 12 : 0)), t, sd * 1.5, 0.15, { attack: 0.006, cutoff: 480, cutTo: 260 });
+    }
+    // arp: a plucked lute-like arpeggio on the eighth notes
+    if (mix.arp > 0 && i % 2 === 0) {
+      const idx = plan.arp[bar % 4][i / 2];
+      if (idx >= 0) {
+        const n = tri[idx % 3] + 12 * Math.floor(idx / 3);
+        mTone(L.arp, 'triangle', mtof(root + 24 + n), t, sd * 3, 0.2, { attack: 0.004, cutoff: 3200, cutTo: 900 });
+      }
+    }
+    // lead: the tune, a reedy pentatonic line that only plays once a wave is live
+    if (mix.lead > 0) {
+      const deg = plan.lead[bar % 4][i];
+      if (deg >= 0) {
+        const semi = plan.scale[deg % 5] + 12 * Math.floor(deg / 5);
+        const f = mtof(plan.key.root + 36 + semi);
+        mTone(L.lead, boss ? 'sawtooth' : 'square', f, t, sd * (boss ? 2.4 : 1.8), boss ? 0.11 : 0.085, { attack: 0.012, cutoff: boss ? 2600 : 1700 });
+        mTone(L.lead, 'triangle', f * 2, t, sd * 1.6, 0.05, { attack: 0.01, cutoff: 2200 });
+      }
+    }
+    // drums: war drums in a fight, four on the floor and rolls for a boss
+    if (mix.drums > 0) {
+      const kickAt = boss ? (i % 4 === 0) : (i === 0 || i === 8 || i === 10);
+      if (kickAt) mKick(L.drums, t, boss ? 0.5 : 0.42);
+      if (i === 4 || i === 12) { mNoise(L.drums, t, 0.14, 0.28, 1900, 'bandpass', 0.8); mTone(L.drums, 'triangle', 190, t, 0.1, 0.16, { cutoff: 900 }); }
+      if (boss && i >= 14) mNoise(L.drums, t, 0.06, 0.16, 1400, 'bandpass', 0.8);
+      if (i % 2 === 0) mNoise(L.drums, t, 0.035, i % 4 === 0 ? 0.07 : 0.045, 7000, 'highpass', 0.7);
+    }
+  }
+
+  function musicTarget() {
+    const s = GameState.state;
+    if (s.phase === 'won' || s.phase === 'lost') return 'end';
+    if (s.phase === 'playing' && s.waveActive) return s.enemies.some((e) => e.boss) ? 'boss' : 'combat';
+    return 'calm';
+  }
+  function applyMix(stateName, graph, c, instant) {
+    const mix = MIX[stateName], now = c.currentTime;
+    for (const n in graph.layers) {
+      const g = graph.layers[n].gain;
+      if (instant) g.value = mix[n]; else g.setTargetAtTime(mix[n], now, stateName === 'end' ? 0.5 : 0.9);
+    }
+  }
+  function musicTick() {
+    if (!ctx || rendering) return;
+    if (ctx.state !== 'running') return;
+    if (muted) { mus.nextTime = ctx.currentTime + 0.05; return; }
+    const target = musicTarget();
+    if (target !== mus.state) { mus.state = target; applyMix(target, mus, ctx, false); }
+    if (mus.nextTime < ctx.currentTime) mus.nextTime = ctx.currentTime + 0.05;   // fell behind (tab hidden): skip the gap, never burst
+    while (mus.nextTime < ctx.currentTime + 0.35) {
+      scheduleStep(mus.step, mus.nextTime, mus.state === 'end' ? 'calm' : mus.state, mus, mus.plan);
+      mus.nextTime += 60 / MIX[mus.state].bpm / 4;
+      mus.step++;
+    }
+  }
+  function startMusic() {
+    if (mus.timer) return;
+    const g = makeMusicGraph(ctx, master);
+    mus.bus = g.bus; mus.layers = g.layers;
+    mus.plan = buildPlan(GameState.currentLevel().id);
+    mus.state = musicTarget();
+    applyMix(mus.state, mus, ctx, true);
+    mus.nextTime = ctx.currentTime + 0.1;
+    mus.timer = setInterval(musicTick, 50);
+  }
+  // Offline render of one music state, for checking levels and structure outside the game.
+  async function renderMusic(stateName, seconds, levelId) {
+    const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext, rate = 44100;
+    const off = new OAC(1, Math.ceil(rate * seconds), rate);
+    const saved = { ctx, master, noiseBuf };
+    ctx = off; buildGraph(off); master.gain.value = 0.6; rendering = true;
+    const graph = makeMusicGraph(off, master), plan = buildPlan(levelId || 'shadow-hollow');
+    applyMix(stateName, graph, off, true);
+    const sd = 60 / MIX[stateName].bpm / 4;
+    let notes = 0;
+    for (let step = 0, t = 0; t < seconds; step++, t += sd) { scheduleStep(step, t, stateName, graph, plan); notes++; }
+    const buffer = await off.startRendering();
+    rendering = false;
+    ctx = saved.ctx; master = saved.master; noiseBuf = saved.noiseBuf;
+    return { buffer, steps: notes };
+  }
+
+  return { init, unlock, update, sfx, setMuted, isMuted, renderBoard, renderMusic, musicState: () => mus.state };
 })();

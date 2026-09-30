@@ -109,6 +109,22 @@ async function enterLevel(page, levelId) {
     return names.has('grass') && names.has('water') && [...names].some((n) => n.startsWith('motes-'));
   }));
 
+  // music: rendered offline so it does not depend on the browser's autoplay policy
+  const mus = await page.evaluate(async () => {
+    const r = {};
+    for (const [st, secs] of [['calm', 8], ['combat', 8], ['boss', 8], ['end', 2]]) {
+      const { buffer } = await Audio.renderMusic(st, secs, 'shadow-hollow');
+      const d = buffer.getChannelData(0); let peak = 0, sum = 0, bad = 0;
+      for (let i = 0; i < d.length; i++) { const v = d[i]; if (v !== v) bad++; peak = Math.max(peak, Math.abs(v)); sum += v * v; }
+      r[st] = { peak: +peak.toFixed(3), rms: +Math.sqrt(sum / d.length).toFixed(4), bad };
+    }
+    return r;
+  });
+  check('music: every mix renders without NaN or clipping', Object.values(mus).every((m) => m.bad === 0 && m.peak < 0.6), JSON.stringify(mus));
+  check('music: calm, combat and boss are audible and get steadily fuller', mus.calm.rms > 0.004 && mus.combat.rms > mus.calm.rms && mus.boss.rms > mus.combat.rms, `rms ${mus.calm.rms} < ${mus.combat.rms} < ${mus.boss.rms}`);
+  check('music: the end state is silent (the win and lose stingers play alone)', mus.end.peak === 0);
+  check('music: stays quieter than the loudest sound effect (peak under 0.3)', mus.boss.peak < 0.3, `boss peak ${mus.boss.peak}`);
+
   // M1 regression: tile rules, drag, resize
   let [x, y] = await cellToScreen(page, 6, 6);
   await page.mouse.click(x, y); await page.waitForTimeout(120);
