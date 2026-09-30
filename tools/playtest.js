@@ -1022,6 +1022,12 @@ async function enterLevel(page, levelId) {
     }, routeIds);
     const usedNow = await page.evaluate(() => GameState.routesForWave(1));
     check(`Level ${n}: an incoming-road marker stands at the road wave 1 uses, and only there`, routeIds.every((r, i) => markers[r] === usedNow.includes(i)), JSON.stringify(markers));
+    check(`Level ${n}: the road is a smooth curve (ribbon drawn, enemies walk a rounded polyline)`, await page.evaluate(() => {
+      const lv = GameState.currentLevel(), sc = Renderer.debugScene();
+      const rt = GameState.routes[0], turns = lv.routes[0].waypoints.length;
+      return !!lv.curvyRoads && !!sc.getObjectByName('roadDirt') && rt.points.length > turns * 4 && Number.isFinite(rt.length);
+    }));
+    check(`Level ${n}: a rounded route never strays more than 0.75 cells from its grid cells`, await page.evaluate(() => GameState.routes.every((rt) => rt.points.every((p) => rt.cells.some(([c, r]) => Math.hypot(GameState.worldX(c) - p.x, GameState.worldZ(r) - p.z) < 0.75)))));
     const lone = await page.evaluate(({ tip, lanes, gold }) => {
       const G = GameState, S = G.state, out = {};
       const reset = () => { S.towers.length = 0; S.enemies.length = 0; S.projectiles.length = 0; S.gold = gold; S.lives = 20; S.wave = 0; S.prep = 0; S.waveActive = false; S.schedule = []; S.waveQueue = []; S.phase = 'playing'; };

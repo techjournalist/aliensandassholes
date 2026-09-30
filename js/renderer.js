@@ -780,6 +780,7 @@ const Renderer = (() => {
     const geos = [];
     const rng = srand(7);
     const vt = levelTheme();
+    const curvy = !!GameState.currentLevel().curvyRoads;
     const topColor = new THREE.Color(), sideColor = new THREE.Color();
     const rowsMin = -border, rowsMax = rows + border, colsMin = -border, colsMax = cols + border;
     for (let r = rowsMin; r < rowsMax; r++) {
@@ -792,7 +793,7 @@ const Renderer = (() => {
         if (kind === 'stream') {
           height = 0.12; yTop = -0.2;
           topColor.set(PALETTE.streamBed); sideColor.set(PALETTE.streamBed);
-        } else if (kind === 'path' || kind === 'bridge') {
+        } else if ((kind === 'path' && !curvy) || kind === 'bridge') {
           const cob = GameState.isCobble(c, r);
           topColor.copy(cob ? lerpColor(PALETTE.cobble, PALETTE.cobbleDark, rng() * 0.5) : lerpColor(PALETTE.path, PALETTE.hollowPath, h));
           topColor.offsetHSL(0, 0, (rng() - 0.5) * 0.04);
@@ -923,7 +924,7 @@ const Renderer = (() => {
     }
     // worn road: dark trampled mud and the odd puddle on the dirt stretches
     for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
-      if (GameState.cellKind(c, r) !== 'path' || GameState.isCobble(c, r)) continue;
+      if (GameState.currentLevel().curvyRoads || GameState.cellKind(c, r) !== 'path' || GameState.isCobble(c, r)) continue;
       if (rng() > 0.5) continue;
       const hz = GameState.zoneFalloff(c, r), puddle = rng() < 0.22;
       if (puddle) col.copy(lerpColor(PALETTE.streamBed, PALETTE.path, 0.35)); else col.copy(lerpColor(PALETTE.path, PALETTE.earth, 0.42));
@@ -958,6 +959,7 @@ const Renderer = (() => {
   // pebbles kicked to the sides, so the road reads hand-painted rather than
   // as a row of flat tiles. Colors are bucketed so it stays a few draw calls.
   function buildRoadEdges(vt) {
+    if (GameState.currentLevel().curvyRoads) { buildCurvyRoad(vt); return; }
     const rng = srand(311);
     const isGround = (c, r) => !GameState.inGrid(c, r) || GameState.cellKind(c, r) === 'ground';
     const lipColor = (h) => lerpColor(vt.meadowDark, PALETTE.hollowGround, Math.round(h * 2) / 2).multiplyScalar(0.84).getHex();
@@ -994,6 +996,133 @@ const Renderer = (() => {
     }
   }
 
+
+  // -------- curvy roads (levels with `curvyRoads`) --------
+  // The road is a smooth ribbon laid along each route's smoothed polyline:
+  // a dark grass lip, the dirt (cobble near the gate, blight-grey in the
+  // Hollow), twin wheel ruts, scattered mud and pebbles. All routes go into
+  // a few merged meshes. Layers sit at fixed heights and colors depend only
+  // on position, so where roads share a tail they overlap invisibly.
+  const roadSamples = [];      // every smoothed point of every route, for roadDist
+  const roadGrid = new Map();
+  function roadKey(x, z) { return Math.floor(x) + ',' + Math.floor(z); }
+  function indexRoad() {
+    roadSamples.length = 0; roadGrid.clear();
+    for (const rt of GameState.routes) {
+      const pts = rt.points;
+      for (let i = 0; i < pts.length - 1; i++) {
+        const a = pts[i], b = pts[i + 1], n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / 0.15));
+        for (let k = 0; k <= n; k++) {
+          const p = { x: a.x + (b.x - a.x) * k / n, z: a.z + (b.z - a.z) * k / n };
+          roadSamples.push(p);
+          const key = roadKey(p.x, p.z);
+          if (!roadGrid.has(key)) roadGrid.set(key, []);
+          roadGrid.get(key).push(p);
+        }
+      }
+    }
+  }
+  // distance from a world point to the nearest road centerline (Infinity on
+  // levels without curvy roads, or far from any road)
+  function roadDist(x, z) {
+    if (!GameState.currentLevel().curvyRoads) return Infinity;
+    let best = Infinity;
+    const cx = Math.floor(x), cz = Math.floor(z);
+    for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) {
+      const list = roadGrid.get((cx + dx) + ',' + (cz + dz));
+      if (!list) continue;
+      for (const p of list) best = Math.min(best, Math.hypot(p.x - x, p.z - z));
+    }
+    return best;
+  }
+  function buildCurvyRoad(vt) {
+    indexRoad();
+    const lv = GameState.currentLevel();
+    const [bc, br] = lv.chokepoint.cell, bx = worldX(bc), bz = worldZ(br);
+    const toCell = (x, z) => [x + cols / 2 - 0.5, z + rows / 2 - 0.5];
+    const inBridge = (x, z) => Math.abs(x - bx) < 0.62 && Math.abs(z - bz) < 0.62;
+    const col = new THREE.Color();
+    const dirt = (x, z, len, left, cobbleTail) => {
+      const [c, r] = toCell(x, z), h = GameState.zoneFalloff(c, r);
+      const n = RendererFX.fbm(x * 2.3 + 11, z * 2.3 + 5);
+      if (cobbleTail && left < cobbleTail) col.copy(lerpColor(PALETTE.cobble, PALETTE.cobbleDark, n * 0.6));
+      else col.copy(lerpColor(PALETTE.path, PALETTE.hollowPath, h)).lerp(new THREE.Color(0xffe2a8), 0.6 * (1 - h));
+      col.offsetHSL(0, 0, (n - 0.5) * 0.07);
+      return col.multiplyScalar(1.5);   // flat ribbons catch less key light than the noise-lit ground
+    };
+    const lip = (x, z) => { const [c, r] = toCell(x, z); return col.copy(lerpColor(vt.meadowDark, PALETTE.hollowGround, GameState.zoneFalloff(c, r))).multiplyScalar(1.15); };
+    const rut = (x, z) => { const [c, r] = toCell(x, z); return col.copy(lerpColor(PALETTE.path, PALETTE.earth, 0.22)).lerp(new THREE.Color(PALETTE.hollowEarth), GameState.zoneFalloff(c, r) * 0.6).multiplyScalar(1.3); };
+    const layers = { lip: [], dirt: [], rut: [] };
+    const ribbon = (list, pts, lens, total, half, y, offset, colorFn, cobbleTail) => {
+      const L = [], R = [];
+      for (let i = 0; i < pts.length; i++) {
+        const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)];
+        let tx = b.x - a.x, tz = b.z - a.z; const m = Math.hypot(tx, tz) || 1; tx /= m; tz /= m;
+        const nx = -tz, nz = tx;
+        L.push([pts[i].x + nx * (offset + half), pts[i].z + nz * (offset + half)]);
+        R.push([pts[i].x + nx * (offset - half), pts[i].z + nz * (offset - half)]);
+      }
+      for (let i = 0; i < pts.length - 1; i++) {
+        const mx = (pts[i].x + pts[i + 1].x) / 2, mz = (pts[i].z + pts[i + 1].z) / 2;
+        if (inBridge(mx, mz)) continue;
+        const left = total - lens[i];
+        const quad = [L[i], R[i], R[i + 1], L[i], R[i + 1], L[i + 1]];
+        for (const [qx, qz] of quad) {
+          const c = colorFn(qx, qz, lens[i], left, cobbleTail);
+          list.push(qx, y, qz, c.r, c.g, c.b);
+        }
+      }
+    };
+    for (const rt of GameState.routes) {
+      const pts = rt.points, total = rt.length;
+      ribbon(layers.lip, pts, rt.lens, total, 0.47, 0.010, 0, lip);
+      ribbon(layers.dirt, pts, rt.lens, total, 0.4, 0.014, 0, dirt, lv.cobbleTailCells);
+      for (const off of [-0.17, 0.17]) ribbon(layers.rut, pts, rt.lens, total, 0.028, 0.017, off, rut);
+    }
+    const meshOf = (list, name) => {
+      if (!list.length) return null;
+      const pos = new Float32Array(list.length / 6 * 3), colr = new Float32Array(list.length / 6 * 3);
+      for (let i = 0, v = 0; i < list.length; i += 6, v += 3) { pos[v] = list[i]; pos[v + 1] = list[i + 1]; pos[v + 2] = list[i + 2]; colr[v] = list[i + 3]; colr[v + 1] = list[i + 4]; colr[v + 2] = list[i + 5]; }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(colr, 3));
+      g.computeVertexNormals();
+      // triangles may wind either way depending on the side; face them up
+      const n = g.attributes.normal; for (let i = 0; i < n.count; i++) n.setXYZ(i, 0, 1, 0);
+      const m = new THREE.Mesh(g, new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap, vertexColors: true, side: THREE.DoubleSide }));
+      m.name = name; m.matrixAutoUpdate = false; scene.add(m);
+      return m;
+    };
+    meshOf(layers.lip, 'roadLip'); meshOf(layers.dirt, 'roadDirt'); meshOf(layers.rut, 'roadRuts');
+    // mud, puddles and pebbles along the curve (deterministic, off the bridge)
+    const rng = srand(311), geos = [];
+    for (const rt of GameState.routes.slice(0, 1).concat(GameState.routes.slice(1))) {
+      const pts = rt.points;
+      for (let i = 2; i < pts.length - 2; i += 3) {
+        const a = pts[i], b = pts[i + 1];
+        let tx = b.x - a.x, tz = b.z - a.z; const m = Math.hypot(tx, tz) || 1; tx /= m; tz /= m;
+        if (inBridge(a.x, a.z)) continue;
+        const [c, r] = toCell(a.x, a.z), h = GameState.zoneFalloff(c, r);
+        if (rng() < 0.3) {
+          const puddle = rng() < 0.22;
+          col.copy(puddle ? lerpColor(PALETTE.streamBed, PALETTE.path, 0.35) : lerpColor(PALETTE.path, PALETTE.earth, 0.42)).lerp(new THREE.Color(PALETTE.hollowPath), h * 0.8);
+          const g = GEO.circle.clone().applyMatrix4(M(a.x + (rng() - 0.5) * 0.3, 0.02, a.z + (rng() - 0.5) * 0.3, { sx: puddle ? 0.2 : 0.14 + rng() * 0.14, sy: 1, sz: puddle ? 0.12 : 0.08 + rng() * 0.08, ry: Math.atan2(tx, tz) }));
+          const colors = new Float32Array(g.attributes.position.count * 3);
+          for (let k = 0; k < g.attributes.position.count; k++) { colors[k * 3] = col.r; colors[k * 3 + 1] = col.g; colors[k * 3 + 2] = col.b; }
+          g.setAttribute('color', new THREE.BufferAttribute(colors, 3)); g.deleteAttribute('uv');
+          geos.push(g);
+        }
+        if (rng() < 0.18) {
+          const side = rng() < 0.5 ? -1 : 1, s = 0.03 + rng() * 0.03;
+          batchPart(P(GEO.rock, h > 0.5 ? PALETTE.hollowRock : PALETTE.stone, M(a.x - tz * side * (0.46 + rng() * 0.1), s * 0.3, a.z + tx * side * (0.46 + rng() * 0.1), { sx: s * 1.3, sy: s * 0.6, sz: s, ry: rng() * 3 }), false));
+        }
+      }
+    }
+    if (geos.length) {
+      const mud = new THREE.Mesh(mergeGeoms(geos), new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap, vertexColors: true }));
+      mud.name = 'roadMud'; mud.matrixAutoUpdate = false; scene.add(mud);
+    }
+  }
+
   // Wind-blown grass on open meadow: one instanced draw call. Skips the
   // road, build plots and deep corruption, thins out as corruption rises.
   function buildGrass() {
@@ -1012,6 +1141,7 @@ const Renderer = (() => {
         const tufts = Math.floor((inGrid ? 3.4 : 2.4) * (1 - h * 0.9) * QUALITY + rng());
         for (let t = 0; t < tufts; t++) {
           const cx = worldX(c) + (rng() - 0.5) * 0.84, cz = worldZ(r) + (rng() - 0.5) * 0.84;
+          if (roadDist(cx, cz) < 0.62) continue;
           const n = 5 + Math.floor(rng() * 5);
           const tint = lerpColor(vt.meadow, PALETTE.meadowLight, 0.2 + rng() * 0.55).lerp(new THREE.Color(PALETTE.hollowGround), Math.min(1, h * 1.2));
           const tall = 0.16 + rng() * 0.12;
@@ -2658,7 +2788,7 @@ const Renderer = (() => {
       toon, unlit, addOutline, srand, lerpColor, shakeCamera, puff,
       treeParts, deadTreeParts, rockParts, mushroomParts, tuftParts, flowerParts, acornParts,
       water, masonry, towerCourses, roofCourses, windowDress, glow, setGlow, bannerGeo, shade,
-      worldX, worldZ, cols, rows, border,
+      worldX, worldZ, cols, rows, border, roadDist,
       scene, animated,
       level: GameState.currentLevel(),
     };

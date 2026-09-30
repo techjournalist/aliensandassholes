@@ -268,7 +268,7 @@ const DawnKit = (() => {
   // Hollow's dead wood only where the blight is. `wide` = the region the
   // spawn mouths keep clear. Returns nothing; adds batched props.
   function meadow(kit, seed) {
-    const { M, batchPart, batchDecal, liveProp, decal, srand, animated, border, cols, rows, worldX, worldZ, level,
+    const { M, batchPart, batchDecal, liveProp, decal, srand, animated, border, cols, rows, worldX, worldZ, level, roadDist,
       treeParts, deadTreeParts, rockParts, mushroomParts, tuftParts, flowerParts, acornParts } = kit;
     const rng = srand(seed);
     const swayTrees = [];
@@ -280,6 +280,7 @@ const DawnKit = (() => {
       const h = GameState.zoneFalloff(c, r);
       const x = worldX(c) + (rng() - 0.5) * 0.5, z = worldZ(r) + (rng() - 0.5) * 0.5;
       const roll = rng();
+      if (roadDist(x, z) < 0.75) return;
       const put = ({ parts, radius }) => { for (const p of parts) batchPart(p, M(x, 0, z)); if (radius) batchDecal(x, z, radius); };
       if (h > 0.45) {
         if (roll < 0.4) put(deadTreeParts(rng)); else if (roll < 0.7) put(rockParts(rng, true));

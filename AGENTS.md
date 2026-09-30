@@ -1271,6 +1271,52 @@ The button shows gold at 2x and a glowing pink at 4x, with an updating
 aria-label. Music tempo and effects stay at normal speed. Harness checks cover
 the cycle and the valid-speed rule.
 
+**P3-M9 — Levels 9 and 10: the dawn levels** *(on branch
+`graphics-pass-units-tiers`, user-requested)*. The user loved the title
+splash and asked for new levels that look like it, with curving roads and
+enemies arriving from several divergent points, "so it's harder". Three
+layouts were drawn and validated first; the user picked two. Both reuse the
+multi-route engine unchanged for pathing (`routes`, per-road groups, `at`) and
+share `js/dawn-kit.js`: Level 1's own Bastion (same masonry, mushroom-cap
+towers, banner, 3 damage states, optional banner colors), a cracked Hollow
+stump with a pulsing glow and spores at the head of every road (facing out
+from whichever map edge it stands on), a short brook with a plank bridge
+(`chokepoint.streamRows`), and a splash-style meadow (more flowers and
+mushrooms, props kept off the road). Theme is the splash dawn: warm pink-gold
+key light, purple fill and backdrop, golden-green ground, fireflies.
+**Level 9, The Flanked Keep** (22x14): six spawns. Five roads start on the
+west, north and south edges and join at (12,8); one more starts in the far
+south-east, circles behind the keep and reaches the gate without ever
+crossing the brook, so no single choke point wins. **Level 10, The Keep
+Between** (22x14): the Bastion stands mid-valley; three roads converge from
+the west and cross the brook, two come in from the east behind the keep.
+New bosses: The Gloam-Moths (`gloam`, a rose-winged moth cloud) and The
+Heartbloom (`heartbloom`, a spiked pulsing bloom), both on the shared boss
+rig. 13 waves each.
+
+**Curvy roads (engine feature, opt-in).** The first build kept the grid
+corners and the user rightly rejected it: the design page had smooth wavy
+roads and the game had straight runs. A level may now set `curvyRoads: true`.
+`GameState` then rounds each route's polyline with three Chaikin
+corner-cutting passes (start and gate stay exact), so enemies, flyers and
+targeting all use the curve; the cells (what is road, what is buildable) are
+unchanged and the curve stays within about half a cell of them (a harness
+check enforces 0.75). `Renderer.buildCurvyRoad` draws the road as merged
+ribbons (grass lip, dirt, cobble near the gate, twin ruts) plus mud and
+pebbles along the curve, skips the bridge cell, and colors depend only on
+position so shared tails overlap invisibly. Path cells render as meadow,
+grass and props keep off the curve (`roadDist`, also in the level kit).
+Levels 1 to 8 are untouched.
+
+Balance lessons: the curve shortens and shifts the path, which cost towers
+coverage, so the isolated-bot numbers moved and the waves were retuned after
+the change, not before. Flyers leaked at a constant rate on roads with no
+anti-air in range (the same coverage-gap archetype as Level 7), so bats were
+moved onto the roads the bot's anti-air covers and the flank carries ground
+units. Bosses again had to be softened (hp 340 and 200) because a leak costs
+5 lives. Final isolated runs: Level 9 8/8 won (5 to 13 lives), Level 10 8/8
+(2 to 10). The P3-FIX1 "last level" end-screen checks moved to Level 10.
+
 **Graphics roadmap**: see `GRAPHICS-ROADMAP.md` for the approved list of
 further graphics work, its priority order, the performance budget and the
 current test status. Read it before starting any graphics task. Its numbered list is the one the

@@ -17,13 +17,13 @@ const LEVEL_9 = (() => {
     { name: 'Quick Feet at Dawn',     flavor: 'Bog-Tricksters dash up the south-west road.',                              groups: [g('grunt', 4, 1.6, 0, 'west', 0), g('trickster', 5, 0.9, 0, 'south-west', 3)] },
     { name: 'The Old Troll Wakes',    flavor: 'A Moss Troll lumbers down from the north.',                                groups: [g('grunt', 4, 1.5, 0, 'west', 0), g('troll', 1, 1, 0, 'north', 6), g('grunt', 3, 1.6, 0, 'far-south', 3)] },
     { name: 'Wings at Sunrise',       flavor: 'Bramble Bats rise over the far south road. Druids and Artillery only.',   groups: [g('bat', 2, 1.5, 0, 'far-south', 0), g('grunt', 6, 1.1, 0, 'north-west', 3)] },
-    { name: 'Five Gates',             flavor: 'Every western road at once. Find the junction.',                          groups: [g('grunt', 4, 1.1, 0, 'north-west', 0), g('grunt', 4, 1.1, 0, 'north', 0), g('grunt', 4, 1.1, 0, 'west', 0), g('grunt', 4, 1.1, 0, 'south-west', 0), g('grunt', 4, 1.1, 0, 'far-south', 0)] },
+    { name: 'Five Gates',             flavor: 'Every western road at once. Find the junction.',                          groups: [g('grunt', 3, 1.2, 0, 'north-west', 0), g('grunt', 3, 1.2, 0, 'north', 1), g('grunt', 3, 1.2, 0, 'west', 0), g('grunt', 3, 1.2, 0, 'south-west', 1), g('grunt', 3, 1.2, 0, 'far-south', 0)] },
     { name: 'The Road Behind the Keep', flavor: 'A new crack opens in the south-east. They will reach the gate without crossing the brook.', groups: [g('grunt', 4, 1.5, 0, 'east-flank', 0), g('trickster', 5, 0.8, 0, 'west', 2), g('troll', 1, 1, 0, 'north', 4)] },
     { name: 'Dawn Chorus',            flavor: 'Bats from the far south, a rush from the north-west, grunts round the back.', groups: [g('bat', 3, 1.0, 0, 'far-south', 0), g('trickster', 7, 0.6, 0, 'north-west', 1), g('grunt', 3, 1.4, 0, 'east-flank', 3)] },
-    { name: 'Every Gate in Turn',     flavor: 'The Hollow leans on each road in turn.',                                   groups: [g('troll', 2, 2.4, 0, 'west', 0), g('grunt', 6, 0.9, 0, 'north', 1), g('trickster', 5, 0.65, 0, 'south-west', 2), g('bat', 2, 1.2, 0, 'east-flank', 6)] },
-    { name: 'Pincer and Flank',       flavor: 'Trolls on two roads, bats round the back.',                                groups: [g('troll', 2, 2.3, 0, 'north-west', 0), g('troll', 2, 2.3, 0, 'south-west', 1), g('bat', 4, 1.0, 0, 'east-flank', 3), g('grunt', 6, 0.85, 0, 'north', 4)] },
-    { name: 'Six Roads at Once',      flavor: 'All six gates open together. The keep shakes.',                            groups: [g('grunt', 8, 0.8, 0, 'west', 0), g('trickster', 8, 0.55, 0, 'north-west', 0), g('troll', 2, 2.0, 0, 'north', 0), g('grunt', 6, 0.9, 0, 'south-west', 0), g('bat', 4, 1.0, 0, 'far-south', 6), g('grunt', 6, 0.9, 0, 'east-flank', 0)] },
-    { name: 'The Long Dawn',          flavor: 'A Troll column, a Trickster rush, a Bat swarm and a flank, all at once.', groups: [g('troll', 3, 2.1, 0, 'west', 0), g('trickster', 12, 0.45, 0, 'north-west', 0), g('bat', 7, 0.65, 0, 'far-south', 0), g('grunt', 8, 0.8, 0, 'east-flank', 0)] },
+    { name: 'Every Gate in Turn',     flavor: 'The Hollow leans on each road in turn.',                                   groups: [g('troll', 2, 2.4, 0, 'west', 0), g('grunt', 6, 0.9, 0, 'north', 1), g('trickster', 5, 0.65, 0, 'south-west', 2), g('bat', 2, 1.2, 0, 'far-south', 6)] },
+    { name: 'Pincer and Flank',       flavor: 'Trolls on two roads, grunts round the back, bats from the far south.',                                groups: [g('troll', 2, 2.3, 0, 'north-west', 0), g('troll', 2, 2.3, 0, 'south-west', 1), g('bat', 3, 1.0, 0, 'far-south', 3), g('grunt', 6, 0.85, 0, 'east-flank', 4)] },
+    { name: 'Six Roads at Once',      flavor: 'All six gates open together. The keep shakes.',                            groups: [g('grunt', 7, 0.9, 0, 'west', 0), g('trickster', 7, 0.6, 0, 'north-west', 0), g('troll', 2, 2.0, 0, 'north', 0), g('grunt', 5, 1.0, 0, 'south-west', 0), g('bat', 4, 1.0, 0, 'far-south', 6), g('grunt', 5, 1.0, 0, 'east-flank', 0)] },
+    { name: 'The Long Dawn',          flavor: 'A Troll column, a Trickster rush, a Bat swarm and a flank, all at once.', groups: [g('troll', 3, 2.1, 0, 'west', 0), g('trickster', 12, 0.45, 0, 'north-west', 0), g('bat', 6, 0.7, 0, 'far-south', 0), g('grunt', 8, 0.8, 0, 'east-flank', 0)] },
     { name: 'The Gloam-Moths Rise',   flavor: 'Something vast unfolds over the Hollow. Only Druids and Artillery reach it.', groups: [g('bat', 4, 1.0, 0, 'far-south', 0), g('grunt', 5, 0.9, 0, 'north', 1), g('gloam', 1, 1, 0, 'north-west', 8), g('grunt', 4, 0.9, 0, 'east-flank', 2)] },
   ];
 
@@ -45,6 +45,7 @@ const LEVEL_9 = (() => {
     subtitle: 'Six roads out of the Hollow, and one circles behind the keep.',
     map: { x: 592, y: 138, reclaim: 90, icon: 'sunkeep' },
     grid: { cols: 22, rows: 14 },
+    curvyRoads: true,   // the road is a smooth ribbon and enemies follow the curve
     spawn: [0, 7],
     routes: [
       { id: 'west',       waypoints: [[0, 7], [3, 7], [3, 9], [6, 9], [6, 7], [9, 7], [9, 8], ...tail] },
@@ -68,7 +69,7 @@ const LEVEL_9 = (() => {
       motes: { fireflies: 18, spores: 8 },
     },
     spawnBlockedText: 'The Hollow is seeping up through this ground.',
-    waves, prepSeconds: 14, startGold: 210, startLives: 20, starThresholds: [16, 8],
+    waves, prepSeconds: 14, startGold: 240, startLives: 20, starThresholds: [16, 8],
     tipTile: [2, 6],
     endScreenText: {
       3: () => 'Thirteen waves, six gates, and a dawn that stayed gold. The Gloam-Moths scattered and the Bastion never flinched.',

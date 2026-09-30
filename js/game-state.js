@@ -72,8 +72,8 @@ const GameState = (() => {
     ashen:     { id: 'ashen',     name: 'The Ashen Swarm',   hp: 600, speed: 0.88, bounty: 160, flying: true,  armor: 1, boss: true },
     leafstorm: { id: 'leafstorm', name: 'The Leaf-Storm',    hp: 520, speed: 0.66, bounty: 160, flying: true,  armor: 0, boss: true },
     // finale bosses for the two dawn levels (9 and 10): a fast rose-winged moth cloud and a slow pulsing shadow bloom
-    gloam:     { id: 'gloam',     name: 'The Gloam-Moths',   hp: 440, speed: 0.8,  bounty: 170, flying: true,  armor: 1, boss: true },
-    heartbloom: { id: 'heartbloom', name: 'The Heartbloom',  hp: 300, speed: 0.6,  bounty: 170, flying: true,  armor: 1, boss: true },
+    gloam:     { id: 'gloam',     name: 'The Gloam-Moths',   hp: 340, speed: 0.8,  bounty: 170, flying: true,  armor: 1, boss: true },
+    heartbloom: { id: 'heartbloom', name: 'The Heartbloom',  hp: 200, speed: 0.55, bounty: 170, flying: true,  armor: 1, boss: true },
   };
 
   const listeners = {};
@@ -178,8 +178,24 @@ const GameState = (() => {
         if (i === 0) cells.push([x, z]);
         while (x !== bx || z !== bz) { x += dx; z += dz; cells.push([x, z]); }
       }
-      const points = wps.map(([c, r]) => ({ x: worldX(c), z: worldZ(r) }));
+      let points = wps.map(([c, r]) => ({ x: worldX(c), z: worldZ(r) }));
       points.push(gate);
+      // Optional `curvyRoads`: round every corner (Chaikin corner cutting) so
+      // the road and the enemies on it sweep in curves instead of turning
+      // on grid corners. The cells (what is road, what is buildable) are
+      // unchanged; the curve only ever cuts inside the corner, staying
+      // within about half a cell of them. Start and gate stay exact.
+      if (def.curvyRoads) {
+        for (let pass = 0; pass < 3; pass++) {
+          const q = [points[0]];
+          for (let i = 0; i < points.length - 1; i++) {
+            const a = points[i], b = points[i + 1];
+            q.push({ x: a.x * 0.75 + b.x * 0.25, z: a.z * 0.75 + b.z * 0.25 }, { x: a.x * 0.25 + b.x * 0.75, z: a.z * 0.25 + b.z * 0.75 });
+          }
+          q.push(points[points.length - 1]);
+          points = q;
+        }
+      }
       const lens = [0];
       for (let i = 1; i < points.length; i++) lens.push(lens[i - 1] + Math.hypot(points[i].x - points[i - 1].x, points[i].z - points[i - 1].z));
       return { id: rd.id, index, cells, points, lens, length: lens[lens.length - 1] };
