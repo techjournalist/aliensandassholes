@@ -1315,7 +1315,7 @@ anti-air in range (the same coverage-gap archetype as Level 7), so bats were
 moved onto the roads the bot's anti-air covers and the flank carries ground
 units. Bosses again had to be softened (hp 340 and 200) because a leak costs
 5 lives. Final isolated runs: Level 9 8/8 won (5 to 13 lives), Level 10 8/8
-(2 to 10). The P3-FIX1 "last level" end-screen checks moved to Level 10.
+(2 to 10). The P3-FIX1 "last level" end-screen checks moved to Level 10. The full harness again lost Level 6's unseeded-RNG mixed-bot check, which locks Levels 7 to 10 and cascades, so the dawn levels' own checks (markers, curve, lone towers, console) were run directly with all levels unlocked and pass; levels 1 to 5 had no failures.
 
 **Graphics roadmap**: see `GRAPHICS-ROADMAP.md` for the approved list of
 further graphics work, its priority order, the performance budget and the

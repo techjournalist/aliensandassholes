@@ -102,7 +102,7 @@ module.exports = {
   'flanked-keep': {
     roadTile: [9, 7], streamTile: [14, 4], farTile: [20, 2],
     firstSlingerTile: [2, 6],
-    laneSlingerTiles: { 'west': [2, 6], 'north-west': [1, 2], 'north': [9, 1], 'south-west': [2, 12], 'far-south': [9, 12], 'east-flank': [20, 12] },
+    laneSlingerTiles: { 'west': [2, 6], 'north-west': [1, 2], 'north': [9, 1], 'south-west': [2, 12], 'far-south': [11, 13], 'east-flank': [20, 12] },
     // trunk first: five of the six roads share the row-8 run from (12,8),
     // so towers around the junction cover them all (the Level 4 lesson).
     // [13,9] is 4th on purpose: that's where the plan's first Druid lands,
