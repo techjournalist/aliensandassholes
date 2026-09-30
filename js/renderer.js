@@ -1606,6 +1606,45 @@ const Renderer = (() => {
     });
   }
 
+  // The Ashen Swarm (Level 3 finale): a scorched, cracked rock core with two
+  // curled horns and embers streaming round it. Silhouette: a jagged dark
+  // burst with a red-hot heart, not a smooth ball.
+  function ashenParts() {
+    const horns = [];
+    for (const s of [1, -1]) {
+      horns.push(P(GEO.cone, PALETTE.hollowRock, M(s * 0.22, 0.2, 0.06, { sx: 0.07, sy: 0.3, sz: 0.07, rz: -s * 0.7, rx: 0.15 }), false));
+      horns.push(P(GEO.cone, PALETTE.capRed, M(s * 0.36, 0.34, 0.08, { sx: 0.03, sy: 0.12, sz: 0.03, rz: -s * 1.0 }), false, { unlit: true }));
+    }
+    for (let i = 0; i < 4; i++) {
+      const a = i * 1.7 + 0.4;
+      horns.push(P(GEO.cone, PALETTE.stoneDark, M(Math.cos(a) * 0.22, -0.1 + i * 0.07, Math.sin(a) * 0.22, { sx: 0.06, sy: 0.16, sz: 0.06, rz: Math.cos(a) * 1.1, rx: -Math.sin(a) * 1.1 }), false));
+    }
+    return makeBossParts({
+      coreColor: PALETTE.hollowRock, coreScale: { sx: 0.34, sy: 0.3, sz: 0.36 }, heartColor: PALETTE.capRed, heartScale: { s: 0.22 },
+      accentColor: PALETTE.gold, extra: horns,
+      orbitScale: { sx: 0.06, sy: 0.06, sz: 0.1 }, orbitColor: PALETTE.gold,
+      wingScale: { sx: 0.26, sy: 0.015, sz: 0.1 }, wingColor: PALETTE.stoneDark,
+      beakScale: { sx: 0.02, sy: 0.07, sz: 0.02 }, beakColor: PALETTE.capRed,
+    });
+  }
+  // The Leaf-Storm (Level 4 finale): a russet whirl of leaves round a small
+  // dark heart. Silhouette: a wide flat spiral of big leaf-blades, a swirl
+  // and not a ball.
+  function leafstormParts() {
+    const leaves = [];
+    for (let i = 0; i < 6; i++) {
+      const a = i * 1.047;
+      leaves.push(P(GEO.sphereLo, i % 2 ? PALETTE.autumn : PALETTE.autumnDark, M(Math.cos(a) * 0.24, 0.02 * i - 0.04, Math.sin(a) * 0.24, { sx: 0.16, sy: 0.025, sz: 0.09, ry: -a }), false));
+    }
+    return makeBossParts({
+      coreColor: PALETTE.autumnDark, coreScale: { sx: 0.3, sy: 0.22, sz: 0.3 }, heartColor: PALETTE.gold, heartScale: { s: 0.16 },
+      accentColor: PALETTE.cream, extra: leaves,
+      orbitScale: { sx: 0.12, sy: 0.02, sz: 0.2 }, orbitColor: PALETTE.autumn,
+      wingScale: { sx: 0.3, sy: 0.012, sz: 0.12 }, wingColor: PALETTE.autumnDark,
+      beakScale: { sx: 0.02, sy: 0.05, sz: 0.02 }, beakColor: PALETTE.gold,
+    });
+  }
+
   const WALK = {
     grunt:     { freq: 7.5, bounce: 0.09, lean: 0.1, sway: 0.08 },
     trickster: { freq: 12,  bounce: 0.15, lean: 0.25, sway: 0.16 },
@@ -1624,7 +1663,7 @@ const Renderer = (() => {
     troll:     { 1: [0.34, 0.5, 0.14], 2: [-0.34, 0.5, 0.14], 3: [0.14, 0.14, -0.02], 4: [-0.14, 0.14, -0.02] },
     bat:       { 1: [0.12, 0.02, 0], 2: [-0.12, 0.02, 0] },
   };
-  const ENEMY_RECIPES = { grunt: gruntParts, trickster: tricksterParts, troll: trollParts, bat: batParts, boss: bossParts, tideworm: tidewormParts, matriarch: matriarchParts, rime: rimeParts };
+  const ENEMY_RECIPES = { grunt: gruntParts, trickster: tricksterParts, troll: trollParts, bat: batParts, boss: bossParts, tideworm: tidewormParts, matriarch: matriarchParts, rime: rimeParts, ashen: ashenParts, leafstorm: leafstormParts };
 
   // -------- particles: a pooled dust puff --------
   // The whole pool is one Points draw call: each puff is a flat round

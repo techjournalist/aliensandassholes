@@ -1172,6 +1172,27 @@ transforms only: no extra WebGL work, Level 1 title view unchanged at 119 calls
 and 170.7k triangles. Full harness: 382 pass, the 19 failures match untouched
 `main`.
 
+**P3-V7 — Finale bosses for Levels 3 and 4** *(on branch
+`graphics-pass-units-tiers`, user-requested: "no boss battle for Level 3 or
+Level 4")*. Levels 3 and 4 had ended on a plain 12th wave. Each now has a
+13th wave with a light escort and a new boss, following the Level 6 to 8
+pattern exactly (a new `ENEMY_TYPES` entry, a `makeBossParts` recipe on the
+shared boss rig, one extra wave, `tools/level-fixtures.js` updated to 13 waves
+with the boss on 13). **The Ashen Swarm** (`ashen`, Level 3, hp 600, speed
+0.88, armor 1, flying): a scorched rock core with curled horns, a red-hot
+heart and embers orbiting; it rises after a bat and grunt escort on the single
+road. **The Leaf-Storm** (`leafstorm`, Level 4, hp 640, speed 0.8, armor 0,
+flying): a russet whirl of leaf-blades round a gold heart, sent down the Long
+Way with bats on the South Road and grunts on the Shortcut. Boss hp scales
+with the wave number like every boss (about 960 and 1,020 at wave 13).
+Everything boss-shaped (camera push, banner, health bar, arrival sting) is
+generic on `e.boss`, so it worked without new code. Verified in the full
+harness: Level 3's mixed defense wins with 7 lives (wave 13 leaked 5, the thin
+spot to watch) and Level 4's with 9, neither single-tower-type run trivializes
+either level, and the failures match untouched `main`. Test labels for
+Levels 3, 4, 6, 7 and 8 now say 13 waves. Level 2 still has no boss (it was not
+part of the request).
+
 **Graphics roadmap**: see `GRAPHICS-ROADMAP.md` for the approved list of
 further graphics work, its priority order, the performance budget and the
 current test status. Read it before starting any graphics task. Its numbered list is the one the

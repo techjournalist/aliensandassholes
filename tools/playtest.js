@@ -658,7 +658,7 @@ async function enterLevel(page, levelId) {
 
   const mixed3 = await runBotOn(['slinger', 'slinger', 'warden', 'druid', 'artillery', 'golem', 'druid', 'warden', 'slinger', 'golem', 'artillery', 'warden', 'druid', 'slinger', 'golem', 'artillery'], L3F.botBuildSpots, L3F.waveCount);
   console.log('LEVEL 3 MIXED BOT: ' + JSON.stringify(mixed3));
-  check('Level 3: a mixed defense can win all 12 waves', mixed3.phase === 'won', `lives=${mixed3.lives} leaks=${JSON.stringify(mixed3.leaks)}`);
+  check('Level 3: a mixed defense can win all 13 waves', mixed3.phase === 'won', `lives=${mixed3.lives} leaks=${JSON.stringify(mixed3.leaks)}`);
   check('Level 3: waves 1 and 2 are nearly unloseable', mixed3.leaks[0] + mixed3.leaks[1] <= 1, `leaks=${JSON.stringify(mixed3.leaks.slice(0, 2))}`);
   // the bot simulates a whole level with no frames in between, so the first
   // frame after it renders every queued death at once and can delay the
@@ -718,7 +718,7 @@ async function enterLevel(page, levelId) {
 
   const mixed4 = await runBotOn(L4F.botPlan, L4F.botBuildSpots, L4F.waveCount);
   console.log('LEVEL 4 MIXED BOT: ' + JSON.stringify(mixed4));
-  check('Level 4: a mixed defense can win all 12 waves', mixed4.phase === 'won', `lives=${mixed4.lives} leaks=${JSON.stringify(mixed4.leaks)}`);
+  check('Level 4: a mixed defense can win all 13 waves', mixed4.phase === 'won', `lives=${mixed4.lives} leaks=${JSON.stringify(mixed4.leaks)}`);
   check('Level 4: waves 1 and 2 are nearly unloseable', mixed4.leaks[0] + mixed4.leaks[1] <= 1, `leaks=${JSON.stringify(mixed4.leaks.slice(0, 2))}`);
   if (mixed4.phase === 'won') await page.locator('#end.show').waitFor({ timeout: 10000 }).catch(() => {});
   await page.waitForTimeout(300);
@@ -833,7 +833,7 @@ async function enterLevel(page, levelId) {
 
   const mixed6 = await runBotOn(L6F.botPlan, L6F.botBuildSpots, L6F.waveCount);
   console.log('LEVEL 6 MIXED BOT: ' + JSON.stringify(mixed6));
-  check('Level 6: a mixed defense can win all 12 waves', mixed6.phase === 'won', `lives=${mixed6.lives} leaks=${JSON.stringify(mixed6.leaks)}`);
+  check('Level 6: a mixed defense can win all 13 waves', mixed6.phase === 'won', `lives=${mixed6.lives} leaks=${JSON.stringify(mixed6.leaks)}`);
   check('Level 6: waves 1 and 2 are nearly unloseable', mixed6.leaks[0] + mixed6.leaks[1] <= 1, `leaks=${JSON.stringify(mixed6.leaks.slice(0, 2))}`);
   if (mixed6.phase === 'won') await page.locator('#end.show').waitFor({ timeout: 10000 }).catch(() => {});
   await page.waitForTimeout(300);
@@ -889,7 +889,7 @@ async function enterLevel(page, levelId) {
 
   const mixed7 = await runBotOn(L7F.botPlan, L7F.botBuildSpots, L7F.waveCount);
   console.log('LEVEL 7 MIXED BOT: ' + JSON.stringify(mixed7));
-  check('Level 7: a mixed defense can win all 12 waves', mixed7.phase === 'won', `lives=${mixed7.lives} leaks=${JSON.stringify(mixed7.leaks)}`);
+  check('Level 7: a mixed defense can win all 13 waves', mixed7.phase === 'won', `lives=${mixed7.lives} leaks=${JSON.stringify(mixed7.leaks)}`);
   check('Level 7: waves 1 and 2 are nearly unloseable', mixed7.leaks[0] + mixed7.leaks[1] <= 1, `leaks=${JSON.stringify(mixed7.leaks.slice(0, 2))}`);
   if (mixed7.phase === 'won') await page.locator('#end.show').waitFor({ timeout: 10000 }).catch(() => {});
   await page.waitForTimeout(300);
@@ -945,7 +945,7 @@ async function enterLevel(page, levelId) {
 
   const mixed8 = await runBotOn(L8F.botPlan, L8F.botBuildSpots, L8F.waveCount);
   console.log('LEVEL 8 MIXED BOT: ' + JSON.stringify(mixed8));
-  check('Level 8: a mixed defense can win all 12 waves', mixed8.phase === 'won', `lives=${mixed8.lives} leaks=${JSON.stringify(mixed8.leaks)}`);
+  check('Level 8: a mixed defense can win all 13 waves', mixed8.phase === 'won', `lives=${mixed8.lives} leaks=${JSON.stringify(mixed8.leaks)}`);
   check('Level 8: waves 1 and 2 are nearly unloseable', mixed8.leaks[0] + mixed8.leaks[1] <= 1, `leaks=${JSON.stringify(mixed8.leaks.slice(0, 2))}`);
   if (mixed8.phase === 'won') await page.locator('#end.show').waitFor({ timeout: 10000 }).catch(() => {});
   await page.waitForTimeout(300);

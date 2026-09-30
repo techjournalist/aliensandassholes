@@ -67,6 +67,10 @@ const GameState = (() => {
     tideworm:  { id: 'tideworm',  name: 'The Drowned Swarm', hp: 580, speed: 0.85, bounty: 160, flying: true,  armor: 1, boss: true },
     matriarch: { id: 'matriarch', name: 'The Hive Matriarch', hp: 600, speed: 0.9,  bounty: 160, flying: true,  armor: 0, boss: true },
     rime:      { id: 'rime',      name: 'The Rime Swarm',    hp: 620, speed: 0.75, bounty: 160, flying: true,  armor: 1, boss: true },
+    // finale bosses for Levels 3 and 4 (previously boss-less): a fast armored
+    // ember cloud and a soft, mid-speed leaf-storm
+    ashen:     { id: 'ashen',     name: 'The Ashen Swarm',   hp: 600, speed: 0.88, bounty: 160, flying: true,  armor: 1, boss: true },
+    leafstorm: { id: 'leafstorm', name: 'The Leaf-Storm',    hp: 640, speed: 0.8,  bounty: 160, flying: true,  armor: 0, boss: true },
   };
 
   const listeners = {};
