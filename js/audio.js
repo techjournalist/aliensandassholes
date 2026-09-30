@@ -3,6 +3,25 @@
 // ===================================================================
 const Audio = (() => {
   let ctx = null, master = null, noiseBuf = null, muted = false;
+  let sfxOut = null, musicOut = null;   // per-kind volume buses, both feeding master
+  // Player settings, saved under bb-audio. Music defaults a little lower than
+  // the effects, since it plays continuously and effects are short events.
+  const settings = { sfxOn: true, sfxVol: 1, musicOn: true, musicVol: 0.6 };
+  try {
+    const saved = JSON.parse(localStorage.getItem('bb-audio') || 'null');
+    if (saved && typeof saved === 'object') {
+      if (typeof saved.sfxOn === 'boolean') settings.sfxOn = saved.sfxOn;
+      if (typeof saved.musicOn === 'boolean') settings.musicOn = saved.musicOn;
+      if (Number.isFinite(saved.sfxVol)) settings.sfxVol = Math.max(0, Math.min(1, saved.sfxVol));
+      if (Number.isFinite(saved.musicVol)) settings.musicVol = Math.max(0, Math.min(1, saved.musicVol));
+    }
+  } catch (e) { /* storage may be blocked or hold junk: keep the defaults */ }
+  function saveSettings() { try { localStorage.setItem('bb-audio', JSON.stringify(settings)); } catch (e) { /* ignore */ } }
+  function applySettings() {
+    if (!ctx || !sfxOut || rendering) return;
+    sfxOut.gain.setTargetAtTime(settings.sfxOn ? settings.sfxVol : 0, ctx.currentTime, 0.03);
+    musicOut.gain.setTargetAtTime(settings.musicOn ? settings.musicVol : 0, ctx.currentTime, 0.05);
+  }
   let baseDelay = 0, rendering = false;
   const recent = [];      // start times of recent voices, for crowd ducking
   const lastAt = {};      // per-key rate limiting
@@ -13,6 +32,8 @@ const Audio = (() => {
     comp.threshold.value = -16; comp.knee.value = 18; comp.ratio.value = 6; comp.attack.value = 0.004; comp.release.value = 0.18;
     master = c.createGain();
     master.connect(comp); comp.connect(c.destination);
+    sfxOut = c.createGain(); musicOut = c.createGain();
+    sfxOut.connect(master); musicOut.connect(master);
     const len = Math.floor(c.sampleRate * 2), buf = c.createBuffer(1, len, c.sampleRate), d = buf.getChannelData(0);
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
     noiseBuf = buf;
@@ -26,6 +47,7 @@ const Audio = (() => {
       buildGraph(ctx);
       try { muted = localStorage.getItem('bb-muted') === '1'; } catch (e) { /* storage may be blocked */ }
       master.gain.value = muted ? 0 : 0.6;
+      applySettings();
       startAmbience();
       startMusic();
     }
@@ -59,7 +81,7 @@ const Audio = (() => {
   // One tonal voice: oscillator -> lowpass -> gain envelope. Slight random
   // detune keeps repeats from sounding stamped out.
   function voice({ type = 'sine', freq = 440, to = null, dur = 0.15, vol = 0.4, cutoff = 2400, delay = 0, attack = 0.008, jitter = 0.04, key = null, gap = 0.05 }) {
-    if (!ctx || limited(key, gap)) return;
+    if (!ctx || (!settings.sfxOn && !rendering) || limited(key, gap)) return;
     const t0 = ctx.currentTime + baseDelay + delay;
     const j = 1 + (Math.random() * 2 - 1) * jitter;
     const osc = ctx.createOscillator(), filt = ctx.createBiquadFilter(), g = ctx.createGain();
@@ -73,7 +95,7 @@ const Audio = (() => {
     g.gain.setValueAtTime(0.0001, t0);
     g.gain.exponentialRampToValueAtTime(v, t0 + attack);
     g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-    osc.connect(filt); filt.connect(g); g.connect(master);
+    osc.connect(filt); filt.connect(g); g.connect(sfxOut);
     osc.start(t0); osc.stop(t0 + dur + 0.03);
   }
   // A shaped noise burst: bandpass or lowpass noise with an envelope. Puffs,
@@ -91,7 +113,7 @@ const Audio = (() => {
     g.gain.setValueAtTime(0.0001, t0);
     g.gain.exponentialRampToValueAtTime(v, t0 + attack);
     g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-    src.connect(filt); filt.connect(g); g.connect(master);
+    src.connect(filt); filt.connect(g); g.connect(sfxOut);
     src.start(t0, Math.random() * 1.5); src.stop(t0 + dur + 0.03);
   }
 
@@ -103,13 +125,13 @@ const Audio = (() => {
     const wg = ctx.createGain(); wg.gain.value = 0.0;
     const lfo = ctx.createOscillator(), lg = ctx.createGain();
     lfo.frequency.value = 0.09; lg.gain.value = 0.02; lfo.connect(lg); lg.connect(wg.gain);
-    wind.connect(wf); wf.connect(wg); wg.connect(master);
+    wind.connect(wf); wf.connect(wg); wg.connect(sfxOut);
     wind.start(); lfo.start();
     wg.gain.setTargetAtTime(0.045, ctx.currentTime, 2);
     const drone = ctx.createOscillator(); drone.type = 'triangle'; drone.frequency.value = 55;
     const d2 = ctx.createOscillator(); d2.type = 'sine'; d2.frequency.value = 82.5;
     const dg = ctx.createGain(); dg.gain.value = 0;
-    drone.connect(dg); d2.connect(dg); dg.connect(master);
+    drone.connect(dg); d2.connect(dg); dg.connect(sfxOut);
     drone.start(); d2.start();
     amb.windGain = wg; amb.droneGain = dg; amb.birdTimer = 2 + Math.random() * 3;
   }
@@ -304,13 +326,13 @@ const Audio = (() => {
     const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
     const names = Object.keys(sfx), step = 1.4, rate = 44100;
     const off = new OAC(1, Math.ceil(rate * (names.length * step + 1)), rate);
-    const saved = { ctx, master, noiseBuf };
+    const saved = { ctx, master, noiseBuf, sfxOut, musicOut };
     ctx = off; buildGraph(off); master.gain.value = 0.6; rendering = true;
     const marks = names.map((name, i) => { baseDelay = i * step; sfx[name](); return { name, at: i * step }; });
     baseDelay = 0;
     const buffer = await off.startRendering();
     rendering = false;
-    ctx = saved.ctx; master = saved.master; noiseBuf = saved.noiseBuf;
+    ctx = saved.ctx; master = saved.master; noiseBuf = saved.noiseBuf; sfxOut = saved.sfxOut; musicOut = saved.musicOut;
     return { buffer, marks };
   }
 
@@ -498,7 +520,7 @@ const Audio = (() => {
   function musicTick() {
     if (!ctx || rendering) return;
     if (ctx.state !== 'running') return;
-    if (muted) { mus.nextTime = ctx.currentTime + 0.05; return; }
+    if (muted || !settings.musicOn) { mus.nextTime = ctx.currentTime + 0.05; return; }
     const target = musicTarget();
     if (target !== mus.state) { mus.state = target; applyMix(target, mus, ctx, false); }
     if (mus.nextTime < ctx.currentTime) mus.nextTime = ctx.currentTime + 0.05;   // fell behind (tab hidden): skip the gap, never burst
@@ -510,7 +532,7 @@ const Audio = (() => {
   }
   function startMusic() {
     if (mus.timer) return;
-    const g = makeMusicGraph(ctx, master);
+    const g = makeMusicGraph(ctx, musicOut);
     mus.bus = g.bus; mus.layers = g.layers;
     mus.plan = buildPlan(GameState.currentLevel().id);
     mus.state = musicTarget();
@@ -522,18 +544,24 @@ const Audio = (() => {
   async function renderMusic(stateName, seconds, levelId) {
     const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext, rate = 44100;
     const off = new OAC(1, Math.ceil(rate * seconds), rate);
-    const saved = { ctx, master, noiseBuf };
+    const saved = { ctx, master, noiseBuf, sfxOut, musicOut };
     ctx = off; buildGraph(off); master.gain.value = 0.6; rendering = true;
-    const graph = makeMusicGraph(off, master), plan = buildPlan(levelId || 'shadow-hollow');
+    const graph = makeMusicGraph(off, musicOut), plan = buildPlan(levelId || 'shadow-hollow');
     applyMix(stateName, graph, off, true);
     const sd = 60 / MIX[stateName].bpm / 4;
     let notes = 0;
     for (let step = 0, t = 0; t < seconds; step++, t += sd) { scheduleStep(step, t, stateName, graph, plan); notes++; }
     const buffer = await off.startRendering();
     rendering = false;
-    ctx = saved.ctx; master = saved.master; noiseBuf = saved.noiseBuf;
+    ctx = saved.ctx; master = saved.master; noiseBuf = saved.noiseBuf; sfxOut = saved.sfxOut; musicOut = saved.musicOut;
     return { buffer, steps: notes };
   }
 
-  return { init, unlock, update, sfx, setMuted, isMuted, renderBoard, renderMusic, musicState: () => mus.state };
+  const getSettings = () => ({ ...settings });
+  function setSfxOn(on) { settings.sfxOn = !!on; saveSettings(); applySettings(); }
+  function setMusicOn(on) { settings.musicOn = !!on; saveSettings(); applySettings(); }
+  function setSfxVolume(v) { settings.sfxVol = Math.max(0, Math.min(1, +v || 0)); saveSettings(); applySettings(); }
+  function setMusicVolume(v) { settings.musicVol = Math.max(0, Math.min(1, +v || 0)); saveSettings(); applySettings(); }
+
+  return { init, unlock, update, sfx, setMuted, isMuted, getSettings, setSfxOn, setMusicOn, setSfxVolume, setMusicVolume, renderBoard, renderMusic, musicState: () => mus.state };
 })();

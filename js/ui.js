@@ -512,6 +512,44 @@ const UI = (() => {
     $('mute-btn').addEventListener('click', () => { Audio.unlock(); Audio.setMuted(!Audio.isMuted()); syncMute(); });
     try { if (localStorage.getItem('bb-muted') === '1') { Audio.setMuted(true); } } catch (e) { /* ignore */ }
     syncMute();
+
+    // ---- settings: master mute, effects and music each get a switch and a volume ----
+    const settingsEl = $('settings');
+    const setChecked = (btn, on) => btn.setAttribute('aria-checked', on ? 'true' : 'false');
+    function syncSettings() {
+      const a = Audio.getSettings();
+      setChecked($('set-master'), !Audio.isMuted());
+      setChecked($('set-sfx'), a.sfxOn);
+      setChecked($('set-music'), a.musicOn);
+      $('set-sfx-vol').value = Math.round(a.sfxVol * 100);
+      $('set-music-vol').value = Math.round(a.musicVol * 100);
+      $('set-sfx-vol').disabled = !a.sfxOn || Audio.isMuted();
+      $('set-music-vol').disabled = !a.musicOn || Audio.isMuted();
+      syncMute();
+    }
+    function openSettings() {
+      Audio.unlock();
+      // opening it mid-battle pauses first, so the screen never covers a live fight
+      if (GameState.state.phase === 'playing' && !GameState.state.paused) GameState.pause();
+      syncSettings();
+      settingsEl.classList.add('show');
+      $('settings-done').focus();
+    }
+    function closeSettings() { settingsEl.classList.remove('show'); }
+    $('settings-btn').addEventListener('click', openSettings);
+    $('title-settings-btn').addEventListener('click', openSettings);
+    $('pause-settings-btn').addEventListener('click', openSettings);
+    $('settings-done').addEventListener('click', closeSettings);
+    settingsEl.addEventListener('pointerdown', (e) => { if (e.target === settingsEl) closeSettings(); });
+    $('set-master').addEventListener('click', () => { Audio.unlock(); Audio.setMuted(!Audio.isMuted()); syncSettings(); });
+    $('set-sfx').addEventListener('click', () => { Audio.unlock(); Audio.setSfxOn(!Audio.getSettings().sfxOn); syncSettings(); if (Audio.getSettings().sfxOn) Audio.sfx.select(); });
+    $('set-music').addEventListener('click', () => { Audio.unlock(); Audio.setMusicOn(!Audio.getSettings().musicOn); syncSettings(); });
+    $('set-sfx-vol').addEventListener('input', (e) => Audio.setSfxVolume(e.target.value / 100));
+    $('set-sfx-vol').addEventListener('change', () => Audio.sfx.select());   // a sample, so the level can be judged
+    $('set-music-vol').addEventListener('input', (e) => Audio.setMusicVolume(e.target.value / 100));
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && settingsEl.classList.contains('show')) { e.preventDefault(); e.stopImmediatePropagation(); closeSettings(); }
+    }, true);
     GameState.on('enemyHit', ({ enemy, amount, armored, x, z }) => floater(x, enemy.boss ? 1.6 : enemy.flying ? 1.2 : 0.7, z, armored ? `${amount} clink` : amount, armored ? 'armored' : ''));
     GameState.on('waveEnded', ({ bonus }) => floater(GameState.gate.x, 1.4, GameState.gate.z, `+${bonus} wave bonus`, 'bonus'));
     GameState.on('earlyBonus', (b) => floater(GameState.gate.x, 1.4, GameState.gate.z, `+${b} for courage`, 'bonus'));

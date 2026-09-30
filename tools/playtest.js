@@ -125,6 +125,27 @@ async function enterLevel(page, levelId) {
   check('music: the end state is silent (the win and lose stingers play alone)', mus.end.peak === 0);
   check('music: stays quieter than the loudest sound effect (peak under 0.3)', mus.boss.peak < 0.3, `boss peak ${mus.boss.peak}`);
 
+  // settings: separate switches for effects and music, saved, reachable in a fight
+  await page.locator('#settings-btn').click(); await page.waitForTimeout(250);
+  check('settings gear opens Settings and pauses the game', await page.evaluate(() => document.getElementById('settings').classList.contains('show') && GameState.state.paused));
+  await page.locator('#set-music').click();
+  const a1 = await page.evaluate(() => ({ s: Audio.getSettings(), saved: JSON.parse(localStorage.getItem('bb-audio') || '{}'), sw: document.getElementById('set-music').getAttribute('aria-checked') }));
+  check('music switch turns music off without touching effects, and saves it', a1.s.musicOn === false && a1.s.sfxOn === true && a1.saved.musicOn === false && a1.sw === 'false', JSON.stringify(a1.s));
+  await page.locator('#set-music').click();
+  await page.locator('#set-sfx').click();
+  const a2 = await page.evaluate(() => ({ s: Audio.getSettings(), slider: document.getElementById('set-sfx-vol').disabled }));
+  check('effects switch turns effects off without touching music, and greys its slider', a2.s.sfxOn === false && a2.s.musicOn === true && a2.slider === true, JSON.stringify(a2));
+  await page.locator('#set-sfx').click();
+  await page.locator('#set-music-vol').fill('40');
+  check('music slider sets the music volume', (await page.evaluate(() => Audio.getSettings().musicVol)) === 0.4);
+  await page.evaluate(() => Audio.setMusicVolume(0.6));
+  const tall = await page.evaluate(() => ['set-master', 'set-sfx', 'set-music', 'set-sfx-vol', 'set-music-vol', 'settings-done'].every((id) => { const r = document.getElementById(id).getBoundingClientRect(); return r.height >= 44; }));
+  check('every settings control is at least 44px tall', tall);
+  await page.keyboard.press('Escape'); await page.waitForTimeout(150);
+  check('Escape closes Settings (and the game stays paused behind it)', await page.evaluate(() => !document.getElementById('settings').classList.contains('show') && GameState.state.paused));
+  await page.locator('#resume-btn').click(); await page.waitForTimeout(200);
+  check('Resume after Settings returns to the fight', await page.evaluate(() => !GameState.state.paused));
+
   // M1 regression: tile rules, drag, resize
   let [x, y] = await cellToScreen(page, 6, 6);
   await page.mouse.click(x, y); await page.waitForTimeout(120);

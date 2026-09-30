@@ -531,6 +531,40 @@
   .wm-swell path:nth-child(2) { animation-delay: -1.5s; } .wm-swell path:nth-child(3) { animation-delay: -3s; } .wm-swell path:nth-child(4) { animation-delay: -4s; }
   #worldmap .card.wide { transition: transform 0.25s ease-out; transform: perspective(1400px) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg)); }
   @media (prefers-reduced-motion: reduce) { .ts-cloud, .ts-rays, .wm-swell path { animation: none; } #worldmap .card.wide { transform: none; } }
+
+  /* ---- settings screen: switches and volume sliders ---- */
+  .title-links { margin-top: 10px; }
+  .linkbtn { min-height: 44px; padding: 0 16px; background: none; border: 0; color: var(--cream); opacity: 0.85; font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; text-decoration: underline; text-underline-offset: 4px; }
+  .linkbtn:hover, .linkbtn:focus-visible { opacity: 1; color: var(--gold); }
+  #settings { z-index: 20; background: rgba(10, 7, 5, 0.9); }
+  #settings .card { max-width: 480px; text-align: left; background-color: #2a1d14; }
+  #settings h1 { text-align: center; }
+  #settings .eyebrow { text-align: center; }
+  .set-rows { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 18px; }
+  .set-row { display: grid; grid-template-columns: 1fr auto; align-items: center; column-gap: 14px; padding: 10px 4px; border-bottom: 1px solid rgba(246, 236, 212, 0.14); }
+  .set-row:last-child { border-bottom: 0; }
+  .set-label { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .set-name { font-size: 18px; font-weight: 800; color: var(--cream); }
+  .set-sub { font-size: 13px; opacity: 0.7; }
+  .switch { position: relative; width: 72px; height: 44px; padding: 0; background: #3a2a1e; border: 3px solid #1b1410; border-radius: 22px; cursor: pointer; box-shadow: inset 0 2px 0 rgba(0, 0, 0, 0.4); transition: background 0.15s ease; }
+  .switch .knob { position: absolute; top: 3px; left: 3px; width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(180deg, #ffe9a0, #d9a12f); border: 2px solid #1b1410; transition: transform 0.15s ease; }
+  .switch[aria-checked="true"] { background: #3c6a3f; }
+  .switch[aria-checked="true"] .knob { transform: translateX(28px); }
+  .switch:focus-visible, .slider:focus-visible, .screen button:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+  .slider { grid-column: 1 / -1; width: 100%; height: 44px; margin: 4px 0 0; accent-color: var(--gold); cursor: pointer; }
+  .slider:disabled { opacity: 0.4; cursor: default; }
+  #settings .card > button#settings-done { display: block; margin: 0 auto; }
+  @media (max-height: 460px) {
+    #settings .card { padding: 14px 20px 14px; }
+    #settings h1 { margin: 2px 0 6px; font-size: 26px; }
+    .set-rows { margin-bottom: 8px; gap: 0; }
+    .set-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr) auto; padding: 4px 4px; }
+    .set-label { grid-column: 1; }
+    .switch { grid-column: 3; grid-row: 1; }
+    .slider { grid-column: 2; grid-row: 1; height: 44px; margin: 0; }
+    .set-sub { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) { .switch, .switch .knob { transition: none; } }
 </style>
 </head>
 <body>
@@ -544,6 +578,7 @@
     <div class="pill lives"><span class="icon">&#9829;</span><span id="hud-lives">0</span></div>
     <div class="pill wave"><span class="icon">&#9873;</span><span id="hud-wave">Wave</span></div>
     <button id="mute-btn" class="pill iconbtn" type="button" aria-label="Sound on" title="Sound"><span class="icon">&#128266;</span></button>
+    <button id="settings-btn" class="pill iconbtn" type="button" aria-label="Settings" title="Settings"><span class="icon">&#9881;</span></button>
     <button id="speed-btn" class="pill iconbtn" type="button" aria-label="Game speed" title="Speed">1&times;</button>
     <button id="pause-btn" class="pill iconbtn" type="button" aria-label="Pause" title="Pause"><span class="icon">&#10074;&#10074;</span></button>
   </div>
@@ -582,6 +617,7 @@
       <li><span class="ico">&#9873;</span>Send the next wave when you're ready and hold the line.</li>
     </ul>
     <button id="start-btn" type="button">Begin the Campaign</button>
+    <div class="title-links"><button id="title-settings-btn" class="linkbtn" type="button">&#9881; Sound settings</button></div>
   </div>
 </div>
 
@@ -669,6 +705,7 @@
       <button id="resume-btn" type="button">Back to the wall</button>
       <button id="pause-restart-btn" type="button" class="secondary">Start over</button>
       <button id="pause-map-btn" type="button" class="secondary">World map</button>
+      <button id="pause-settings-btn" type="button" class="secondary">Settings</button>
     </div>
     <p class="keys">Desktop: P or Esc pauses. Space sends the next wave.</p>
   </div>
@@ -683,6 +720,31 @@
       <button id="restart-btn" type="button">Play again</button>
       <button id="end-map-btn" type="button" class="secondary">Choose another battle</button>
     </div>
+  </div>
+</div>
+
+
+<div id="settings" class="screen" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+  <div class="card">
+    <div class="eyebrow">Your valley, your volume</div>
+    <h1 id="settings-title">Settings</h1>
+    <div class="set-rows">
+      <div class="set-row">
+        <div class="set-label"><span class="set-name">All sound</span><span class="set-sub">A quick mute for everything</span></div>
+        <button id="set-master" class="switch" type="button" role="switch" aria-checked="true" aria-label="All sound"><span class="knob"></span></button>
+      </div>
+      <div class="set-row">
+        <div class="set-label"><span class="set-name">Sound effects</span><span class="set-sub">Shots, hits, horns and chimes</span></div>
+        <button id="set-sfx" class="switch" type="button" role="switch" aria-checked="true" aria-label="Sound effects"><span class="knob"></span></button>
+        <input id="set-sfx-vol" class="slider" type="range" min="0" max="100" step="5" aria-label="Sound effects volume">
+      </div>
+      <div class="set-row">
+        <div class="set-label"><span class="set-name">Music</span><span class="set-sub">The score that follows the battle</span></div>
+        <button id="set-music" class="switch" type="button" role="switch" aria-checked="true" aria-label="Music"><span class="knob"></span></button>
+        <input id="set-music-vol" class="slider" type="range" min="0" max="100" step="5" aria-label="Music volume">
+      </div>
+    </div>
+    <button id="settings-done" type="button">Done</button>
   </div>
 </div>
 

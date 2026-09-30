@@ -1223,6 +1223,28 @@ boss mix). Four harness checks now cover it, and a live-game run confirmed the
 state sequence calm, combat, boss, combat, end. A real ear should still judge
 taste; the mix constants are all in `MIX` and `MUSIC_KEYS`.
 
+**P3-V9 — Settings: separate effects and music controls** *(on branch
+`graphics-pass-units-tiers`, user-requested after the music was found a bit
+annoying)*. The single mute button became one of three controls on a new
+Settings screen (`#settings`): **All sound** (the old quick mute, still on the
+HUD too), **Sound effects** and **Music**, each with an on/off switch, and the
+last two with a volume slider. Audio now has two volume buses (`sfxOut`,
+`musicOut`) feeding the master gain: every sound effect and the ambience route
+through the first, the score through the second; a switched-off kind skips its
+work entirely (effects return before creating nodes, the music scheduler idles)
+instead of just being silenced. Settings persist in `localStorage` under
+`bb-audio` (`sfxOn`, `sfxVol`, `musicOn`, `musicVol`), alongside the existing
+`bb-muted`; bad or blocked storage falls back to the defaults. Music now
+defaults to 0.6 of its old volume, since continuous music reads louder than
+short effects. Reachable from the title screen ("Sound settings" link), the
+pause menu, and a gear button in the HUD; the gear pauses a live game first so
+the screen never covers a fight, and Done returns to the pause menu. Esc closes
+it, clicking the dark backdrop closes it, changing the effects slider plays a
+sample so the level can be judged, every control is at least 44px (on short
+phone screens each slider moves inline beside its label to stay 44px tall),
+switches use `role="switch"` with `aria-checked`, and reduced motion removes
+the knob animation. Seven harness checks cover it.
+
 **Graphics roadmap**: see `GRAPHICS-ROADMAP.md` for the approved list of
 further graphics work, its priority order, the performance budget and the
 current test status. Read it before starting any graphics task. Its numbered list is the one the
