@@ -384,6 +384,8 @@ const Audio = (() => {
     'sunken-market':   { root: 41, minor: false },
     'amber-terraces':  { root: 36, minor: false },
     'frostpine-camp':  { root: 47, minor: true },
+    'flanked-keep':    { root: 43, minor: false },
+    'keep-between':    { root: 40, minor: false },
   };
   // chord = [semitones above the key root, 'maj' | 'min']; one chord per bar
   const PROG = {

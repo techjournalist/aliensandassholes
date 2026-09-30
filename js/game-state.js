@@ -71,6 +71,9 @@ const GameState = (() => {
     // ember cloud and a soft, mid-speed leaf-storm
     ashen:     { id: 'ashen',     name: 'The Ashen Swarm',   hp: 600, speed: 0.88, bounty: 160, flying: true,  armor: 1, boss: true },
     leafstorm: { id: 'leafstorm', name: 'The Leaf-Storm',    hp: 520, speed: 0.66, bounty: 160, flying: true,  armor: 0, boss: true },
+    // finale bosses for the two dawn levels (9 and 10): a fast rose-winged moth cloud and a slow pulsing shadow bloom
+    gloam:     { id: 'gloam',     name: 'The Gloam-Moths',   hp: 440, speed: 0.8,  bounty: 170, flying: true,  armor: 1, boss: true },
+    heartbloom: { id: 'heartbloom', name: 'The Heartbloom',  hp: 300, speed: 0.6,  bounty: 170, flying: true,  armor: 1, boss: true },
   };
 
   const listeners = {};

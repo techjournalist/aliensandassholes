@@ -99,4 +99,33 @@ module.exports = {
     // wave 13 (added): The Rime Swarm, a new finale boss.
     waveCount: 13, hasBossOnWave: 13,
   },
+  'flanked-keep': {
+    roadTile: [9, 7], streamTile: [14, 4], farTile: [20, 2],
+    firstSlingerTile: [2, 6],
+    laneSlingerTiles: { 'west': [2, 6], 'north-west': [1, 2], 'north': [9, 1], 'south-west': [2, 12], 'far-south': [9, 12], 'east-flank': [20, 12] },
+    // trunk first: five of the six roads share the row-8 run from (12,8),
+    // so towers around the junction cover them all (the Level 4 lesson).
+    // [13,9] is 4th on purpose: that's where the plan's first Druid lands,
+    // with the far-south road's whole vertical approach (col 12, rows 10-12)
+    // in range; [16,9] (3rd) covers the flank's last steps and [19,9] (5th, where
+    // the plan's Warden lands, then the anti-air the bot adds for bat waves)
+    // sees 8 cells of the flank road.
+    botBuildSpots: [[13, 7], [11, 7], [16, 9], [13, 9], [19, 9], [15, 7], [11, 9], [16, 7], [17, 7], [13, 10], [11, 6], [10, 9], [16, 10], [19, 8], [13, 6], [20, 9]],
+    botPlan: ['slinger', 'slinger', 'slinger', 'druid', 'warden', 'artillery', 'golem', 'druid', 'warden', 'slinger', 'golem', 'artillery', 'warden', 'druid', 'slinger', 'golem'],
+    waveCount: 13, hasBossOnWave: 13,
+  },
+  'keep-between': {
+    roadTile: [5, 7], streamTile: [8, 4], farTile: [20, 7],
+    firstSlingerTile: [1, 7],
+    laneSlingerTiles: { 'west-mid': [1, 7], 'west-high': [1, 2], 'west-low': [1, 12], 'east-high': [20, 2], 'east-low': [20, 12] },
+    // two trunks (west run from (5,8), east run from (13,8)) and the gate
+    // between them. [14,9] is 4th on purpose: the plan's first Druid there has
+    // the whole east-low approach (cols 13-15, rows 10-11) in range, which a
+    // central Druid left uncovered; [14,7] (6th) does the same for east-high, and [5,4] (6th, the first spot the
+    // bot's bat-wave anti-air reaches; the 5th is a ground tower) covers the high road's corner at (3,3)-(6,5), which bats use
+    // (from [7,7] only the last four cells of that road were in range).
+    botBuildSpots: [[6, 7], [6, 9], [12, 7], [14, 9], [11, 9], [5, 4], [14, 7], [7, 7], [9, 9], [9, 7], [12, 9], [4, 7], [14, 8], [12, 6], [4, 10], [3, 8]],
+    botPlan: ['slinger', 'slinger', 'slinger', 'druid', 'warden', 'artillery', 'golem', 'druid', 'warden', 'slinger', 'golem', 'artillery', 'warden', 'druid', 'slinger', 'golem'],
+    waveCount: 13, hasBossOnWave: 13,
+  },
 };

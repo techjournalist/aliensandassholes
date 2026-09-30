@@ -1645,6 +1645,42 @@ const Renderer = (() => {
     });
   }
 
+  // The Gloam-Moths (Level 9 finale): a fat dusk-purple body between two
+  // huge rose-and-gold wings, with antennae and eye-spots. Silhouette: a
+  // wide butterfly shape, not a ball.
+  function gloamParts() {
+    const extra = [];
+    for (const s of [1, -1]) {
+      extra.push(P(GEO.sphereLo, PALETTE.flowerPink, M(s * 0.32, 0.04, -0.02, { sx: 0.3, sy: 0.02, sz: 0.24, ry: s * 0.3 }), false));
+      extra.push(P(GEO.sphereLo, PALETTE.gold, M(s * 0.4, 0.05, -0.02, { sx: 0.09, sy: 0.022, sz: 0.09 }), false, { unlit: true }));
+      extra.push(P(GEO.cone, PALETTE.batDark, M(s * 0.06, 0.26, 0.14, { sx: 0.018, sy: 0.22, sz: 0.018, rz: -s * 0.4, rx: -0.3 }), false));
+    }
+    return makeBossParts({
+      coreColor: PALETTE.batDark, coreScale: { sx: 0.2, sy: 0.22, sz: 0.36 }, heartColor: PALETTE.flowerPink, heartScale: { s: 0.15 },
+      accentColor: PALETTE.gold, extra,
+      orbitScale: { sx: 0.05, sy: 0.05, sz: 0.08 }, orbitColor: PALETTE.flowerYellow,
+      wingScale: { sx: 0.22, sy: 0.012, sz: 0.1 }, wingColor: PALETTE.magic,
+      beakScale: { sx: 0.02, sy: 0.05, sz: 0.02 }, beakColor: PALETTE.cream,
+    });
+  }
+  // The Heartbloom (Level 10 finale): a dark bloom with a ring of spiked
+  // petals round a pulsing magenta heart, spores orbiting. Silhouette: a
+  // spiky flower-head, flatter and wider than the crow swarm.
+  function heartbloomParts() {
+    const petals = [];
+    for (let i = 0; i < 8; i++) {
+      const a = i * Math.PI / 4;
+      petals.push(P(GEO.cone, i % 2 ? PALETTE.hollowWood : PALETTE.spore, M(Math.cos(a) * 0.26, 0, Math.sin(a) * 0.26, { sx: 0.1, sy: 0.3, sz: 0.06, rz: Math.cos(a) * 1.35, rx: -Math.sin(a) * 1.35, ry: -a }), false));
+    }
+    return makeBossParts({
+      coreColor: PALETTE.hollowEarth, coreScale: { sx: 0.3, sy: 0.24, sz: 0.3 }, heartColor: PALETTE.magicGlow, heartScale: { s: 0.22 },
+      accentColor: PALETTE.flowerPink, extra: petals,
+      orbitScale: { sx: 0.07, sy: 0.07, sz: 0.07 }, orbitColor: PALETTE.spore,
+      wingScale: { sx: 0.2, sy: 0.02, sz: 0.08 }, wingColor: PALETTE.hollowWood,
+      beakScale: { sx: 0.02, sy: 0.06, sz: 0.02 }, beakColor: PALETTE.magicGlow,
+    });
+  }
+
   const WALK = {
     grunt:     { freq: 7.5, bounce: 0.09, lean: 0.1, sway: 0.08 },
     trickster: { freq: 12,  bounce: 0.15, lean: 0.25, sway: 0.16 },
@@ -1663,7 +1699,7 @@ const Renderer = (() => {
     troll:     { 1: [0.34, 0.5, 0.14], 2: [-0.34, 0.5, 0.14], 3: [0.14, 0.14, -0.02], 4: [-0.14, 0.14, -0.02] },
     bat:       { 1: [0.12, 0.02, 0], 2: [-0.12, 0.02, 0] },
   };
-  const ENEMY_RECIPES = { grunt: gruntParts, trickster: tricksterParts, troll: trollParts, bat: batParts, boss: bossParts, tideworm: tidewormParts, matriarch: matriarchParts, rime: rimeParts, ashen: ashenParts, leafstorm: leafstormParts };
+  const ENEMY_RECIPES = { grunt: gruntParts, trickster: tricksterParts, troll: trollParts, bat: batParts, boss: bossParts, tideworm: tidewormParts, matriarch: matriarchParts, rime: rimeParts, ashen: ashenParts, leafstorm: leafstormParts, gloam: gloamParts, heartbloom: heartbloomParts };
 
   // -------- particles: a pooled dust puff --------
   // The whole pool is one Points draw call: each puff is a flat round

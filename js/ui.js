@@ -246,6 +246,8 @@ const UI = (() => {
     market: '<path class="wd" d="M -13 6 L -13 -4 M 13 6 L 13 -4" style="fill:none;stroke:var(--bark);stroke-width:2.2"></path>'
       + '<path class="rf" d="M -15 -4 L 0 -12 L 15 -4 Z"></path><path class="rf" d="M -15 -4 L -8 -1 L -8 -8 Z" style="fill:var(--gold);opacity:0.8"></path>'
       + '<rect class="wn" x="-9" y="0" width="18" height="6" style="fill:var(--water)"></rect>',
+    sunkeep: '<circle cx="9" cy="-9" r="4.5" style="fill:var(--gold);stroke:var(--ink);stroke-width:1"></circle><rect class="st" x="-9" y="-6" width="18" height="12"></rect><rect class="st" x="-12" y="-12" width="7" height="18"></rect><rect class="st" x="5" y="-12" width="7" height="18"></rect>'
+      + '<path class="rf" d="M -13 -12 A 4.5 4.5 0 0 1 -4 -12 Z"></path><path class="rf" d="M 4 -12 A 4.5 4.5 0 0 1 13 -12 Z"></path><rect class="wn" x="-2" y="-2" width="4" height="5"></rect>',
     apiary: '<rect class="st" x="-6" y="-2" width="12" height="14"></rect>'
       + '<path class="rf" d="M -6 -2 A 6 5 0 0 1 6 -2 Z" style="fill:var(--gold)"></path>'
       + '<rect class="wn" x="-2" y="4" width="4" height="5"></rect>',

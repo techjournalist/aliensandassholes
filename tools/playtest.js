@@ -992,35 +992,9 @@ async function enterLevel(page, levelId) {
   check('Level 8 win screen shows stars', mixed8.phase !== 'won' || (await page.locator('#end').isVisible() && await page.locator('#stars span.lit').count() === mixed8.stars));
   await page.screenshot({ path: `${OUT}/level8-win.png` });
   check('Level 8 win recorded progress', await page.evaluate(() => Progress.starsFor('frostpine-camp') > 0));
-  check('Level 8 win screen keeps "Choose another battle" (no Level 9 yet)', (await page.locator('#end-map-btn').innerText()) === 'Choose another battle');
+  check('Level 8 win screen now offers Continue to Level 9', mixed8.phase !== 'won' || (await page.locator('#end-map-btn').innerText()) === 'Continue');
   await page.evaluate(() => { document.getElementById('end').classList.remove('show'); });
 
-  // ---- P3-FIX1: a finished level can never strand the player ----
-  // the user's exact sequence: win, Choose another battle, the map pre-selects
-  // this same level; its button used to "Hold" it, which did nothing.
-  // Level 8 is the currently-last level, so this is where that scenario lives.
-  if (mixed8.phase === 'won') {
-    await page.locator('#pause-btn').click(); await page.waitForTimeout(200);
-    check('after a win the pause button brings back the end screen', await page.locator('#end').isVisible());
-    await page.evaluate(() => { document.getElementById('end').classList.remove('show'); });
-    await page.waitForTimeout(2300);
-    check('safety net: a finished level with no screen showing gets its end screen back', await page.locator('#end').isVisible());
-    await page.locator('#end-map-btn').click(); await page.waitForTimeout(300);
-    const replayLabel = await page.locator('#wm-play-btn').innerText();
-    check('the map offers to play the finished level again', replayLabel === 'Play The Frostpine Camp again', replayLabel);
-    await page.locator('#wm-play-btn').click();
-    await page.waitForTimeout(2500);
-    const fresh = await page.evaluate(() => ({ id: GameState.currentLevel().id, phase: GameState.state.phase, wave: GameState.state.wave, lives: GameState.state.lives }));
-    check('playing it again lands in a fresh game of that level', fresh.id === 'frostpine-camp' && fresh.phase === 'playing' && fresh.wave === 0 && fresh.lives === 20, JSON.stringify(fresh));
-    await page.locator('#pause-btn').click(); await page.waitForTimeout(200);
-    await page.locator('#pause-map-btn').click(); await page.waitForTimeout(300);
-    check('the pause menu has a way out to the world map', await page.locator('#worldmap').isVisible());
-    const backLabel = await page.locator('#wm-play-btn').innerText();
-    check('from a paused battle the map offers to return to it', backLabel === 'Return to The Frostpine Camp', backLabel);
-    await page.locator('#wm-play-btn').click(); await page.waitForTimeout(250);
-    check('returning brings back the pause menu, game still paused', await page.locator('#pause').isVisible() && await page.evaluate(() => GameState.state.paused && GameState.state.phase === 'playing'));
-    await page.locator('#resume-btn').click(); await page.waitForTimeout(150);
-  }
   await page.evaluate(() => { document.getElementById('end').classList.remove('show'); });
 
   for (const type of ['slinger', 'warden', 'druid', 'golem', 'artillery']) for (const pick of [0, 1]) {
@@ -1030,6 +1004,106 @@ async function enterLevel(page, levelId) {
     console.log(`LEVEL 8 ONLY ${type}/${br}: ` + JSON.stringify(r) + ` clean waves=${clean}/${L8F.waveCount}`);
     check(`Level 8: only ${type} (${br}) does not trivialize the level`, !(r.phase === 'won' && clean > Math.floor(L8F.waveCount * 0.6)), `phase=${r.phase} clean=${clean}`);
   }
+  // ---------------- Levels 9 and 10: the dawn levels (many divergent roads) ----------------
+  // One shared routine: a wave-1 lone tower, a lone Slinger holding each
+  // road's entry, a mixed bot over all waves, and a single-type stress test.
+  const dawnLevel = async (n, id, name, routeIds, roadCount) => {
+    const F = LEVEL_FIXTURES[id];
+    check(`winning Level ${n - 1} unlocked Level ${n}`, await page.evaluate((i) => Progress.isUnlocked(i), id));
+    await page.reload(); await page.waitForTimeout(1000);
+    await enterLevel(page, id);
+    check(`Level ${n} loads with ${roadCount} routes`, await page.evaluate(([i, k]) => GameState.currentLevel().id === i && GameState.routes.length === k, [id, roadCount]));
+    await page.waitForTimeout(1500);
+    await page.screenshot({ path: `${OUT}/level${n}-title.png` });
+    console.log(`LEVEL ${n} DEBUG OVERLAY: ` + (await page.locator('#debug').innerText()).replace(/\n/g, ' | '));
+    const markers = await page.evaluate((ids) => {
+      const sc = Renderer.debugScene(), vis = (r) => { const g = sc.getObjectByName(`route-marker-${r}`); return g ? g.visible : null; };
+      const out = {}; ids.forEach((r) => { out[r] = vis(r); }); return out;
+    }, routeIds);
+    const usedNow = await page.evaluate(() => GameState.routesForWave(1));
+    check(`Level ${n}: an incoming-road marker stands at the road wave 1 uses, and only there`, routeIds.every((r, i) => markers[r] === usedNow.includes(i)), JSON.stringify(markers));
+    const lone = await page.evaluate(({ tip, lanes, gold }) => {
+      const G = GameState, S = G.state, out = {};
+      const reset = () => { S.towers.length = 0; S.enemies.length = 0; S.projectiles.length = 0; S.gold = gold; S.lives = 20; S.wave = 0; S.prep = 0; S.waveActive = false; S.schedule = []; S.waveQueue = []; S.phase = 'playing'; };
+      reset(); S.selected = { kind: 'tile', c: tip[0], r: tip[1] }; G.placeTower('slinger');
+      G.startWave();
+      for (let i = 0; i < 60 * 90 && S.waveActive; i++) G.update(1 / 60);
+      out.wave1 = 20 - S.lives;
+      for (const [route, [c, r]] of Object.entries(lanes)) {
+        reset(); S.selected = { kind: 'tile', c, r }; G.placeTower('slinger');
+        let t = 0, k = 0;
+        for (let i = 0; i < 60 * 90; i++) { if (k < 5 && t >= k * 3.2) { G.spawnEnemy('grunt', route); k++; } G.update(1 / 60); t += 1 / 60; if (k >= 5 && !S.enemies.length) break; }
+        out[route] = 20 - S.lives;
+      }
+      reset();
+      return out;
+    }, { tip: F.firstSlingerTile, lanes: F.laneSlingerTiles, gold: await page.evaluate(() => GameState.currentLevel().startGold) });
+    check(`Level ${n} wave 1 is winnable by a single lone tower (no leaks)`, lone.wave1 === 0, JSON.stringify(lone));
+    check(`Level ${n}: every road can be held early by one Slinger at its entry`, routeIds.every((r) => lone[r] === 0), JSON.stringify(lone));
+
+    const mixed = await runBotOn(F.botPlan, F.botBuildSpots, F.waveCount);
+    console.log(`LEVEL ${n} MIXED BOT: ` + JSON.stringify(mixed));
+    check(`Level ${n}: a mixed defense can win all 13 waves`, mixed.phase === 'won', `lives=${mixed.lives} leaks=${JSON.stringify(mixed.leaks)}`);
+    check(`Level ${n}: waves 1 and 2 are nearly unloseable`, mixed.leaks[0] + mixed.leaks[1] <= 1, `leaks=${JSON.stringify(mixed.leaks.slice(0, 2))}`);
+    if (mixed.phase === 'won') await page.locator('#end.show').waitFor({ timeout: 10000 }).catch(() => {});
+    await page.waitForTimeout(300);
+    check(`Level ${n} win screen shows stars`, mixed.phase !== 'won' || (await page.locator('#end').isVisible() && await page.locator('#stars span.lit').count() === mixed.stars));
+    await page.screenshot({ path: `${OUT}/level${n}-win.png` });
+    check(`Level ${n} win recorded progress`, await page.evaluate((i) => Progress.starsFor(i) > 0, id));
+    return { mixed, F };
+  };
+  const dawnStress = async (n, F) => {
+    for (const type of ['slinger', 'warden', 'druid', 'golem', 'artillery']) for (const pick of [0, 1]) {
+      const br = Object.keys(BRANCH_KEYS[type])[pick];
+      const r = await runBotOn([type], F.botBuildSpots, F.waveCount, pick);
+      const clean = r.leaks.filter((l) => l <= 1).length;
+      console.log(`LEVEL ${n} ONLY ${type}/${br}: ` + JSON.stringify(r) + ` clean waves=${clean}/${F.waveCount}`);
+      check(`Level ${n}: only ${type} (${br}) does not trivialize the level`, !(r.phase === 'won' && clean > Math.floor(F.waveCount * 0.6)), `phase=${r.phase} clean=${clean}`);
+    }
+  };
+
+  const d9 = await dawnLevel(9, 'flanked-keep', 'The Flanked Keep', ['west', 'north-west', 'north', 'south-west', 'far-south', 'east-flank'], 6);
+  check('Level 9 win screen offers Continue to Level 10', d9.mixed.phase !== 'won' || (await page.locator('#end-map-btn').innerText()) === 'Continue');
+  check('Level 9 has six separate spawn points', await page.evaluate(() => new Set(GameState.routes.map((r) => r.cells[0].join(','))).size === 6));
+  check('Level 9: the east flank never crosses the brook', await page.evaluate(() => { const cp = GameState.currentLevel().chokepoint; return !GameState.routes.find((r) => r.id === 'east-flank').cells.some(([c]) => c === cp.streamCol); }));
+  await page.evaluate(() => { document.getElementById('end').classList.remove('show'); });
+  await dawnStress(9, d9.F);
+  await page.evaluate(() => { GameState.state.enemies.length = 0; document.getElementById('end').classList.remove('show'); });
+
+  const d10 = await dawnLevel(10, 'keep-between', 'The Keep Between', ['west-mid', 'west-high', 'west-low', 'east-high', 'east-low'], 5);
+  check('Level 10 has five separate spawn points', await page.evaluate(() => new Set(GameState.routes.map((r) => r.cells[0].join(','))).size === 5));
+  check('Level 10: east roads reach the gate without crossing the brook', await page.evaluate(() => { const cp = GameState.currentLevel().chokepoint; return GameState.routes.filter((r) => r.id.startsWith('east')).every((r) => !r.cells.some(([c]) => c === cp.streamCol)); }));
+  check('Level 10 win screen keeps "Choose another battle" (no Level 11 yet)', d10.mixed.phase !== 'won' || (await page.locator('#end-map-btn').innerText()) === 'Choose another battle');
+  await page.evaluate(() => { document.getElementById('end').classList.remove('show'); });
+  const mixed10 = d10.mixed;
+  // ---- P3-FIX1: a finished level can never strand the player ----
+  // the user's exact sequence: win, Choose another battle, the map pre-selects
+  // this same level; its button used to "Hold" it, which did nothing.
+  // Level 10 is the currently-last level, so this is where that scenario lives.
+  if (mixed10.phase === 'won') {
+    await page.locator('#pause-btn').click(); await page.waitForTimeout(200);
+    check('after a win the pause button brings back the end screen', await page.locator('#end').isVisible());
+    await page.evaluate(() => { document.getElementById('end').classList.remove('show'); });
+    await page.waitForTimeout(2300);
+    check('safety net: a finished level with no screen showing gets its end screen back', await page.locator('#end').isVisible());
+    await page.locator('#end-map-btn').click(); await page.waitForTimeout(300);
+    const replayLabel = await page.locator('#wm-play-btn').innerText();
+    check('the map offers to play the finished level again', replayLabel === 'Play The Keep Between again', replayLabel);
+    await page.locator('#wm-play-btn').click();
+    await page.waitForTimeout(2500);
+    const fresh = await page.evaluate(() => ({ id: GameState.currentLevel().id, phase: GameState.state.phase, wave: GameState.state.wave, lives: GameState.state.lives }));
+    check('playing it again lands in a fresh game of that level', fresh.id === 'keep-between' && fresh.phase === 'playing' && fresh.wave === 0 && fresh.lives === 20, JSON.stringify(fresh));
+    await page.locator('#pause-btn').click(); await page.waitForTimeout(200);
+    await page.locator('#pause-map-btn').click(); await page.waitForTimeout(300);
+    check('the pause menu has a way out to the world map', await page.locator('#worldmap').isVisible());
+    const backLabel = await page.locator('#wm-play-btn').innerText();
+    check('from a paused battle the map offers to return to it', backLabel === 'Return to The Keep Between', backLabel);
+    await page.locator('#wm-play-btn').click(); await page.waitForTimeout(250);
+    check('returning brings back the pause menu, game still paused', await page.locator('#pause').isVisible() && await page.evaluate(() => GameState.state.paused && GameState.state.phase === 'playing'));
+    await page.locator('#resume-btn').click(); await page.waitForTimeout(150);
+  }
+  await page.evaluate(() => { document.getElementById('end').classList.remove('show'); });
+  await dawnStress(10, d10.F);
   await page.waitForTimeout(1600);
   await page.evaluate(() => { GameState.state.enemies.length = 0; document.getElementById('end').classList.remove('show'); });
   await ctx.close();
