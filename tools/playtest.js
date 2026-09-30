@@ -94,7 +94,10 @@ async function enterLevel(page, levelId) {
   await page.locator('#speed-btn').click(); await page.waitForTimeout(100);
   check('speed toggles to 2x and shows it', await page.evaluate(() => GameState.state.speed === 2 && document.getElementById('speed-btn').textContent.startsWith('2')));
   await page.locator('#speed-btn').click(); await page.waitForTimeout(100);
-  check('speed toggles back to 1x', await page.evaluate(() => GameState.state.speed === 1));
+  check('speed steps up to 4x and shows it', await page.evaluate(() => GameState.state.speed === 4 && document.getElementById('speed-btn').textContent.startsWith('4') && document.getElementById('speed-btn').classList.contains('faster')));
+  await page.locator('#speed-btn').click(); await page.waitForTimeout(100);
+  check('speed cycles back to 1x after 4x', await page.evaluate(() => GameState.state.speed === 1 && !document.getElementById('speed-btn').classList.contains('faster')));
+  check('only 1x, 2x and 4x are valid speeds', await page.evaluate(() => [GameState.setSpeed(4), GameState.setSpeed(3), GameState.setSpeed(2), GameState.setSpeed(0), GameState.setSpeed(1)].join() === '4,1,2,1,1'));
   check('tip points at a tile before the first tower', await page.locator('#tip').isVisible() && (await page.locator('#tip').innerText()).includes('plant'));
   await page.screenshot({ path: `${OUT}/desktop.png` });
   console.log('DEBUG OVERLAY: ' + (await page.locator('#debug').innerText()).replace(/\n/g, ' | '));

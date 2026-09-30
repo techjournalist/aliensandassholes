@@ -2083,6 +2083,11 @@ const Renderer = (() => {
       const k = dir.punch / dir.punchDur;
       zoom += dir.punchAmt * k * k;
     }
+    // leaving the title drops the drift at once (the map screen covers the cut),
+    // so the first tap of a game never lands on a still-easing camera
+    const onTitle = GameState.state.phase === 'title';
+    if (dir.wasTitle && !onTitle) { camState.zoom = zoom; camState.px = px; camState.py = py; }
+    dir.wasTitle = onTitle;
     // ease toward the target so nothing snaps when a shot starts or ends
     const f = 1 - Math.exp(-dt * 9);
     camState.zoom += (zoom - camState.zoom) * f; camState.px += (px - camState.px) * f; camState.py += (py - camState.py) * f;

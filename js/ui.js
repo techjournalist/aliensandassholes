@@ -480,7 +480,8 @@ const UI = (() => {
     });
     $('pause-map-btn').addEventListener('click', () => { $('pause').classList.remove('show'); enterWorldMap(); });
     $('resume-btn').addEventListener('click', () => { Audio.unlock(); GameState.resume(); });
-    $('speed-btn').addEventListener('click', () => { Audio.unlock(); GameState.setSpeed(GameState.state.speed === 1 ? 2 : 1); });
+    const NEXT_SPEED = { 1: 2, 2: 4, 4: 1 };   // the speed button cycles 1x, 2x, 4x
+    $('speed-btn').addEventListener('click', () => { Audio.unlock(); GameState.setSpeed(NEXT_SPEED[GameState.state.speed] || 1); });
     GameState.on('paused', () => {
       const s = GameState.state;
       $('pause-text').textContent = s.waveActive
@@ -490,7 +491,12 @@ const UI = (() => {
       updateTip();
     });
     GameState.on('resumed', () => $('pause').classList.remove('show'));
-    GameState.on('speedChanged', (x) => { $('speed-btn').textContent = x + '×'; $('speed-btn').classList.toggle('fast', x === 2); });
+    GameState.on('speedChanged', (x) => {
+      $('speed-btn').textContent = x + '×';
+      $('speed-btn').classList.toggle('fast', x === 2);
+      $('speed-btn').classList.toggle('faster', x === 4);
+      $('speed-btn').setAttribute('aria-label', `Game speed ${x}×`);
+    });
     // the tab going away pauses the fight, so nobody comes back to an empty endpoint
     document.addEventListener('visibilitychange', () => { if (document.hidden) GameState.pause(); });
     window.addEventListener('blur', () => GameState.pause());
@@ -505,7 +511,7 @@ const UI = (() => {
         if (s.phase === 'title') { e.preventDefault(); $('start-btn').click(); }
         else if (s.phase === 'playing' && !s.paused && !s.waveActive) { e.preventDefault(); Audio.unlock(); GameState.sendWave(); }
       } else if (e.key === 'f' || e.key === 'F') {
-        if (s.phase === 'playing') GameState.setSpeed(s.speed === 1 ? 2 : 1);
+        if (s.phase === 'playing') GameState.setSpeed({ 1: 2, 2: 4, 4: 1 }[s.speed] || 1);
       }
     });
     const syncMute = () => { const m = Audio.isMuted(); $('mute-btn').classList.toggle('muted', m); $('mute-btn').querySelector('.icon').innerHTML = m ? '&#128263;' : '&#128266;'; $('mute-btn').setAttribute('aria-label', m ? 'Sound off' : 'Sound on'); };

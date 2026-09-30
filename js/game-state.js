@@ -70,7 +70,7 @@ const GameState = (() => {
     // finale bosses for Levels 3 and 4 (previously boss-less): a fast armored
     // ember cloud and a soft, mid-speed leaf-storm
     ashen:     { id: 'ashen',     name: 'The Ashen Swarm',   hp: 600, speed: 0.88, bounty: 160, flying: true,  armor: 1, boss: true },
-    leafstorm: { id: 'leafstorm', name: 'The Leaf-Storm',    hp: 640, speed: 0.8,  bounty: 160, flying: true,  armor: 0, boss: true },
+    leafstorm: { id: 'leafstorm', name: 'The Leaf-Storm',    hp: 520, speed: 0.66, bounty: 160, flying: true,  armor: 0, boss: true },
   };
 
   const listeners = {};
@@ -233,7 +233,7 @@ const GameState = (() => {
     return true;
   }
   function setSpeed(x) {
-    state.speed = x === 2 ? 2 : 1;
+    state.speed = x === 2 || x === 4 ? x : 1;   // 1x, 2x or 4x
     emit('speedChanged', state.speed);
     return state.speed;
   }

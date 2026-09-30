@@ -22,7 +22,9 @@
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
     const gdt = dt * GameState.state.speed;
-    GameState.update(gdt);
+    // fast-forward in small fixed steps (at most 1/60 s, the size the tests use),
+    // so 4x plays the same battle as 1x, only sooner, and never one big jump
+    for (let left = gdt; left > 1e-6;) { const step = Math.min(left, 1 / 60); GameState.update(step); left -= step; }
     Renderer.render(GameState.state.time, GameState.state.paused ? 0 : gdt);
     UI.frame(dt);
     Audio.update(dt);

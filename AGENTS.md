@@ -1181,10 +1181,11 @@ shared boss rig, one extra wave, `tools/level-fixtures.js` updated to 13 waves
 with the boss on 13). **The Ashen Swarm** (`ashen`, Level 3, hp 600, speed
 0.88, armor 1, flying): a scorched rock core with curled horns, a red-hot
 heart and embers orbiting; it rises after a bat and grunt escort on the single
-road. **The Leaf-Storm** (`leafstorm`, Level 4, hp 640, speed 0.8, armor 0,
-flying): a russet whirl of leaf-blades round a gold heart, sent down the Long
+road. **The Leaf-Storm** (`leafstorm`, Level 4, hp 520, speed 0.66, armor 0,
+flying; first drafted at 640 and 0.8, see the tuning note below): a russet whirl of leaf-blades round a gold heart, sent down the Long
 Way with bats on the South Road and grunts on the Shortcut. Boss hp scales
-with the wave number like every boss (about 960 and 1,020 at wave 13).
+with the wave number like every boss (about 960 for the Ashen Swarm and 830 for
+the Leaf-Storm at wave 13).
 Everything boss-shaped (camera push, banner, health bar, arrival sting) is
 generic on `e.boss`, so it worked without new code. Verified in the full
 harness: Level 3's mixed defense wins with 7 lives (wave 13 leaked 5, the thin
@@ -1244,6 +1245,31 @@ sample so the level can be judged, every control is at least 44px (on short
 phone screens each slider moves inline beside its label to stay 44px tall),
 switches use `role="switch"` with `aria-checked`, and reduced motion removes
 the knob animation. Seven harness checks cover it.
+
+**P3-V7 tuning note (found while adding 4x speed)**: a full-harness run then
+showed Level 4's mixed defense losing, and isolated runs of the test bot
+(ten or more per version, in scratchpad `l4bot.js`: untouched `main` 10/10, the
+commit before the boss 18/18, the boss as first drafted about 7/10 to 11/20)
+showed why: a leaking boss costs exactly 5 lives and the defense reaches wave
+13 with only about 6, so a leak often ends the run, and in the losing runs the
+boss reached the gate with about 5% hp left. The escort was cut to 3 bats and 4
+grunts and the Leaf-Storm eased to hp 520 and speed 0.66 (a slower, softer
+boss than the Shadow-Crow, fitting a level where three roads drain gold):
+14/14 wins, the boss never leaked. Level 3's Ashen Swarm needed nothing (10/10,
+the boss died on the road in 9 of 10). Lesson for the next boss: measure win
+rate over 10 or more isolated runs, because a single harness run cannot tell a
+70% level from a 100% one, and look at the boss's remaining hp when it leaks.
+
+**P3-V10 — 4x game speed** *(on branch `graphics-pass-units-tiers`,
+user-requested)*. The speed button (and the F key) now cycles 1x, 2x, 4x.
+`GameState.setSpeed` accepts only 1, 2 or 4. The game loop (`js/boot.js`)
+advances the simulation in fixed steps of at most 1/60 second instead of one
+frame-sized step, so 4x plays the same battle as 1x (the step size the tests
+and balance work use) and never takes one big jump; at most 12 steps a frame.
+Measured in the running game: game time per frame time is exactly 1, 2 and 4.
+The button shows gold at 2x and a glowing pink at 4x, with an updating
+aria-label. Music tempo and effects stay at normal speed. Harness checks cover
+the cycle and the valid-speed rule.
 
 **Graphics roadmap**: see `GRAPHICS-ROADMAP.md` for the approved list of
 further graphics work, its priority order, the performance budget and the
