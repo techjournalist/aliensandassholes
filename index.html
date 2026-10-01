@@ -338,6 +338,12 @@
   .wm-seg.claimed { stroke: var(--path); stroke-width: 7; }
   .wm-seg.open { stroke: var(--gold); stroke-width: 4; stroke-dasharray: 2 11; animation: wm-march 1.1s linear infinite; }
   .wm-seg.locked { stroke: var(--bark); stroke-width: 4; stroke-dasharray: 2 11; opacity: 0.55; }
+  .wm-mtn-shadows { pointer-events: none; }
+  .wm-mtn-shadows ellipse { fill: url(#wm-shade); }
+  .wm-hill-body { fill: var(--meadow-light); stroke: none; }
+  .wm-hill-under { fill: none; stroke: var(--meadow-dark); stroke-width: 3.2; stroke-linecap: round; opacity: 0.9; }
+  .wm-hill-lit { fill: var(--cream); opacity: 0.22; }
+  .wm-ford { fill: var(--foam); opacity: 0.7; }
   .wm-bridge-shadow { fill: var(--ink); opacity: 0.32; }
   .wm-bridge-wood { fill: var(--bark); stroke: var(--ink); stroke-width: 1.6; }
   .wm-bridge-plank { fill: none; stroke: var(--ink); stroke-width: 1; opacity: 0.45; }
@@ -633,6 +639,7 @@
     <svg id="wm-svg" viewBox="0 0 800 320" role="img" aria-label="Map of the Briar kingdom and its battle sites">
       <defs>
         <linearGradient id="wm-sea-grad" x1="0" y1="0" x2="0.4" y2="1"><stop offset="0" stop-color="#1f4a63"/><stop offset="0.55" stop-color="#2a6580"/><stop offset="1" stop-color="#1b3f56"/></linearGradient>
+        <radialGradient id="wm-shade"><stop offset="0" stop-color="#1b1410" stop-opacity="0.42"></stop><stop offset="0.6" stop-color="#1b1410" stop-opacity="0.2"></stop><stop offset="1" stop-color="#1b1410" stop-opacity="0"></stop></radialGradient>
         <radialGradient id="wm-soft">
           <stop offset="0" stop-color="#000" stop-opacity="1"></stop>
           <stop offset="0.6" stop-color="#000" stop-opacity="1"></stop>
@@ -693,7 +700,15 @@
       <g class="wm-cloudshadows" clip-path="url(#wm-land-clip)"><ellipse cx="-120" cy="90" rx="110" ry="46"></ellipse><ellipse cx="-380" cy="220" rx="150" ry="52"></ellipse><ellipse cx="-620" cy="150" rx="90" ry="38"></ellipse></g>
       <g class="wm-ripples"><path d="M 8 24 q 8 -5 16 0 t 16 0"></path><path d="M 762 20 q 8 -5 16 0 t 16 0"></path><path d="M 6 300 q 8 -5 16 0 t 16 0"></path><path d="M 690 314 q 8 -5 16 0 t 16 0"></path></g>
       <g class="wm-compass" transform="translate(772 292)"><circle r="17"></circle><path class="wm-compass-n" d="M 0 -14 L 4 0 L 0 14 L -4 0 Z"></path><path class="wm-compass-e" d="M -14 0 L 0 4 L 14 0 L 0 -4 Z"></path><text y="-21" text-anchor="middle">N</text></g>
+      <g id="wm-hills"></g>
       <g id="wm-roads"></g>
+      <!-- the light comes from the west: each mountain throws a soft shadow east, across any road beneath it -->
+      <g class="wm-mtn-shadows" clip-path="url(#wm-land-clip)">
+        <ellipse cx="318" cy="124" rx="62" ry="15" transform="rotate(-6 318 124)"></ellipse>
+        <ellipse cx="368" cy="120" rx="74" ry="17" transform="rotate(-6 368 120)"></ellipse>
+        <ellipse cx="410" cy="112" rx="50" ry="13" transform="rotate(-6 410 112)"></ellipse>
+        <ellipse cx="214" cy="254" rx="42" ry="11" transform="rotate(-4 214 254)"></ellipse>
+      </g>
       <g id="wm-fx"></g>
     </svg>
     <p id="wm-blurb" class="stakes">Pick a battle on the map.</p>

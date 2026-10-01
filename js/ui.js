@@ -278,6 +278,34 @@ const UI = (() => {
     });
     const N = 48, polys = curves.map((k) => Array.from({ length: N + 1 }, (_, n) => pt(k, n / N)));
     const nodes = ordered.map((lv, i) => mapPos(lv, i));
+    // the river (same two cubic curves as the SVG path), crossed on a bridge too
+    const cubic = (p0, p1, p2, p3, t) => {
+      const u = 1 - t;
+      return { x: u * u * u * p0[0] + 3 * u * u * t * p1[0] + 3 * u * t * t * p2[0] + t * t * t * p3[0], y: u * u * u * p0[1] + 3 * u * u * t * p1[1] + 3 * u * t * t * p2[1] + t * t * t * p3[1] };
+    };
+    const river = [];
+    for (let k = 0; k <= 40; k++) river.push(cubic([598, 20], [575, 70], [612, 118], [572, 168], k / 40));
+    for (let k = 1; k <= 40; k++) river.push(cubic([572, 168], [542, 206], [586, 250], [560, 306], k / 40));
+    for (let n = 0; n < curves.length; n++) for (let v = 0; v < N; v++) for (let u = 0; u < river.length - 1; u++) {
+      const p1 = river[u], p2 = river[u + 1], q1 = polys[n][v], q2 = polys[n][v + 1];
+      const rx = p2.x - p1.x, ry = p2.y - p1.y, sx = q2.x - q1.x, sy = q2.y - q1.y;
+      const den = rx * sy - ry * sx;
+      if (Math.abs(den) < 1e-9) continue;
+      const tt = ((q1.x - p1.x) * sy - (q1.y - p1.y) * sx) / den, uu = ((q1.x - p1.x) * ry - (q1.y - p1.y) * rx) / den;
+      if (tt < 0 || tt >= 1 || uu < 0 || uu >= 1) continue;
+      const x = p1.x + rx * tt, y = p1.y + ry * tt;
+      if (nodes.some((nd) => Math.hypot(nd.x - x, nd.y - y) < 22)) continue;
+      const ang = Math.atan2(sy, sx) * 180 / Math.PI, riverAng = Math.atan2(ry, rx) * 180 / Math.PI;
+      const g = svgEl('g', { transform: `translate(${x.toFixed(1)} ${y.toFixed(1)})` }, 'wm-bridge');
+      g.appendChild(svgEl('ellipse', { cx: 0, cy: 0, rx: 5, ry: 13, transform: `rotate(${riverAng.toFixed(1)})` }, 'wm-ford'));
+      g.appendChild(svgEl('ellipse', { cx: 2, cy: 4, rx: 17, ry: 5, transform: `rotate(${ang.toFixed(1)})` }, 'wm-bridge-shadow'));
+      const deck = svgEl('g', { transform: `rotate(${ang.toFixed(1)})` }, 'wm-bridge-deck');
+      deck.appendChild(svgEl('rect', { x: -15, y: -7.5, width: 30, height: 15, rx: 2.5 }, 'wm-bridge-wood'));
+      for (const px of [-8, 0, 8]) deck.appendChild(svgEl('path', { d: `M ${px} -7 V 7` }, 'wm-bridge-plank'));
+      deck.appendChild(svgEl('path', { d: 'M -15 -7.5 H 15 M -15 7.5 H 15' }, 'wm-bridge-rail'));
+      g.appendChild(deck);
+      layer.appendChild(g);
+    }
     for (let m = 0; m < curves.length; m++) for (let n = m + 2; n < curves.length; n++) {
       // road n (the later one) crosses road m
       for (let u = 0; u < N; u++) for (let v = 0; v < N; v++) {
@@ -300,6 +328,24 @@ const UI = (() => {
         g.appendChild(shadow); g.appendChild(deck);
         layer.appendChild(g);
       }
+    }
+  }
+  // Low hills the roads climb over: a lit mound with a darker underside, drawn
+  // beneath the road so the road reads as going up and over the crest.
+  function drawHills(curves) {
+    const layer = $('wm-hills');
+    if (!layer) return;
+    layer.innerHTML = '';
+    for (const k of [1, 3, 5, 8]) {
+      const c = curves[k];
+      if (!c) continue;
+      const t = 0.5, u = 1 - t;
+      const x = u * u * c.a.x + 2 * u * t * c.c.x + t * t * c.b.x, y = u * u * c.a.y + 2 * u * t * c.c.y + t * t * c.b.y;
+      const g = svgEl('g', { transform: `translate(${x.toFixed(1)} ${y.toFixed(1)})` }, 'wm-hill');
+      g.appendChild(svgEl('ellipse', { cx: 0, cy: 0, rx: 30, ry: 13 }, 'wm-hill-body'));
+      g.appendChild(svgEl('path', { d: 'M -28 4 Q 0 20 28 4' }, 'wm-hill-under'));
+      g.appendChild(svgEl('ellipse', { cx: -8, cy: -5, rx: 14, ry: 4.5 }, 'wm-hill-lit'));
+      layer.appendChild(g);
     }
   }
   let mapSelected = null, firstWin = null;
@@ -333,6 +379,7 @@ const UI = (() => {
       if (state === 'claimed') roads.appendChild(svgEl('path', { d }, 'wm-seg wm-seg-edge'));
       roads.appendChild(svgEl('path', { d, 'data-from': ordered[i].id, 'data-to': ordered[i + 1].id }, `wm-seg ${state}`));
     }
+    drawHills(curves);
     drawBridges(roads, curves, ordered);
     ordered.forEach((lv, i) => {
       const unlocked = Progress.isUnlocked(lv.id);
