@@ -1321,3 +1321,5 @@ units. Bosses again had to be softened (hp 340 and 200) because a leak costs
 further graphics work, its priority order, the performance budget and the
 current test status. Read it before starting any graphics task. Its numbered list is the one the
 user was given in chat and is authoritative.
+
+**Endless mode, difficulty tiers and daily run**: designed, not built. See `ENDLESS-MODE.md` for the plan, build order, save-format notes and itch.io and Steam hosting notes. Read it before starting any of that work.
