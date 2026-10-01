@@ -119,19 +119,19 @@ rule in `AGENTS.md`.
 Candidates:
 - **Spore-Medic**: small mushroom healer, mends enemies near it. Forces focus
   fire. Rewards long-range and single-target towers.
-- **Pod-Bearer**: seed pod that splits into three sprouts on death. Good for
-  the Warden's splash, bad for the Golem's single hit.
 - **Sapper**: goblin that jams the nearest tower for a few seconds. Forces
   clustered towers or killing it first.
 - **Digger**: mole that burrows under part of the road and cannot be targeted
   while underground, so it can skip the chokepoint. Hardest to build because
   it touches targeting and road logic.
-- **Magpie**: fast thief, steals gold if it leaks. A different kind of leak
-  from losing a life. Simplest to build.
+
+Considered and dropped by the user (2026-10-01): the **Pod-Bearer** (splits
+into sprouts on death) and the **Magpie** (steals gold on a leak). Do not
+build them unless the user brings them back.
 
 Where to use them:
 - Leave Levels 1 to 7 alone (played and tuned). Introduce one new type each in
-  Levels 8, 9 and 10, with a short first-appearance tip. The four existing
+  Levels 8, 9 and 10 (three types: Medic, Sapper, Digger), with a short first-appearance tip. The four existing
   enemies stay in every level.
 - Add them to the Endless wave generator's pool (section 2) so late waves are
   more varied than the same four types.
@@ -140,13 +140,13 @@ Where to use them:
 Cost per enemy, roughly 1 to 3 hours, mostly tuning:
 - a model and animation (the per-limb rig in `renderer.js` covers walkers; a
   new silhouette needs its own recipe and pivots, like the boss recipes);
-- new logic in `GameState` (heal aura, split on death, burrow state, tower
-  jam, gold steal), plus `ENEMY_TYPES` stats;
+- new logic in `GameState` (heal aura, burrow state, tower jam), plus `ENEMY_TYPES` stats;
 - a sound and a first-appearance tip;
 - balance: isolated bot runs (10 or more) on every level that gets the type.
 
-Suggested first three: Spore-Medic, Pod-Bearer and Sapper (cheapest, and each
-forces a different tower choice).
+Suggested order: Spore-Medic first (simplest, one new rule), then the Sapper,
+then the Digger last (it touches targeting and road logic). Each forces a
+different tower choice.
 
 Watch out for:
 - Flyer rule: only the Druid and Artillery hit flyers. Do not make any new
@@ -155,4 +155,4 @@ Watch out for:
   needs a specific tower will look harder to the bot than to a person. Add
   counters to the bot's plan before judging balance.
 - Leaks cost 1 life for normal enemies and 5 for bosses. Decide the cost for
-  any new type explicitly.
+  any new type explicitly (likely 1 for all three).
