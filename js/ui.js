@@ -268,6 +268,40 @@ const UI = (() => {
       dead.appendChild(svgEl('path', { d: `M ${x} ${y + 8} L ${x} ${y - 8} M ${x} ${y - 2} L ${x - 6} ${y - 9} M ${x} ${y - 5} L ${x + 5} ${y - 11}` }, 'wm-deadtree'));
     }
   }
+  // Where one road crosses another, the later road goes over on a small wooden
+  // bridge and the earlier road passes beneath in its shadow, so a crossing
+  // reads as depth and not as a four-way junction.
+  function drawBridges(layer, curves, ordered) {
+    const pt = (k, t) => ({
+      x: (1 - t) * (1 - t) * k.a.x + 2 * (1 - t) * t * k.c.x + t * t * k.b.x,
+      y: (1 - t) * (1 - t) * k.a.y + 2 * (1 - t) * t * k.c.y + t * t * k.b.y,
+    });
+    const N = 48, polys = curves.map((k) => Array.from({ length: N + 1 }, (_, n) => pt(k, n / N)));
+    const nodes = ordered.map((lv, i) => mapPos(lv, i));
+    for (let m = 0; m < curves.length; m++) for (let n = m + 2; n < curves.length; n++) {
+      // road n (the later one) crosses road m
+      for (let u = 0; u < N; u++) for (let v = 0; v < N; v++) {
+        const p1 = polys[m][u], p2 = polys[m][u + 1], q1 = polys[n][v], q2 = polys[n][v + 1];
+        const rx = p2.x - p1.x, ry = p2.y - p1.y, sx = q2.x - q1.x, sy = q2.y - q1.y;
+        const den = rx * sy - ry * sx;
+        if (Math.abs(den) < 1e-9) continue;
+        const tt = ((q1.x - p1.x) * sy - (q1.y - p1.y) * sx) / den, uu = ((q1.x - p1.x) * ry - (q1.y - p1.y) * rx) / den;
+        if (tt < 0 || tt >= 1 || uu < 0 || uu >= 1) continue;
+        const x = p1.x + rx * tt, y = p1.y + ry * tt;
+        if (nodes.some((nd) => Math.hypot(nd.x - x, nd.y - y) < 22)) continue;   // never under a level marker
+        const ang = Math.atan2(sy, sx) * 180 / Math.PI;
+        const lowerAng = Math.atan2(ry, rx) * 180 / Math.PI;
+        const g = svgEl('g', { transform: `translate(${x.toFixed(1)} ${y.toFixed(1)})` }, 'wm-bridge');
+        const shadow = svgEl('ellipse', { cx: 2, cy: 4, rx: 18, ry: 5.5, transform: `rotate(${lowerAng.toFixed(1)})` }, 'wm-bridge-shadow');
+        const deck = svgEl('g', { transform: `rotate(${ang.toFixed(1)})` }, 'wm-bridge-deck');
+        deck.appendChild(svgEl('rect', { x: -14, y: -7.5, width: 28, height: 15, rx: 2.5 }, 'wm-bridge-wood'));
+        for (const px of [-7, 0, 7]) deck.appendChild(svgEl('path', { d: `M ${px} -7 V 7` }, 'wm-bridge-plank'));
+        deck.appendChild(svgEl('path', { d: 'M -14 -7.5 H 14 M -14 7.5 H 14' }, 'wm-bridge-rail'));
+        g.appendChild(shadow); g.appendChild(deck);
+        layer.appendChild(g);
+      }
+    }
+  }
   let mapSelected = null, firstWin = null;
   function renderWorldMap() {
     drawMapArt();
@@ -286,16 +320,20 @@ const UI = (() => {
       cuts.appendChild(svgEl('circle', { cx: p.x, cy: p.y, r: p.reclaim, fill: 'url(#wm-soft)', 'data-level': lv.id }, 'wm-cut'));
     });
     // roads between consecutive battles: claimed, open (the way forward) or locked
+    const curves = [];   // each road's quadratic curve, for the bridges below
     for (let i = 0; i < ordered.length - 1; i++) {
       const a = mapPos(ordered[i], i), b = mapPos(ordered[i + 1], i + 1);
       const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2, len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
       const bend = (i % 2 ? -1 : 1) * 16;
-      const d = `M ${a.x} ${a.y} Q ${mx - (b.y - a.y) / len * bend} ${my + (b.x - a.x) / len * bend} ${b.x} ${b.y}`;
+      const cx = mx - (b.y - a.y) / len * bend, cy = my + (b.x - a.x) / len * bend;
+      const d = `M ${a.x} ${a.y} Q ${cx} ${cy} ${b.x} ${b.y}`;
+      curves.push({ a, c: { x: cx, y: cy }, b, i });
       const state = won(ordered[i]) && won(ordered[i + 1]) ? 'claimed'
         : Progress.isUnlocked(ordered[i + 1].id) ? 'open' : 'locked';
       if (state === 'claimed') roads.appendChild(svgEl('path', { d }, 'wm-seg wm-seg-edge'));
       roads.appendChild(svgEl('path', { d, 'data-from': ordered[i].id, 'data-to': ordered[i + 1].id }, `wm-seg ${state}`));
     }
+    drawBridges(roads, curves, ordered);
     ordered.forEach((lv, i) => {
       const unlocked = Progress.isUnlocked(lv.id);
       const stars = Progress.starsFor(lv.id);
