@@ -1,6 +1,6 @@
 # Endless mode, difficulty tiers and daily run (design notes)
 
-Status: designed in chat, not built. Read this before starting any of it.
+Status: designed in chat, not built (sections 1 to 7). Read this before starting any of it.
 Written 2026-10-01 after Levels 9 and 10 shipped on branch
 `graphics-pass-units-tiers`.
 
@@ -108,3 +108,51 @@ Check each point against current platform docs before relying on it.
   and bounty.
 - Save format: old `bb-progress` saves still load.
 - Endless end screen appears on loss, never a win screen.
+
+## 7. New enemy types (design notes, not built)
+Idea from the user, 2026-10-01: the roster is the same four enemies (grunt,
+trickster, troll, bat) across all 10 levels and only the boss changes. New
+enemies would change how the player plays, not just where they build. Each
+asks for a different tower answer, which supports the "no dominant strategy"
+rule in `AGENTS.md`.
+
+Candidates:
+- **Spore-Medic**: small mushroom healer, mends enemies near it. Forces focus
+  fire. Rewards long-range and single-target towers.
+- **Pod-Bearer**: seed pod that splits into three sprouts on death. Good for
+  the Warden's splash, bad for the Golem's single hit.
+- **Sapper**: goblin that jams the nearest tower for a few seconds. Forces
+  clustered towers or killing it first.
+- **Digger**: mole that burrows under part of the road and cannot be targeted
+  while underground, so it can skip the chokepoint. Hardest to build because
+  it touches targeting and road logic.
+- **Magpie**: fast thief, steals gold if it leaks. A different kind of leak
+  from losing a life. Simplest to build.
+
+Where to use them:
+- Leave Levels 1 to 7 alone (played and tuned). Introduce one new type each in
+  Levels 8, 9 and 10, with a short first-appearance tip. The four existing
+  enemies stay in every level.
+- Add them to the Endless wave generator's pool (section 2) so late waves are
+  more varied than the same four types.
+- Add them to Bramble (section 1) later if more variety is wanted.
+
+Cost per enemy, roughly 1 to 3 hours, mostly tuning:
+- a model and animation (the per-limb rig in `renderer.js` covers walkers; a
+  new silhouette needs its own recipe and pivots, like the boss recipes);
+- new logic in `GameState` (heal aura, split on death, burrow state, tower
+  jam, gold steal), plus `ENEMY_TYPES` stats;
+- a sound and a first-appearance tip;
+- balance: isolated bot runs (10 or more) on every level that gets the type.
+
+Suggested first three: Spore-Medic, Pod-Bearer and Sapper (cheapest, and each
+forces a different tower choice).
+
+Watch out for:
+- Flyer rule: only the Druid and Artillery hit flyers. Do not make any new
+  enemy both fast and unreachable for them.
+- The bot in `scratchpad/l4bot.js` picks towers blindly, so a new type that
+  needs a specific tower will look harder to the bot than to a person. Add
+  counters to the bot's plan before judging balance.
+- Leaks cost 1 life for normal enemies and 5 for bosses. Decide the cost for
+  any new type explicitly.
