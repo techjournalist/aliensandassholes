@@ -1360,6 +1360,22 @@ Also retuned: the curvy road ribbons' dirt brightness for the new pipeline.
 Level 1 title view: 119 calls and 170.7k triangles (budget 158 and 189k). Phone
 frame rate is still unmeasured: the real test is the user's phone.
 
+**P3-FIX2 — "Send next wave" sometimes needed a second tap** *(user-reported
+after finishing Level 3)*. Not reproducible in automated mouse and touch taps
+(48 of 48 sent), so the fix hardens the likely causes instead of guessing at
+one: the button's label and size changed every second during prep, a click is
+only delivered when press and release land on the same element, and a 3px
+press-down transform could move the pill out from under a press near its top
+edge. Now: the button never moves or resizes (fixed minimum size, the second
+line always reserves its height), the `:active` shift is gone, an invisible
+13px margin enlarges the tap target (hit-tested), the wave sends on pointer
+release as well as on click (`sendWave` is idempotent), and the wave goes
+before the sound unlock inside a try/catch so an audio error can never eat a
+tap. An open, unconfirmed guess: the button is disabled while enemies are
+still alive ("N coming"), so a tap during a wave does nothing by design; if
+players expect to call the next wave early, that is a design change (call
+early for a gold bonus), not a bug.
+
 **Graphics roadmap**: see `GRAPHICS-ROADMAP.md` for the approved list of
 further graphics work, its priority order, the performance budget and the
 current test status. Read it before starting any graphics task. Its numbered list is the one the

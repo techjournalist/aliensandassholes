@@ -474,7 +474,20 @@ const UI = (() => {
       if (res && !res.ok && res.reason) toast(res.reason, true);
       renderPanel();
     });
-    $('wave-btn').addEventListener('click', () => { Audio.unlock(); GameState.sendWave(); });
+    // Send on press-and-release of the pointer as well as on click: a click is only
+    // delivered when the press and release land on the same element, and the label
+    // under the finger changes every second, so some taps were lost. sendWave is
+    // idempotent (it refuses while a wave is active), so firing from both is safe.
+    // The wave goes first and sound last, so an audio error can never eat a tap.
+    {
+      const wb = $('wave-btn');
+      let armed = false;
+      const send = () => { GameState.sendWave(); try { Audio.unlock(); } catch (err) { /* sound must never block the wave */ } };
+      wb.addEventListener('pointerdown', () => { armed = true; });
+      wb.addEventListener('pointerup', () => { if (armed) { armed = false; send(); } });
+      wb.addEventListener('pointercancel', () => { armed = false; });
+      wb.addEventListener('click', send);
+    }
     let skipToPlay = false;
     try { skipToPlay = sessionStorage.getItem('bb-enter-play') === '1'; sessionStorage.removeItem('bb-enter-play'); } catch (e) { /* ignore */ }
     if (skipToPlay) GameState.startGame(); else $('title').classList.add('show');

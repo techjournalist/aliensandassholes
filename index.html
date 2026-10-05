@@ -87,13 +87,17 @@
   #wave-btn {
     position: absolute; top: max(10px, env(safe-area-inset-top));
     right: max(10px, env(safe-area-inset-right));
-    pointer-events: auto; min-height: 48px; padding: 0 20px;
+    pointer-events: auto; min-height: 56px; min-width: 190px; padding: 0 20px;
     background: var(--gold); color: var(--ink); border: 3px solid var(--ink);
     border-radius: 24px; font: inherit; font-size: 18px; font-weight: 800;
     cursor: pointer; box-shadow: 0 4px 0 var(--ink);
-    transition: transform 0.08s ease, box-shadow 0.08s ease;
+    transition: box-shadow 0.08s ease;
   }
-  #wave-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
+  /* The tap target reaches 10px past the visible pill on every side, and the
+     button never moves or changes size under the finger (its label changes every
+     second during prep), so a press near an edge still counts. */
+  #wave-btn::before { content: ""; position: absolute; inset: -13px; }
+  #wave-btn:active { box-shadow: 0 1px 0 var(--ink); }
   #wave-btn:disabled {
     background: var(--panel); color: #bfe6ff; border-color: #bfe6ff;
     box-shadow: 0 3px 0 rgba(0,0,0,0.35); cursor: default; transform: none;
@@ -223,7 +227,8 @@
     #worldmap h1 { font-size: 30px; }
   }
   #wave-btn .sub { display: block; font-size: 12px; font-weight: 700; opacity: 0.8; line-height: 1.1; }
-  #wave-btn .sub:empty { display: none; }
+  #wave-btn .sub:empty { visibility: hidden; }
+  #wave-btn .sub:empty::before { content: "\00a0"; }
   #boss-bar {
     position: absolute; top: max(64px, calc(env(safe-area-inset-top) + 54px)); left: 50%; transform: translateX(-50%);
     width: min(420px, 46vw); display: none; text-align: center;
