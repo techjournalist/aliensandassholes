@@ -27,6 +27,27 @@ const Renderer = (() => {
   }
   const { worldX, worldZ } = GameState;
   const lerpColor = (a, b, t) => new THREE.Color(a).lerp(new THREE.Color(b), t);
+  // Pipeline switch, set in init(). Light intensities and the toon ramp were
+  // tuned in display space, so in linear light they are raised to 2.2 to keep
+  // the look the same before it is deliberately retuned.
+  let LIN = false;
+  const EXPOSURE = 1.3;
+  const lin = (v) => (LIN ? Math.pow(v, 2.2) : v);
+  // what the screen shows for a linear color after ACES (r128's curve) and sRGB encoding
+  function displayColor(c, exposure) {
+    let r = c.r, g = c.g, b = c.b;
+    if (exposure) {
+      const k = exposure / 0.6;
+      r *= k; g *= k; b *= k;
+      const r1 = 0.59719 * r + 0.35458 * g + 0.04823 * b, g1 = 0.0760 * r + 0.90834 * g + 0.01566 * b, b1 = 0.0284 * r + 0.13383 * g + 0.83777 * b;
+      const fit = (v) => (v * (v + 0.0245786) - 0.000090537) / (v * (0.983729 * v + 0.432951) + 0.238081);
+      const a = fit(r1), bb = fit(g1), cc = fit(b1);
+      r = 1.60475 * a - 0.53108 * bb - 0.07367 * cc; g = -0.10208 * a + 1.10813 * bb - 0.00605 * cc; b = -0.00327 * a - 0.07276 * bb + 1.07602 * cc;
+      r = Math.min(1, Math.max(0, r)); g = Math.min(1, Math.max(0, g)); b = Math.min(1, Math.max(0, b));
+    }
+    return new THREE.Color(r, g, b).convertLinearToSRGB();
+  }
+
 
   // A level's `theme` object can override the "healthy ground" palette and
   // mood; the corruption blend itself always targets the shared
@@ -221,6 +242,8 @@ const Renderer = (() => {
         #include <fog_pars_fragment>
         void main() {
           gl_FragColor = vec4(color, 1.0);
+          #include <tonemapping_fragment>
+          #include <encodings_fragment>
           #include <fog_fragment>
         }`,
       side: THREE.BackSide,
@@ -1861,6 +1884,8 @@ const Renderer = (() => {
           float r = length(gl_PointCoord - 0.5);
           if (r > 0.5) discard;
           gl_FragColor = vec4(vColor * (1.0 - r * 0.35), vAlpha * (1.0 - smoothstep(0.42, 0.5, r)));
+          #include <tonemapping_fragment>
+          #include <encodings_fragment>
         }`,
       transparent: true, depthWrite: false,
     });
@@ -2115,7 +2140,9 @@ const Renderer = (() => {
         void main(){ vec2 q = vP * 0.11 + vec2(uTime * 0.018, uTime * 0.007);
           float n = vn(q) * 0.62 + vn(q * 2.3 + 7.0) * 0.38;
           float a = smoothstep(0.5, 0.72, n) * 0.25;
-          gl_FragColor = vec4(0.06, 0.09, 0.16, a); }`,
+          gl_FragColor = vec4(0.06, 0.09, 0.16, a);
+          #include <encodings_fragment>
+        }`,
     });
     const cloud = new THREE.Mesh(new THREE.PlaneGeometry(w + 8, h + 8), cloudMat);
     cloud.rotation.x = -Math.PI / 2; cloud.position.y = 0.045; cloud.renderOrder = 0; cloud.name = 'cloudShadows';
@@ -2860,13 +2887,26 @@ const Renderer = (() => {
     canvas = canvasEl;
     renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
     const vt = levelTheme();
-    renderer.setClearColor(vt.backdrop);
+    // Colour pipeline: linear lighting, ACES filmic tone mapping, sRGB output.
+    // js/color-pipeline.js converts the authored sRGB hexes on the way in.
+    const q = new URLSearchParams(location.search);
+    LIN = !!(THREE.ColorPipeline && THREE.ColorPipeline.on);
+    if (LIN) {
+      renderer.outputEncoding = THREE.sRGBEncoding;
+      if (q.get('tm') !== 'none') {
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = +(q.get('exp') || EXPOSURE);
+      }
+    }
+    // the clear color is written to the screen untouched, so it gets the same
+    // tone mapping and encoding the fogged scene does and the two meet seamlessly
+    renderer.setClearColor(LIN ? displayColor(new THREE.Color(vt.backdrop), renderer.toneMapping !== THREE.NoToneMapping ? renderer.toneMappingExposure : 0) : vt.backdrop);
     scene = new THREE.Scene();
     camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 1, 100);
 
     // Five crisp light bands instead of three: still hand-inked steps, but
     // enough of them to model a rounded form.
-    gradientMap = new THREE.DataTexture(new Uint8Array([124, 166, 204, 234, 255]), 5, 1, THREE.LuminanceFormat);
+    gradientMap = new THREE.DataTexture(new Uint8Array([124, 166, 204, 234, 255].map((v) => Math.round(255 * lin(v / 255)))), 5, 1, THREE.LuminanceFormat);
     gradientMap.minFilter = THREE.NearestFilter;
     gradientMap.magFilter = THREE.NearestFilter;
     gradientMap.generateMipmaps = false;
@@ -2874,11 +2914,11 @@ const Renderer = (() => {
     outlineMat = makeOutlineMaterial();
     buildPrimitives();
 
-    scene.add(new THREE.HemisphereLight(vt.sky, vt.bounce, vt.hemi));
-    const sun = new THREE.DirectionalLight(0xfff0d8, vt.sun);
+    scene.add(new THREE.HemisphereLight(vt.sky, vt.bounce, lin(vt.hemi)));
+    const sun = new THREE.DirectionalLight(0xfff0d8, lin(vt.sun));
     sun.position.set(-6, 10, 7);
     scene.add(sun);
-    const fill = new THREE.DirectionalLight(vt.fill, vt.fillIntensity);
+    const fill = new THREE.DirectionalLight(vt.fill, lin(vt.fillIntensity));
     fill.position.set(7, 4, -6);
     scene.add(fill);
 

@@ -102,6 +102,8 @@ const RendererFX = (() => {
           float bank = step(0.84 - 0.07 * sin(vW.z * 8.0 + uTime * 1.9), edge);
           col = mix(col, uFoam, bank * 0.85);
           gl_FragColor = vec4(col, 1.0);
+          #include <tonemapping_fragment>
+          #include <encodings_fragment>
           #include <fog_fragment>
         }`,
       fog: true,
@@ -212,6 +214,8 @@ const RendererFX = (() => {
           ${shape}
           if (a * vAlpha < 0.01) discard;
           gl_FragColor = vec4(uColor, a * vAlpha);
+          #include <tonemapping_fragment>
+          #include <encodings_fragment>
         }`,
       transparent: true,
       depthWrite: false,
