@@ -10,12 +10,13 @@ const DawnKit = (() => {
   // The Bastion on its endpoint block (2 columns x 3 rows, gate at the
   // bottom-left cell, roads arriving from the south).
   function bastion(kit, cfg = {}) {
-    const { P, M, GEO, PALETTE, batchPart, toon, unlit, addOutline, scene, animated, shakeCamera, puff,
+    const { P, M, GEO, PALETTE, batchPart, batchDecal, toon, unlit, addOutline, scene, animated, shakeCamera, puff,
       masonry, towerCourses, roofCourses, windowDress, glow, setGlow, worldX, worldZ, level } = kit;
       const cells = level.endpoint.cells;
       const cx = worldX((cells[0][0] + cells[cells.length - 1][0]) / 2);
       const cz = worldZ((cells[0][1] + cells[cells.length - 1][1]) / 2);
       const wm = M(cx, 0, cz);
+      batchDecal(cx + 0.1, cz + 0.1, 1.35, 2.2);   // the keep throws a long shadow
       const stone = PALETTE.stone, dark = PALETTE.stoneDark;
       const H = 1.9;   // keep wall height: tall enough that the walls read from the camera angle
       // main keep body, a moss line along the top and a darker stone footing

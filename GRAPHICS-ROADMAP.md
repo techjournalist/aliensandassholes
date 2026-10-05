@@ -51,8 +51,11 @@ file reordered it, which caused confusion; this numbering is authoritative.
    keep their own rig.
 8. **Ability effects.** OPEN. The M6 spells, Call the Burrow Guard and Bramble
    Burst, were never built. They would be the biggest visual set pieces.
-9. **Real shadow maps and true bloom.** OPEN, desktop only. Must sit behind a
-   quality setting because of the mobile frame-rate risk.
+9. **Real shadow maps and true bloom.** DONE as baked look (P3-V11), not as real
+   shadow maps or a bloom pass: the user wants the same look on phone and
+   desktop. Violet trailing cast shadows, softer glow halos, haze gradient, sRGB
+   and ACES, toon lighting patch, resolution governor. Real shadow maps and
+   post-processing remain excluded.
 10. **Full PBR materials and post-processing stacks.** AVOID. They would break
     the illustrated toon and ink-outline identity.
 

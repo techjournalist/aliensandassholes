@@ -107,6 +107,23 @@ async function enterLevel(page, levelId) {
   const baseTris = await page.evaluate(() => Renderer.stats().triangles);
   check('render budget: draw calls within 1.5x pre-V1 baseline', baselineCalls <= 158, `calls=${baselineCalls}`);
   check('render budget: triangles within 2x pre-V1 baseline', baseTris <= 189000, `tris=${baseTris}`);
+  // diorama look: linear lighting, ACES tone mapping, sRGB output, toon lighting patch, cast shadows
+  const look = await page.evaluate(() => {
+    const sc = Renderer.debugScene();
+    const cvs = document.getElementById('game');
+    const gl = cvs.getContext('webgl2') || cvs.getContext('webgl');
+    return {
+      pipeline: !!(THREE.ColorPipeline && THREE.ColorPipeline.on),
+      shim: new THREE.Color(0x808080).r < 0.3 && new THREE.Color(0x336699).getHex() === 0x336699,
+      toonPatched: THREE.ShaderLib.toon.fragmentShader.includes('tlShade'),
+      hasShadows: !!sc.children.find((o) => o.material && o.material.map && o.material.transparent && o.material.opacity >= 0.7 && o.material.color && o.material.color.getHex() === 0x2a2048),
+      scaleApi: typeof Renderer.setPixelScale === 'function' && Renderer.pixelScale() === 1,
+    };
+  });
+  check('color pipeline: sRGB shim on and hex values round-trip', look.pipeline && look.shim, JSON.stringify(look));
+  check('toon lighting patch is applied to the shared toon shader', look.toonPatched);
+  check('props and the keep throw cast shadows (violet trailing decals)', look.hasShadows);
+  check('frame-rate governor API exists and is idle under automation', look.scaleApi);
   check('grass, water and ambient motes are in the scene', await page.evaluate(() => {
     const names = new Set(); Renderer.debugScene().traverse((o) => names.add(o.name));
     return names.has('grass') && names.has('water') && [...names].some((n) => n.startsWith('motes-'));

@@ -1317,6 +1317,49 @@ units. Bosses again had to be softened (hp 340 and 200) because a leak costs
 5 lives. Final isolated runs: Level 9 8/8 won (5 to 13 lives), Level 10 8/8
 (2 to 10). The P3-FIX1 "last level" end-screen checks moved to Level 10. The full harness again lost Level 6's unseeded-RNG mixed-bot check, which locks Levels 7 to 10 and cascades, so the dawn levels' own checks (markers, curve, lone towers, console) were run directly with all levels unlocked and pass; levels 1 to 5 had no failures.
 
+**P3-V11 — Diorama look: color, toon lighting, cast shadows, glow, haze**
+*(on branch `graphics-pass-units-tiers`, user-requested: "a high-quality
+miniature diorama aesthetic", same on mobile and desktop)*. The user asked for
+sRGB output, ACES tone mapping, soft PCF shadow maps, lit materials and
+bloom or tilt-shift, and then ruled out quality tiers: phones and desktops get
+the same look. Real shadow maps and a post-processing pass stay excluded (they
+cost a lot on phones), so the same look is built from baked and in-shader
+techniques instead. three.js is still r128, which has no `SRGBColorSpace`;
+`renderer.outputEncoding = THREE.sRGBEncoding` does the job.
+1. **Color pipeline.** `js/color-pipeline.js` (loads right after three.js)
+wraps `THREE.Color` so every authored sRGB hex becomes linear on the way in and
+converts back on `getHex`/`getHSL`, with blends (`lerp`) done in sRGB so
+gradients keep the look the palette was tuned for. No palette or level file
+changed. `Renderer.init` sets sRGB output and ACES tone mapping (exposure 1.3;
+1.0 was too dark), raises light intensities and the toon ramp to linear
+equivalents (`lin()`), tone-maps the clear color the same way (`displayColor`)
+so the backdrop meets the fog, and every custom shader (water, particles,
+outline, puffs, cloud shadows) includes the tone mapping and encoding chunks.
+`?lin=0` restores the old look for comparison.
+2. **Toon lighting.** `js/toon-lighting.js` patches the shared
+`THREE.ShaderLib.toon` fragment shader once, so every toon material (including
+ones with their own `onBeforeCompile`) gets cool violet tint in the shaded ramp
+steps, a warm lift on sunlit steps and a faint top-light sheen on upward curved
+edges. Thresholds were calibrated from a debug color-coded view of the real
+light values (the first guess tinted the whole ground violet). `?toon=0` turns
+it off.
+3. **Cast shadows.** The baked decal system now draws a trailing teardrop
+(`castShadowTexture`) in cool violet along the sun's direction, longer and
+darker than the old round blobs; towers get a trailing shadow too and the
+Bastion (Level 1 and the dawn levels) a long one. Still merged decals, so no new
+draw calls. This is a baked look, not a per-pixel shadow map: shadows do not
+deform for animated units, and props do not shade each other's bodies.
+4. **Glow and haze.** Window and lantern halos are larger and softer (a cheap
+stand-in for bloom). The old desktop-only CSS blur strips became a plain
+top and bottom colored haze gradient on every device (no blur filter).
+5. **Frame-rate governor** (`boot.js`, `Renderer.setPixelScale`): if frames stay
+slow it steps resolution down to at most 0.6x and back up when fast, and never
+switches an effect off. Off under automation (`navigator.webdriver`) and with
+`?gov=0`.
+Also retuned: the curvy road ribbons' dirt brightness for the new pipeline.
+Level 1 title view: 119 calls and 170.7k triangles (budget 158 and 189k). Phone
+frame rate is still unmeasured: the real test is the user's phone.
+
 **Graphics roadmap**: see `GRAPHICS-ROADMAP.md` for the approved list of
 further graphics work, its priority order, the performance budget and the
 current test status. Read it before starting any graphics task. Its numbered list is the one the

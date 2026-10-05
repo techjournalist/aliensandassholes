@@ -188,10 +188,17 @@ const Renderer = (() => {
     GEO.shadowDisc.scale(1.35, 1, 1.35);
   }
 
-  let _shadowMat = null;
+  // Shadows are cool violet, not brown-black, so they read as shade on a sunny
+  // meadow. Round for units, trailing for things that stand still.
+  let _shadowMat = null, _castMat = null;
   function shadowMat() {
     return _shadowMat || (_shadowMat = new THREE.MeshBasicMaterial({
-      color: 0x1b120a, map: RendererFX.shadowTexture(), transparent: true, opacity: 0.5, depthWrite: false,
+      color: 0x2a2048, map: RendererFX.shadowTexture(), transparent: true, opacity: 0.55, depthWrite: false,
+    }));
+  }
+  function castShadowMat() {
+    return _castMat || (_castMat = new THREE.MeshBasicMaterial({
+      color: 0x2a2048, map: RendererFX.castShadowTexture(), transparent: true, opacity: 0.8, depthWrite: false,
     }));
   }
 
@@ -411,10 +418,13 @@ const Renderer = (() => {
     grp.geos.push(g);
     if (part.outline) batch.outlines.push(smoothedForOutline(part.geo).clone().applyMatrix4(m));
   }
-  function batchDecal(x, z, radius) {
-    // shadow falls away from the sun (upper left): pushed and stretched along that line
-    batch.decals.push(GEO.shadowDisc.clone().applyMatrix4(M(x + radius * 0.3, groundYAt(x, z) + 0.012, z - radius * 0.34,
-      { sx: radius * 0.95, sy: 1, sz: radius * 1.4, ry: Math.atan2(0.3, -0.34) })));
+  // The sun is at (-6, 10, 7), so shadows fall toward +x and -z. The cast
+  // texture's tail runs along +u, which is local +x before rotation.
+  const SUN_AWAY = Math.atan2(-7, 6);
+  function batchDecal(x, z, radius, tall = 1) {
+    const len = radius * (2.7 + 0.6 * tall);
+    batch.decals.push(GEO.shadowDisc.clone().applyMatrix4(M(x + Math.cos(SUN_AWAY) * len * 0.34, groundYAt(x, z) + 0.012, z - Math.sin(SUN_AWAY) * len * 0.34 * -1,
+      { sx: len, sy: 1, sz: radius * 1.15, ry: -SUN_AWAY })));
   }
   function flushBatch() {
     for (const grp of batch.groups.values()) {
@@ -428,7 +438,7 @@ const Renderer = (() => {
       scene.add(mesh);
     }
     if (batch.decals.length) {
-      const mesh = new THREE.Mesh(mergeGeoms(batch.decals), shadowMat());
+      const mesh = new THREE.Mesh(mergeGeoms(batch.decals), castShadowMat());
       mesh.matrixAutoUpdate = false;
       mesh.renderOrder = 1;
       scene.add(mesh);
@@ -579,7 +589,7 @@ const Renderer = (() => {
     batchPart(P(GEO.box, PALETTE.outline, at(0, h * 0.08, 0.03, w, 0.014, 0.012), false), wm);
     if (halo) {
       const p = new THREE.Vector3(...d(0.02)).add(new THREE.Vector3(x, y, z)).applyMatrix4(wm);
-      glow(p.x, p.y, p.z, { w: w * 3.6, h: h * 2.6, axis, sign });
+      glow(p.x, p.y, p.z, { w: w * 4.6, h: h * 3.3, axis, sign });
     }
   }
   function setGlow(k) { glowK = k; }
@@ -590,19 +600,20 @@ const Renderer = (() => {
     const ctx = c.getContext('2d');
     const grd = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
     grd.addColorStop(0, 'rgba(255,255,255,0.9)');
-    grd.addColorStop(0.3, 'rgba(255,255,255,0.4)');
+    grd.addColorStop(0.2, 'rgba(255,255,255,0.55)');
+    grd.addColorStop(0.5, 'rgba(255,255,255,0.18)');
     grd.addColorStop(1, 'rgba(255,255,255,0)');
     ctx.fillStyle = grd; ctx.fillRect(0, 0, 64, 64);
     glowMat = new THREE.MeshBasicMaterial({
       color: PALETTE.windowWarm, map: new THREE.CanvasTexture(c), transparent: true,
-      blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.5,
+      blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.55,
     });
     const mesh = new THREE.Mesh(mergeGeoms(glowGeos), glowMat);
     mesh.name = 'glow';
     mesh.renderOrder = 2;
     mesh.matrixAutoUpdate = false;
     scene.add(mesh);
-    animated.push({ update(t) { glowMat.opacity = glowK * (0.44 + 0.06 * Math.sin(t * 7.3) * Math.sin(t * 2.9)); } });
+    animated.push({ update(t) { glowMat.opacity = glowK * (0.52 + 0.07 * Math.sin(t * 7.3) * Math.sin(t * 2.9)); } });
   }
   // Banner cloth: a swallowtailed field with a trim border, a stripe and a
   // round emblem, painted in vertex color. Centered on its origin, `w` wide,
@@ -1071,7 +1082,7 @@ const Renderer = (() => {
       if (cobbleTail && left < cobbleTail) col.copy(lerpColor(PALETTE.cobble, PALETTE.cobbleDark, n * 0.6));
       else col.copy(lerpColor(PALETTE.path, PALETTE.hollowPath, h)).lerp(new THREE.Color(0xffe2a8), 0.6 * (1 - h));
       col.offsetHSL(0, 0, (n - 0.5) * 0.07);
-      return col.multiplyScalar(1.5);   // flat ribbons catch less key light than the noise-lit ground
+      return col.multiplyScalar(2.3);   // flat ribbons catch less key light than the noise-lit ground
     };
     const lip = (x, z) => { const [c, r] = toCell(x, z); return col.copy(lerpColor(vt.meadowDark, PALETTE.hollowGround, GameState.zoneFalloff(c, r))).multiplyScalar(1.15); };
     const rut = (x, z) => { const [c, r] = toCell(x, z); return col.copy(lerpColor(PALETTE.path, PALETTE.earth, 0.22)).lerp(new THREE.Color(PALETTE.hollowEarth), GameState.zoneFalloff(c, r) * 0.6).multiplyScalar(1.3); };
@@ -2303,7 +2314,11 @@ const Renderer = (() => {
     const parts = TOWER_RECIPES[tower.type]().concat(tierParts(tower.tier, tower.branch, tower.type));
     const g = liveProp(parts, tower.x, 0, tower.z);
     g.name = `tower-${tower.id}`;
-    decal(0, 0, 0.36, g);
+    { // a tower throws a trailing shadow away from the sun, like the props do
+      const sh = new THREE.Mesh(GEO.shadowDisc, castShadowMat());
+      sh.renderOrder = 1; sh.position.set(0.3, 0.012, -0.22); sh.rotation.y = -SUN_AWAY; sh.scale.set(0.78, 1, 0.42);
+      g.add(sh);
+    }
     const live = {};
     g.traverse((o) => { if (o.name && o !== g && o.name !== 'outline') live[o.name] = o; });
     const base = {};
@@ -2784,9 +2799,20 @@ const Renderer = (() => {
   function resize() {
     cssW = Math.max(1, window.innerWidth);
     cssH = Math.max(1, window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, CONFIG.maxPixelRatio));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, CONFIG.maxPixelRatio) * pixelScale);
     renderer.setSize(cssW, cssH, false);
     fitCamera();
+  }
+  // Frame-rate safety net (see boot.js): a device that cannot hold its frame
+  // rate renders at a slightly lower resolution. The picture keeps the same
+  // look, just a touch softer; nothing is ever switched off.
+  let pixelScale = 1;
+  function setPixelScale(k) {
+    k = Math.max(0.6, Math.min(1, k));
+    if (Math.abs(k - pixelScale) < 0.01) return pixelScale;
+    pixelScale = k;
+    resize();
+    return pixelScale;
   }
 
   // -------- picking --------
@@ -2976,5 +3002,5 @@ const Renderer = (() => {
     return { calls: r.calls, triangles: r.triangles };
   }
 
-  return { init, render, resize, screenToCell, worldToScreen, stats, shakeCamera, puff, debugScene: () => scene, debugViews: () => ({ bars: barBack ? barBack.count : -1, enemyViews: enemyViews.size, dying: dying.map((d) => [+d.t.toFixed(3), d.dur]), towerViews: towerViews.size }) };
+  return { init, render, resize, setPixelScale, pixelScale: () => pixelScale, screenToCell, worldToScreen, stats, shakeCamera, puff, debugScene: () => scene, debugViews: () => ({ bars: barBack ? barBack.count : -1, enemyViews: enemyViews.size, dying: dying.map((d) => [+d.t.toFixed(3), d.dur]), towerViews: towerViews.size }) };
 })();

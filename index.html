@@ -476,15 +476,13 @@
   .wm-compass text { fill: var(--gold); font: 800 11px "Trebuchet MS", sans-serif; }
   #wm-svg { filter: drop-shadow(0 4px 0 rgba(0, 0, 0, 0.35)); }
 
-  /* ---- tilt-shift: a soft focus falloff at the top and bottom edges. Desktop
-     only: a blur over a live WebGL canvas is the sort of cost phones should not pay. ---- */
-  #tiltshift { display: none; }
-  @media (pointer: fine) and (min-width: 900px) {
-    #tiltshift { display: block; position: fixed; inset: 0; pointer-events: none; }
-    #tiltshift::before, #tiltshift::after { content: ""; position: absolute; left: 0; right: 0; height: 13vh; backdrop-filter: blur(2.5px); -webkit-backdrop-filter: blur(2.5px); }
-    #tiltshift::before { top: 0; -webkit-mask-image: linear-gradient(#000, transparent); mask-image: linear-gradient(#000, transparent); }
-    #tiltshift::after { bottom: 0; -webkit-mask-image: linear-gradient(transparent, #000); mask-image: linear-gradient(transparent, #000); }
-  }
+  /* ---- miniature haze: the far and near edges of the board melt into soft
+     colored mist, the way a tilt-shift photo of a model falls out of focus.
+     A plain gradient (no blur filter), so it costs the same on every device. ---- */
+  #tiltshift { display: block; position: fixed; inset: 0; pointer-events: none; }
+  #tiltshift::before, #tiltshift::after { content: ""; position: absolute; left: 0; right: 0; }
+  #tiltshift::before { top: 0; height: 15vh; background: linear-gradient(rgba(70, 52, 110, 0.38), rgba(70, 52, 110, 0.14) 45%, transparent); }
+  #tiltshift::after { bottom: 0; height: 15vh; background: linear-gradient(transparent, rgba(255, 214, 160, 0.10) 55%, rgba(70, 52, 110, 0.30)); }
   @media (prefers-reduced-motion: reduce) {
     .crest, .t-rays, .t-clouds i, .t-flies i, .wm-cloudshadows, .wm-ripples path { animation: none; }
     #boss-intro.go, #boss-vig.go { animation-duration: 0.01s; }
