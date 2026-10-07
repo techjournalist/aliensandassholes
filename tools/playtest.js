@@ -23,6 +23,10 @@ function watch(page, log) {
   page.on('console', (m) => { if (['error', 'warning'].includes(m.type())) log.push(`[console.${m.type()}] ${m.text()}`); });
   page.on('pageerror', (e) => log.push(`[pageerror] ${e.message}`));
 }
+// After the title the camera snaps from its drifting title zoom to 1 on the next
+// rendered frame; under software rendering that frame can be seconds away, so a
+// position measured before it and tapped after it lands off center. Wait for it.
+const cameraSettled = (page) => page.waitForFunction(() => Math.abs(Renderer.debugLook().cam - 1) < 1e-3, null, { timeout: 15000 }).catch(() => {});
 // Screen position of a grid cell's center, found through the page's own picking.
 async function cellToScreen(page, c, r) {
   return page.evaluate(([c, r]) => {
@@ -167,6 +171,7 @@ async function enterLevel(page, levelId) {
   check('Resume after Settings returns to the fight', await page.evaluate(() => !GameState.state.paused));
 
   // M1 regression: tile rules, drag, resize
+  await cameraSettled(page);
   let [x, y] = await cellToScreen(page, 6, 6);
   await page.mouse.click(x, y); await page.waitForTimeout(120);
   check('road tile rejected', (await page.locator('#toast').innerText()).includes('road'));
@@ -1254,6 +1259,7 @@ async function enterLevel(page, levelId) {
   check('world map play button fits on a phone', wmPlay && wmPlay.height >= 44);
   await page.locator('#wm-play-btn').click(); await page.waitForTimeout(300);
   check('start by touch through the world map', await page.evaluate(() => GameState.state.phase === 'playing'));
+  await cameraSettled(page);
   [x, y] = await cellToScreen(page, 9, 5);
   await page.touchscreen.tap(x, y); await page.waitForTimeout(200);
   st = await S(page);
