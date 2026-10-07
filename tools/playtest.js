@@ -531,7 +531,7 @@ async function enterLevel(page, levelId) {
   // P3-V13: every win gets a ribbon, counted stats and a confetti show; only the last level gets the finale
   if (mixed.phase === 'won') {
     const ribbon = { 3: 'Flawless!', 2: 'Well held!', 1: 'Victory!' }[mixed.stars];
-    check('win screen shows the victory ribbon for its star rating', (await page.locator('#end-ribbon').isVisible()) && (await page.locator('#end-ribbon-text').innerText()) === ribbon, ribbon);
+    check('win screen shows the victory ribbon for its star rating', (await page.locator('#end-ribbon').isVisible()) && (await page.locator('#end-ribbon-text').textContent()) === ribbon, ribbon);   // textContent: innerText honors the CSS uppercase
     check('win screen counts up its stats to the real numbers', await page.waitForFunction((n) => document.getElementById('stat-waves').textContent === String(n) && +document.getElementById('stat-kills').textContent > 0 && document.getElementById('stat-lives').textContent === String(GameState.state.lives), 12, { timeout: 15000 }).then(() => true, () => false));
     check('win screen is not the finale on a level that has a next one', !(await page.locator('#finale').isVisible()) && (await page.locator('#end-title').innerText()) === 'The Bastion holds!');
     check('the celebration canvas covers the screen and never blocks a tap', await page.evaluate(() => { const c = document.getElementById('celebrate'), r = c.getBoundingClientRect(); return r.width >= innerWidth - 1 && r.height >= innerHeight - 1 && getComputedStyle(c).pointerEvents === 'none'; }));
@@ -1106,7 +1106,7 @@ async function enterLevel(page, levelId) {
   check('Level 10 has five separate spawn points', await page.evaluate(() => new Set(GameState.routes.map((r) => r.cells[0].join(','))).size === 5));
   check('Level 10: east roads reach the gate without crossing the brook', await page.evaluate(() => { const cp = GameState.currentLevel().chokepoint; return GameState.routes.filter((r) => r.id.startsWith('east')).every((r) => !r.cells.some(([c]) => c === cp.streamCol)); }));
   if (d10.mixed.phase === 'won') {
-    check('Level 10 win is the finale: "The Hollow is healed!" with a campaign recap', (await page.locator('#end-title').innerText()) === 'The Hollow is healed!' && (await page.locator('#end-ribbon-text').innerText()) === 'Dawn breaks!' && await page.locator('#finale').isVisible());
+    check('Level 10 win is the finale: "The Hollow is healed!" with a campaign recap', (await page.locator('#end-title').innerText()) === 'The Hollow is healed!' && (await page.locator('#end-ribbon-text').textContent()) === 'Dawn breaks!' && await page.locator('#finale').isVisible());
     check('the finale recap shows all ten levels and a star total', await page.locator('#finale-badges .fb').count() === 10 && /of 30 stars/.test(await page.locator('#finale-total').innerText()));
     check('the finale keeps its fireworks going until the screen closes', await page.waitForFunction(() => Celebrate.running, null, { timeout: 15000 }).then(() => true, () => false));
     check('the finale card fits the screen (buttons reachable)', await page.evaluate(() => { const r = document.querySelector('#end .card').getBoundingClientRect(); return r.height <= innerHeight; }));
