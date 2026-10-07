@@ -176,10 +176,52 @@ function legacyTests(G, LEVELS) {
     for (let i = 1; i < pts.length; i++) len += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].z - pts[i - 1].z);
     const cobbleOld = cells.slice(cells.length - def.cobbleTailCells);
     const ok = JSON.stringify(G.pathCells) === JSON.stringify(cells)
-      && G.routes.length === 1 && Math.abs(G.routes[0].length - len) < 1e-9
+      && G.routes.length === 1
+      // a curvy level cuts its corners, so its road is shorter than the grid
+      // polyline but not by much; a straight one matches exactly
+      && (def.curvyRoads ? (G.routes[0].length < len && G.routes[0].length > len * 0.8) : Math.abs(G.routes[0].length - len) < 1e-9)
       && cells.every(([c, r]) => G.isCobble(c, r) === cobbleOld.some((p) => same(p, [c, r])))
       && G.isSpawn(def.spawn[0], def.spawn[1]);
     out.push({ name: `${def.id}: single-route level derives exactly the pre-route path`, ok });
+  }
+  return out;
+}
+
+// ---- 3b. a rounded road stays on its cells (curvyRoads levels) ----
+function curveTests(G, LEVELS) {
+  const out = [];
+  for (const def of LEVELS) {
+    if (!def.curvyRoads) continue;
+    G.loadLevel(def);
+    for (const rt of G.routes) {
+      const worst = Math.max(...rt.points.map((p) => Math.min(...rt.cells.map(([c, r]) => Math.hypot(G.worldX(c) - p.x, G.worldZ(r) - p.z)))));
+      out.push({ name: `${def.id}: route ${rt.id} stays within 0.75 cells of its grid cells when rounded`, ok: worst < 0.75, detail: `worst ${worst.toFixed(2)}` });
+      const a = rt.points[0], b = rt.points[rt.points.length - 1];
+      out.push({ name: `${def.id}: route ${rt.id} still starts on its spawn cell and ends at the gate`, ok: Math.hypot(a.x - G.worldX(rt.cells[0][0]), a.z - G.worldZ(rt.cells[0][1])) < 1e-9 && Math.hypot(b.x - G.gate.x, b.z - G.gate.z) < 1e-9 });
+    }
+  }
+  return out;
+}
+
+// ---- 3c. curveKeepsPace: a rounded road takes as long to walk as the straight one ----
+function paceTests(G, LEVELS) {
+  const out = [];
+  const walkTime = (def, routeId) => {
+    G.loadLevel(def); G.startGame();
+    const e = G.spawnEnemy('grunt', routeId);
+    e.lane = 0;
+    let t = 0;
+    while (G.state.enemies.includes(e) && t < 300) { G.update(1 / 60); t += 1 / 60; }
+    return t;
+  };
+  for (const def of LEVELS) {
+    if (!def.curvyRoads || !def.curveKeepsPace) continue;
+    const ids = (def.routes || [{ id: 'main' }]).map((r) => r.id);
+    const worst = Math.max(...ids.map((id) => {
+      const curved = walkTime(def, id), straight = walkTime({ ...def, curvyRoads: false }, id);
+      return Math.abs(curved - straight) / straight;
+    }));
+    out.push({ name: `${def.id}: curved roads keep the straight road's walking time (every route within 1%)`, ok: worst < 0.01, detail: `worst ${(worst * 100).toFixed(2)}%` });
   }
   return out;
 }
@@ -212,6 +254,8 @@ function validate() {
   const results = [];
   for (const def of LEVELS) results.push(...checkLevel(def));
   results.push(...legacyTests(GameState, LEVELS));
+  results.push(...curveTests(GameState, LEVELS));
+  results.push(...paceTests(GameState, LEVELS));
   results.push(...engineTests(GameState));
   results.push(...isolationTests());
   return results;

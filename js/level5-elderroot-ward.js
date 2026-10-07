@@ -336,12 +336,16 @@ const LEVEL_5 = (() => {
     spawn: [0, 4],
     // a rectangular spiral: two coiling rings around an open plaza at the
     // center, where the Elderroot itself stands untouched by the road
-    pathWaypoints: [[0, 4], [4, 4], [4, 12], [15, 12], [15, 2], [7, 2], [7, 5], [13, 5], [13, 9], [10, 9], [10, 8]],
+    // (collinear waypoints on the long legs keep every run under 5 cells, so the
+    // rounded curve hugs the road instead of cutting across the plots)
+    pathWaypoints: [[0, 4], [4, 4], [4, 8], [4, 12], [9, 12], [15, 12], [15, 7], [15, 2], [11, 2], [7, 2], [7, 5], [10, 5], [13, 5], [13, 9], [10, 9], [10, 8]],
     chokepoint: { cell: [2, 4], streamCol: 2, streamRows: [1, 8] },
     endpoint: {
       name: 'the Elderroot', properName: 'The Elderroot',
       cells: [[9, 6], [10, 6], [11, 6], [9, 7], [10, 7], [11, 7]], gateCell: [10, 7],
     },
+    curvyRoads: true,   // the road is a smooth ribbon and enemies follow the curve
+    curveKeepsPace: true,   // shorter road, proportionally slower walkers: same time spawn to gate as the straight road
     cobbleTailCells: 3,
     theme: {
       // the danger zone covers nearly the whole map (overwhelmingly

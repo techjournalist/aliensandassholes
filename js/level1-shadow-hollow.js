@@ -481,6 +481,8 @@ const LEVEL_1 = (() => {
       name: 'the Bastion', properName: 'The Bastion',
       cells: [[16, 6], [17, 6], [16, 7], [17, 7], [16, 8], [17, 8]], gateCell: [16, 8],
     },
+    curvyRoads: true,   // the road is a smooth ribbon and enemies follow the curve
+    curveKeepsPace: true,   // shorter road, proportionally slower walkers: same time spawn to gate as the straight road
     cobbleTailCells: 3,
     theme: { center: [0.6, 2.1], radiusOut: { x: 4.1, z: 3.4 }, radiusIn: 1.18, falloffWidth: 0.42 },
     spawnBlockedText: 'Nothing grows on the Hollow stump.',

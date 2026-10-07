@@ -64,7 +64,7 @@ const GameState = (() => {
     // three new finale bosses, one each for Levels 6-8 (previously boss-less).
     // fast+armored, fast+soft and slow+heavily-armored respectively, so each
     // demands a genuinely different anti-air answer, not just a reskin.
-    tideworm:  { id: 'tideworm',  name: 'The Drowned Swarm', hp: 580, speed: 0.85, bounty: 160, flying: true,  armor: 1, boss: true },
+    tideworm:  { id: 'tideworm',  name: 'The Drowned Swarm', hp: 360, speed: 0.62, bounty: 160, flying: true,  armor: 1, boss: true },
     matriarch: { id: 'matriarch', name: 'The Hive Matriarch', hp: 600, speed: 0.9,  bounty: 160, flying: true,  armor: 0, boss: true },
     rime:      { id: 'rime',      name: 'The Rime Swarm',    hp: 620, speed: 0.75, bounty: 160, flying: true,  armor: 1, boss: true },
     // finale bosses for Levels 3 and 4 (previously boss-less): a fast armored
@@ -185,6 +185,8 @@ const GameState = (() => {
       // on grid corners. The cells (what is road, what is buildable) are
       // unchanged; the curve only ever cuts inside the corner, staying
       // within about half a cell of them. Start and gate stay exact.
+      let straightLen = 0;
+      for (let i = 1; i < points.length; i++) straightLen += Math.hypot(points[i].x - points[i - 1].x, points[i].z - points[i - 1].z);
       if (def.curvyRoads) {
         for (let pass = 0; pass < 3; pass++) {
           const q = [points[0]];
@@ -198,7 +200,13 @@ const GameState = (() => {
       }
       const lens = [0];
       for (let i = 1; i < points.length; i++) lens.push(lens[i - 1] + Math.hypot(points[i].x - points[i - 1].x, points[i].z - points[i - 1].z));
-      return { id: rd.id, index, cells, points, lens, length: lens[lens.length - 1] };
+      const length = lens[lens.length - 1];
+      // Optional `curveKeepsPace`: rounding the corners shortens a road, so
+      // enemies walk it proportionally slower and take as long from spawn to
+      // gate as they did on the straight road. A level tuned before it got
+      // curves keeps its wave table and its time in tower range.
+      const pace = def.curvyRoads && def.curveKeepsPace ? length / straightLen : 1;
+      return { id: rd.id, index, cells, points, lens, length, pace };
     });
     // the union of every route's cells, primary route first and in order
     pathCells = []; pathIndex = new Map();
@@ -410,7 +418,7 @@ const GameState = (() => {
     e.rooted = state.time < e.rootUntil;
     e.chilled = state.time < e.chillUntil;
     e.speedMul = e.rooted ? 0 : (e.chilled ? e.chillMul : 1);
-    e.dist += e.speed * e.speedMul * dt;
+    e.dist += e.speed * e.speedMul * dt * routes[e.route].pace;
     const route = routes[e.route];
     pathPosAt(e.dist - 0.3, _a, route);
     pathPosAt(e.dist + 0.3, _b, route);

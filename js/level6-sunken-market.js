@@ -13,15 +13,15 @@ const LEVEL_6 = (() => {
     { name: 'Wading In',              flavor: 'Grunts wade up the Market Row. Only one quay open so far.',        groups: [g('grunt', 5, 3.2, 0, 'market-row')] },
     { name: 'The North Quay Opens',   flavor: 'Watch the North Docks too. The horn shows where they come from.',  groups: [g('grunt', 5, 2.0, 0, 'market-row', 0), g('grunt', 3, 2.4, 0, 'north-docks', 4)] },
     { name: 'Quick Feet on the Water', flavor: 'Bog-Tricksters splash up the South Docks.',                       groups: [g('grunt', 4, 1.6, 0, 'market-row', 0), g('trickster', 4, 0.9, 0, 'south-docks', 3)] },
-    { name: 'The Old Troll Wades In', flavor: 'A Moss Troll takes the North Docks. It has time to spare.',        groups: [g('grunt', 4, 1.4, 0, 'market-row', 0), g('troll', 1, 1, 0, 'north-docks', 2), g('grunt', 2, 1.6, 0, 'south-docks', 6)] },
+    { name: 'The Old Troll Wades In', flavor: 'A Moss Troll takes the North Docks. It has time to spare.',        groups: [g('grunt', 3, 1.4, 0, 'market-row', 0), g('troll', 1, 1, 0, 'north-docks', 2), g('grunt', 2, 1.6, 0, 'south-docks', 6)] },
     { name: 'Wings Over the Water',   flavor: 'Bramble Bats skim the South Docks. Druids and Artillery only.',    groups: [g('bat', 2, 1.8, 0, 'south-docks', 0), g('grunt', 7, 1.0, 0, 'market-row', 3)] },
     { name: 'Three Quays at Once',    flavor: 'Every quay at once. Find the spots that cover two.',                groups: [g('grunt', 5, 1.0, 0, 'market-row', 0), g('grunt', 5, 1.0, 0, 'north-docks', 0), g('grunt', 5, 1.0, 0, 'south-docks', 0)] },
     { name: 'Barrels and Speed',      flavor: 'A Troll on the North Docks, Tricksters on the Market Row.',        groups: [g('troll', 2, 2.6, 0, 'north-docks', 0), g('trickster', 7, 0.7, 0, 'market-row', 2)] },
     { name: 'Flooded Swarm',          flavor: 'Bats south, Tricksters through the market, grunts from the north.', groups: [g('bat', 6, 0.9, 0, 'south-docks', 0), g('trickster', 8, 0.6, 0, 'market-row', 2), g('grunt', 5, 1.0, 0, 'north-docks', 4)] },
-    { name: 'The Market Presses',     flavor: 'The Hollow leans on every quay in turn.',                          groups: [g('troll', 2, 2.7, 0, 'north-docks', 0), g('grunt', 7, 0.8, 0, 'market-row', 1), g('trickster', 5, 0.65, 0, 'south-docks', 5), g('bat', 3, 1.0, 0, 'south-docks', 9)] },
-    { name: 'Pincer on the Quays',    flavor: 'Trolls down both northern quays, bats over the south.',            groups: [g('troll', 2, 2.2, 0, 'north-docks', 0), g('troll', 2, 2.2, 0, 'market-row', 1), g('bat', 6, 0.85, 0, 'south-docks', 3), g('grunt', 6, 0.85, 0, 'south-docks', 8)] },
-    { name: 'Every Quay at Once',     flavor: 'The square shakes. Hold the causeway.',                            groups: [g('grunt', 10, 0.7, 0, 'market-row', 0), g('trickster', 10, 0.55, 0, 'south-docks', 0), g('troll', 2, 2.0, 0, 'north-docks', 0), g('bat', 4, 1.0, 0, 'north-docks', 6)] },
-    { name: 'The Market Floods',      flavor: 'A Troll column, a Trickster rush and a Bat swarm, all at once.',   groups: [g('troll', 4, 2.0, 0, 'north-docks', 0), g('trickster', 14, 0.4, 0, 'market-row', 0), g('bat', 9, 0.55, 0, 'south-docks', 0)] },
+    { name: 'The Market Presses',     flavor: 'The Hollow leans on every quay in turn.',                          groups: [g('troll', 2, 2.7, 0, 'north-docks', 0), g('grunt', 6, 0.8, 0, 'market-row', 1), g('trickster', 4, 0.65, 0, 'south-docks', 5), g('bat', 2, 1.0, 0, 'south-docks', 9)] },
+    { name: 'Pincer on the Quays',    flavor: 'Trolls down both northern quays, bats over the south.',            groups: [g('troll', 2, 2.2, 0, 'north-docks', 0), g('troll', 1, 2.2, 0, 'market-row', 1), g('bat', 5, 0.85, 0, 'south-docks', 3), g('grunt', 5, 0.85, 0, 'south-docks', 8)] },
+    { name: 'Every Quay at Once',     flavor: 'The square shakes. Hold the causeway.',                            groups: [g('grunt', 9, 0.7, 0, 'market-row', 0), g('trickster', 9, 0.55, 0, 'south-docks', 0), g('troll', 2, 2.0, 0, 'north-docks', 0), g('bat', 3, 1.0, 0, 'north-docks', 6)] },
+    { name: 'The Market Floods',      flavor: 'A Troll column, a Trickster rush and a Bat swarm, all at once.',   groups: [g('troll', 4, 2.0, 0, 'north-docks', 0), g('trickster', 12, 0.4, 0, 'market-row', 0), g('bat', 8, 0.55, 0, 'south-docks', 0)] },
     { name: 'The Drowned Swarm Rises', flavor: 'Something enormous surfaces in the flood. Only Druids and Artillery reach it.', groups: [g('bat', 5, 1.0, 0, 'south-docks', 0), g('grunt', 6, 0.9, 0, 'north-docks', 1), g('tideworm', 1, 1, 0, 'market-row', 8)] },
   ];
 
@@ -280,6 +280,8 @@ const LEVEL_6 = (() => {
       name: 'the Counting-House', properName: 'The Counting-House',
       cells: [[15, 4], [16, 4], [15, 5], [16, 5]], gateCell: [15, 5],
     },
+    curvyRoads: true,   // the road is a smooth ribbon and enemies follow the curve
+    curveKeepsPace: true,   // shorter road, proportionally slower walkers: same time spawn to gate as the straight road
     cobbleTailCells: 3,
     theme: {
       center: [1, 5], radiusOut: { x: 8, z: 6 }, radiusIn: 1.1, falloffWidth: 0.5,

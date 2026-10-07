@@ -291,6 +291,8 @@ const LEVEL_7 = (() => {
       name: 'the Apiary Tower', properName: 'The Apiary Tower',
       cells: [[17, 6], [18, 6], [17, 7], [18, 7]], gateCell: [17, 7],
     },
+    curvyRoads: true,   // the road is a smooth ribbon and enemies follow the curve
+    curveKeepsPace: true,   // shorter road, proportionally slower walkers: same time spawn to gate as the straight road
     cobbleTailCells: 3,
     theme: {
       center: [1, 4], radiusOut: { x: 16, z: 12 }, radiusIn: 0.4, falloffWidth: 0.45,

@@ -21,8 +21,8 @@ const LEVEL_4 = (() => {
     { name: 'Stone and Speed',     flavor: 'Trolls on the long road, Tricksters on the short one.',             groups: [g('troll', 2, 2.6, 0, 'long', 0), g('trickster', 9, 0.6, 0, 'shortcut', 2)] },
     { name: 'Swarm Season',        flavor: 'Bats south, Tricksters north, grunts on the long road.',            groups: [g('bat', 7, 0.8, 0, 'south', 0), g('trickster', 10, 0.5, 0, 'shortcut', 2), g('grunt', 6, 0.9, 0, 'long', 4)] },
     { name: 'The Press',           flavor: 'The Hollow leans on every road in turn.',                           groups: [g('troll', 2, 2.4, 0, 'long', 0), g('grunt', 10, 0.7, 0, 'shortcut', 1), g('trickster', 8, 0.55, 0, 'south', 5), g('bat', 5, 0.9, 0, 'south', 9)] },
-    { name: 'Pincer',              flavor: 'Trolls down both northern roads, bats over the south.',             groups: [g('troll', 2, 2.2, 0, 'long', 0), g('troll', 2, 2.2, 0, 'shortcut', 1), g('bat', 8, 0.7, 0, 'south', 3), g('grunt', 8, 0.7, 0, 'south', 8)] },
-    { name: 'Every Road at Once',  flavor: 'The camp shakes. Hold the Fallen Oak.',                             groups: [g('grunt', 12, 0.6, 0, 'shortcut', 0), g('trickster', 12, 0.45, 0, 'south', 0), g('troll', 3, 2.0, 0, 'long', 0), g('bat', 6, 0.8, 0, 'long', 6)] },
+    { name: 'Pincer',              flavor: 'Trolls down both northern roads, bats over the south.',             groups: [g('troll', 2, 2.2, 0, 'long', 0), g('troll', 2, 2.2, 0, 'shortcut', 1), g('bat', 7, 0.7, 0, 'south', 3), g('grunt', 7, 0.7, 0, 'south', 8)] },
+    { name: 'Every Road at Once',  flavor: 'The camp shakes. Hold the Fallen Oak.',                             groups: [g('grunt', 11, 0.6, 0, 'shortcut', 0), g('trickster', 11, 0.45, 0, 'south', 0), g('troll', 3, 2.0, 0, 'long', 0), g('bat', 5, 0.8, 0, 'long', 6)] },
     { name: 'The Vale Splinters',  flavor: 'A Troll column, a Trickster rush and a Bat swarm, all at the same moment.', groups: [g('troll', 4, 2.0, 0, 'long', 0), g('trickster', 14, 0.4, 0, 'shortcut', 0), g('bat', 9, 0.55, 0, 'south', 0)] },
     { name: 'The Leaf-Storm Breaks', flavor: 'The autumn wind is not wind at all. Only Druids and Artillery reach it.', groups: [g('bat', 3, 1.0, 0, 'south', 0), g('grunt', 4, 0.9, 0, 'shortcut', 1), g('leafstorm', 1, 1, 0, 'long', 8)] },
   ];
@@ -393,6 +393,8 @@ const LEVEL_4 = (() => {
       name: 'the Forward Camp', properName: 'The Forward Camp',
       cells: [[17, 5], [18, 5], [17, 6], [18, 6], [17, 7], [18, 7]], gateCell: [17, 7],
     },
+    curvyRoads: true,   // the road is a smooth ribbon and enemies follow the curve
+    curveKeepsPace: true,   // shorter road, proportionally slower walkers: same time spawn to gate as the straight road
     cobbleTailCells: 3,
     theme: {
       center: [2, 6], radiusOut: { x: 10, z: 8 }, radiusIn: 1.5, falloffWidth: 0.6,

@@ -484,6 +484,8 @@ const LEVEL_3 = (() => {
       name: 'the Cairnwatch', properName: 'The Cairnwatch',
       cells: [[17, 3], [18, 3], [17, 4], [18, 4], [17, 5], [18, 5]], gateCell: [17, 5],
     },
+    curvyRoads: true,   // the road is a smooth ribbon and enemies follow the curve
+    curveKeepsPace: true,   // shorter road, proportionally slower walkers: same time spawn to gate as the straight road
     cobbleTailCells: 3,
     theme: {
       center: [7, 5], radiusOut: { x: 9, z: 6.2 }, radiusIn: 1.6, falloffWidth: 0.7,
