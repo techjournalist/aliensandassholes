@@ -2335,9 +2335,11 @@ const Renderer = (() => {
     // ease toward the target so nothing snaps when a shot starts or ends
     const f = 1 - Math.exp(-dt * 9);
     camState.zoom += (zoom - camState.zoom) * f; camState.px += (px - camState.px) * f; camState.py += (py - camState.py) * f;
-    if (Math.abs(camera.zoom - camState.zoom) > 1e-4) {
-      camera.zoom = camState.zoom; camera.updateProjectionMatrix();
-      outlineMat.uniforms.thickness.value = CONFIG.outlinePx * unitsPerPixel / camState.zoom;
+    updateLook(dt);
+    const zTotal = camState.zoom * look.zoom;
+    if (Math.abs(camera.zoom - zTotal) > 1e-4) {
+      camera.zoom = zTotal; camera.updateProjectionMatrix();
+      outlineMat.uniforms.thickness.value = CONFIG.outlinePx * unitsPerPixel / zTotal;
     }
   }
 
@@ -2799,6 +2801,48 @@ const Renderer = (() => {
 
   // -------- camera --------
   const camBase = new THREE.Vector3(), camRight = new THREE.Vector3(), camUp = new THREE.Vector3();
+  // -------- player zoom and pan --------
+  // Layered on top of the camera director: `look.zoom` multiplies the director's
+  // zoom, and `look.px/py` pan along the camera's own axes (world units). The
+  // `t*` fields are targets the live values ease toward. Zooming out past 1 shows
+  // the valley's surroundings; zooming in lets the player drag around, but never
+  // past the edge of the original framing.
+  const ZOOM_MIN = 0.75, ZOOM_MAX = 2.5;
+  const look = { zoom: 1, tz: 1, px: 0, py: 0, tx: 0, ty: 0 };
+  const fit = { hw: 1, hh: 1 };
+  function clampLook() {
+    look.tz = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, look.tz));
+    const z = Math.max(1, look.tz), mx = fit.hw * (1 - 1 / z), my = fit.hh * (1 - 1 / z);
+    look.tx = Math.min(mx, Math.max(-mx, look.tx));
+    look.ty = Math.min(my, Math.max(-my, look.ty));
+  }
+  // zoom by `factor` keeping the point under screen (sx, sy) where it is
+  function zoomAt(factor, sx = cssW / 2, sy = cssH / 2) {
+    const old = look.tz;
+    look.tz = old * factor;
+    clampLook();
+    const k = 1 / old - 1 / look.tz;
+    look.tx += ((sx / cssW) * 2 - 1) * fit.hw * k;
+    look.ty += (-(sy / cssH) * 2 + 1) * fit.hh * k;
+    clampLook();
+    return look.tz;
+  }
+  // drag the map by (dx, dy) screen pixels; follows the finger at once
+  function panBy(dx, dy) {
+    if (look.tz <= 1.001) return;
+    look.tx -= dx * unitsPerPixel / look.zoom; look.ty += dy * unitsPerPixel / look.zoom;
+    clampLook();
+    look.px = look.tx; look.py = look.ty;
+  }
+  function resetLook() { look.tz = 1; look.tx = look.ty = 0; }
+  function updateLook(dt) {
+    const f = 1 - Math.exp(-dt * 12);
+    look.zoom += (look.tz - look.zoom) * f; look.px += (look.tx - look.px) * f; look.py += (look.ty - look.py) * f;
+    if (Math.abs(look.tz - look.zoom) < 1e-4) look.zoom = look.tz;
+    if (Math.abs(look.tx - look.px) < 1e-4) look.px = look.tx;
+    if (Math.abs(look.ty - look.py) < 1e-4) look.py = look.ty;
+  }
+
   // The player can turn the view in four fixed steps of 90 degrees around the
   // valley. `deg` is the extra yaw on top of CONFIG.cameraYaw, eased while it
   // turns; `idx` (0 to 3) is the step, saved so a reload keeps it.
@@ -2811,6 +2855,7 @@ const Renderer = (() => {
     dir = dir < 0 ? -1 : 1;
     view.idx = (view.idx + dir + 4) % 4;
     view.from = view.deg; view.to = view.to + dir * 90; view.t = 0;
+    look.tx = look.ty = 0;   // the pan belongs to the old angle
     saveView();
     return view.idx;
   }
@@ -2863,7 +2908,9 @@ const Renderer = (() => {
     camera.near = 1; camera.far = 100;
     camera.updateProjectionMatrix();
     unitsPerPixel = (hw * 2) / cssW;
-    outlineMat.uniforms.thickness.value = CONFIG.outlinePx * unitsPerPixel;
+    fit.hw = hw; fit.hh = hh;
+    clampLook();
+    outlineMat.uniforms.thickness.value = CONFIG.outlinePx * unitsPerPixel / camera.zoom;
     moteScale.value = renderer.getPixelRatio() / unitsPerPixel;
   }
 
@@ -3066,7 +3113,7 @@ const Renderer = (() => {
     updateView(dirDt);
     updateHealthBars(dirDt);
     updateCameraDirector(dirDt);
-    camera.position.copy(camBase).addScaledVector(camRight, shake.x + camState.px).addScaledVector(camUp, shake.y + camState.py);
+    camera.position.copy(camBase).addScaledVector(camRight, shake.x + camState.px + look.px).addScaledVector(camUp, shake.y + camState.py + look.py);
     renderer.render(scene, camera);
   }
 
@@ -3075,5 +3122,5 @@ const Renderer = (() => {
     return { calls: r.calls, triangles: r.triangles };
   }
 
-  return { init, render, resize, rotateView, setView, viewIndex: () => view.idx, viewTurning: () => view.t < 1, debugCamera: () => ({ x: camBase.x, y: camBase.y, z: camBase.z, deg: view.deg, idx: view.idx }), setPixelScale, pixelScale: () => pixelScale, screenToCell, worldToScreen, stats, shakeCamera, puff, debugScene: () => scene, debugViews: () => ({ bars: barBack ? barBack.count : -1, enemyViews: enemyViews.size, dying: dying.map((d) => [+d.t.toFixed(3), d.dur]), towerViews: towerViews.size }) };
+  return { init, render, resize, zoomAt, zoomStep: (dir) => zoomAt(dir > 0 ? 1.25 : 0.8), panBy, resetLook, zoomLevel: () => look.tz, debugLook: () => ({ zoom: look.zoom, tz: look.tz, px: look.px, py: look.py, tx: look.tx, ty: look.ty, hw: fit.hw, hh: fit.hh, cam: camera.zoom }), ZOOM_MIN, ZOOM_MAX, rotateView, setView, viewIndex: () => view.idx, viewTurning: () => view.t < 1, debugCamera: () => ({ x: camBase.x, y: camBase.y, z: camBase.z, deg: view.deg, idx: view.idx }), setPixelScale, pixelScale: () => pixelScale, screenToCell, worldToScreen, stats, shakeCamera, puff, debugScene: () => scene, debugViews: () => ({ bars: barBack ? barBack.count : -1, enemyViews: enemyViews.size, dying: dying.map((d) => [+d.t.toFixed(3), d.dur]), towerViews: towerViews.size }) };
 })();

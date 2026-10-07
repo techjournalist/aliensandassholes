@@ -257,6 +257,56 @@ async function enterLevel(page, levelId) {
   await page.evaluate(() => GameState.clearSelection && GameState.clearSelection());
   check('the view ends back at the default so later checks are unaffected', await page.evaluate(() => Renderer.viewIndex() === 0 && localStorage.getItem('bb-view') === '0'));
 
+  // ---- P3-V15: zoom and pan ----
+  const lookNow = () => page.evaluate(() => Renderer.debugLook());
+  const settled = () => page.waitForFunction(() => { const l = Renderer.debugLook(); return Math.abs(l.zoom - l.tz) < 0.003 && Math.abs(l.px - l.tx) < 0.003 && Math.abs(l.py - l.ty) < 0.003; }, null, { timeout: 30000 }).then(() => true, () => false);
+  check('zoom buttons are 44px targets', await page.evaluate(() => ['zoom-in-btn', 'zoom-out-btn'].every((id) => { const r = document.getElementById(id).getBoundingClientRect(); return r.width >= 44 && r.height >= 44; })));
+  await page.locator('#zoom-in-btn').click(); await settled();
+  check('the plus button zooms in', Math.abs((await lookNow()).tz - 1.25) < 1e-6);
+  for (let i = 0; i < 10; i++) await page.locator('#zoom-in-btn').click();
+  for (let i = 0; i < 25; i++) await page.locator('#zoom-out-btn').click();
+  check('zoom is limited to 0.75x at the far end', Math.abs((await lookNow()).tz - 0.75) < 1e-6);
+  for (let i = 0; i < 25; i++) await page.locator('#zoom-in-btn').click();
+  check('zoom is limited to 2.5x at the near end', Math.abs((await lookNow()).tz - 2.5) < 1e-6);
+  await page.keyboard.press('0'); await settled();
+  check('the 0 key puts zoom and pan back to the start', await (async () => { const l = await lookNow(); return Math.abs(l.zoom - 1) < 0.003 && Math.abs(l.px) < 0.003 && Math.abs(l.py) < 0.003; })());
+  const zp = await page.evaluate(() => Renderer.worldToScreen(GameState.worldX(13), 0, GameState.worldZ(7)));
+  const zc0 = await page.evaluate(([x, y]) => Renderer.screenToCell(x, y), [zp.x, zp.y]);
+  await page.mouse.move(zp.x, zp.y); await page.mouse.wheel(0, -600); await settled();
+  const zc1 = await page.evaluate(([x, y]) => Renderer.screenToCell(x, y), [zp.x, zp.y]);
+  check('the wheel zooms toward the pointer (the tile under it stays put)', (await lookNow()).tz > 2 && zc0.c === zc1.c && zc0.r === zc1.r, JSON.stringify({ zc0, zc1 }));
+  const selBefore = await page.evaluate(() => JSON.stringify(GameState.state.selected));
+  const lk0 = await lookNow();
+  await page.mouse.move(600, 300); await page.mouse.down(); await page.mouse.move(520, 270, { steps: 5 }); await page.mouse.up(); await settled();
+  const lk1 = await lookNow();
+  check('dragging pans a zoomed view and does not select a tile', (Math.abs(lk1.px - lk0.px) > 0.05 || Math.abs(lk1.py - lk0.py) > 0.05) && selBefore === await page.evaluate(() => JSON.stringify(GameState.state.selected)), JSON.stringify({ lk0: [lk0.px, lk0.py], lk1: [lk1.px, lk1.py] }));
+  for (let i = 0; i < 4; i++) { await page.mouse.move(900, 500); await page.mouse.down(); await page.mouse.move(100, 60, { steps: 8 }); await page.mouse.up(); }
+  await settled();
+  const lk2 = await lookNow();
+  check('the pan stops at the edge of the original framing', Math.abs(lk2.px) <= lk2.hw * (1 - 1 / lk2.tz) + 0.01 && Math.abs(lk2.py) <= lk2.hh * (1 - 1 / lk2.tz) + 0.01 && Math.abs(lk2.tx) > 0.5, JSON.stringify(lk2));
+  const ztap = await page.evaluate(() => { const cur = GameState.state.selected; const vw = innerWidth, vh = innerHeight; for (let r = 0; r < GameState.currentLevel().grid.rows; r++) for (let c = 0; c < GameState.currentLevel().grid.cols; c++) { if (!GameState.isBuildable(c, r) || (cur && cur.c === c && cur.r === r)) continue; const p = Renderer.worldToScreen(GameState.worldX(c), 0, GameState.worldZ(r)); if (p.x > vw * 0.25 && p.x < vw * 0.75 && p.y > vh * 0.3 && p.y < vh * 0.7) return { c, r, x: p.x, y: p.y }; } return null; });
+  await page.mouse.click(ztap.x, ztap.y); await page.waitForTimeout(200);
+  const zsel = await page.evaluate(() => GameState.state.selected);
+  check('a tap on a zoomed view still selects the tile under it', !!zsel && zsel.kind === 'tile' && zsel.c === ztap.c && zsel.r === ztap.r, JSON.stringify({ want: [ztap.c, ztap.r], got: zsel }));
+  const zTurnFrom = (await lookNow()).tz;
+  await page.locator('#rot-right-btn').click(); await turned(); await settled();
+  const lt = await lookNow();
+  check('turning the view keeps the zoom and recentres the pan', Math.abs(lt.tz - zTurnFrom) < 1e-6 && Math.abs(lt.px) < 0.01 && Math.abs(lt.py) < 0.01, JSON.stringify({ tz: lt.tz, px: lt.px, py: lt.py }));
+  await page.locator('#rot-left-btn').click(); await turned();
+  await page.keyboard.press('0'); await settled();
+  const selPinch = await page.evaluate(() => JSON.stringify(GameState.state.selected));
+  await page.evaluate(() => {
+    const c = document.getElementById('game'), ev = (type, id, x, y) => c.dispatchEvent(new PointerEvent(type, { pointerId: id, clientX: x, clientY: y, bubbles: true, pointerType: 'touch' }));
+    ev('pointerdown', 11, 500, 300); ev('pointerdown', 12, 600, 300);
+    for (let i = 1; i <= 10; i++) { ev('pointermove', 11, 500 - i * 15, 300); ev('pointermove', 12, 600 + i * 15, 300); }
+    ev('pointerup', 11, 350, 300); ev('pointerup', 12, 750, 300);
+  });
+  await settled();
+  check('two fingers moving apart zoom in, and never count as a tap', (await lookNow()).tz > 1.5 && selPinch === await page.evaluate(() => JSON.stringify(GameState.state.selected)));
+  await page.keyboard.press('0'); await settled();
+  check('zoom ends back at the default so later checks are unaffected', await (async () => { const l = await lookNow(); return Math.abs(l.zoom - 1) < 0.003 && Math.abs(l.cam - 1) < 0.003; })());
+  await page.evaluate(() => GameState.clearSelection && GameState.clearSelection());
+
   // wave: start, watch goblins walk, let them all leak
   await page.locator('#wave-btn').click(); await page.waitForTimeout(200);
   st = await S(page);

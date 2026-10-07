@@ -1521,6 +1521,40 @@ turned view, camera-facing glows, Q and E, a full circle and a tap in a turned
 view. Known and unchanged: at 667px wide the HUD row already overlapped the wave
 button before this change.
 
+**P3-V15 - Player zoom and pan** *(on branch `claude/fervent-wright-jeojom`,
+user-requested: "a zoom in / out for the camera view")*. The player can zoom the
+camera from 0.75x (a little more of the surroundings) to 2.5x (close enough to
+read the tower details), and drag to look around once zoomed in. It is layered on
+the camera director that already existed for the boss entrance and the title
+drift: `look.zoom` multiplies the director's zoom into `camera.zoom`, and
+`look.px/py` pan along the camera's own axes, so picking, health bars, the tip
+arrow and `worldToScreen` follow with no changes. Targets ease (wall-clock time,
+works while paused); a drag follows the finger at once. The pan is clamped so
+the view never leaves the original framing (`fit.hw/hh`, refreshed on every
+resize and turn), and zooming out past 1 allows no pan. Outline width is
+recomputed from the real camera zoom, including inside `fitCamera` (it used to
+reset to the unzoomed width on a resize while the director was zoomed).
+
+**Controls.** Mouse wheel and trackpad pinch (a wheel event with `ctrlKey`)
+zoom toward the pointer, so the tile under it stays put; two fingers pinch and
+pan together; dragging pans; the plus and minus keys step the zoom (1.25x), 0
+resets zoom and pan, arrow keys pan while zoomed. Minus and plus buttons sit in
+the HUD row from 1000px width up; phones use the pinch, since the row has no
+room (see P3-V14). `js/input.js` now tracks every pressed pointer: a press that
+moves less than 12px is still a tap, a drag past that is a pan and never
+selects a tile, and a second finger turns the gesture into a pinch for good
+(lifting one finger does not produce a stray tap). Zoom and pan only work while
+a level is being played, and are not saved between visits. Turning the view
+(P3-V14) keeps the zoom and eases the pan back to the center, since the pan
+belongs to the old angle.
+
+**Checked.** In a real page: the buttons clamp at 0.75x and 2.5x; the wheel
+keeps the cell under the cursor; a drag pans without selecting and stops at the
+clamp; a tap while zoomed picks the intended tile; turning keeps the zoom; a
+synthetic two-finger pinch zooms and selects nothing; screenshots at both ends.
+Twelve new harness checks cover these. Not done: saving the zoom, a zoom
+indicator, and a double-tap to reset (0 and zooming out do the job).
+
 **Graphics roadmap**: see `GRAPHICS-ROADMAP.md` for the approved list of
 further graphics work, its priority order, the performance budget and the
 current test status. Read it before starting any graphics task. Its numbered list is the one the
