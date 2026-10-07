@@ -16,10 +16,13 @@ Read `AGENTS.md` first, then the file named in each item below.
   shadows, softer glow, haze gradient, resolution governor (AGENTS.md P3-V11).
 - World map has a bridge where roads cross (hills, mountain shadows and a river
   bridge were tried and reverted at the user's request; do not redo them).
-- Tests: `node tools/validate-levels.js` always passes. The full
-  `tools/playtest.js` loses Level 6's bot check at random, which locks Levels 7 to
-  10 by cascade (known). Run the dawn levels directly with the scratchpad scripts
-  or all levels unlocked. Needs `THREE_LOCAL=<path to three.min.js r128>`.
+- Tests: `node tools/validate-levels.js` passes (284 checks). The full
+  `tools/playtest.js` passed 617 of 617 on the curving roads work, with all 10
+  levels won by the mixed bot, so the old Level 6 cascade that locked Levels 7 to
+  10 is gone (Level 6 was rebalanced; the root cause, unseeded `Math.random`, is
+  still open as item 3). A full run takes about 25 minutes. Install with
+  `npm install three@0.128.0 playwright` or set `THREE_LOCAL=<path to three.min.js
+  r128>`.
 
 ## Open items, in the order I would do them
 1. **Confirm the "Send next wave" fix.** User-reported: the button sometimes needed
