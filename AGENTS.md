@@ -1476,6 +1476,51 @@ here: judge timing on a real device. Eight new harness checks cover the
 ribbon, the counted stats, the non-finale title, a click-through canvas, the
 finale title and recap, ten badges, running fireworks and the card fitting.
 
+**P3-V14 - Player-rotatable view (four fixed views)** *(on branch
+`claude/fervent-wright-jeojom`, user-requested: "can the angle of the gameplay
+screen be rotated by the player", then "four fixed views")*. The camera was
+already built from two numbers (`CONFIG.cameraElevation` and `cameraYaw`), and
+picking, framing (`fitCamera`), health bars and `worldToScreen` all derive from
+the camera, so turning it was cheap. The view is now one of four 90 degree
+steps around the valley (`view.idx` 0 to 3, on top of the original 12 degree
+yaw). `Renderer.rotateView(+1 | -1)` eases to the next step over 0.55s of
+wall-clock time (so a slow frame cannot stall it, and it works while paused),
+re-placing the camera and re-fitting the frustum every frame while it turns.
+`+1` turns the valley clockwise as seen from above (checked: the Bastion moves
+from bottom right to bottom left). The step is saved in `localStorage` under
+`bb-view` (wrapped in try/catch) and restored on load. Default is the original
+view, so every level plays exactly as before until the player turns it.
+
+**Controls.** A clockwise button in the HUD row (aria-label, 44px), plus an
+anticlockwise one at 900px width and up; Q turns anticlockwise and E clockwise
+on a keyboard (only while a level is being played). On phones only the
+clockwise button shows: both of them pushed the HUD row 16px into the wave
+button at 844px wide. Taps still pick the right tile in every view (a harness
+check places a tower through a mouse click in a turned view). Not done:
+free-drag rotation (it would fight with tap-to-place on touch), a view per
+level, and an on-screen hint for the keys beyond the title card's key line.
+
+**Two things were baked to the old camera and had to change.** The soft
+lantern, brazier and fire halos (`glow(..., axis: 'cam')`) were built facing the
+camera at build time, so they would have skewed sideways in other views. They
+are now one dynamic mesh (`glowCam`) rebuilt from the camera's right and up
+vectors whenever the camera turns; window halos on walls (`axis: 'z' | 'x'`)
+are unchanged. The clouds were placed along the world's far and near edges,
+which become the left and right sides after a quarter turn (one drifted over the
+tower panel in the first test). They are now laid out in camera space, along the
+screen's horizontal and beyond the valley's far and near edges measured along
+the camera's forward direction, so they ride the same edges in every view.
+
+**Checked.** All ten levels at all four views (contact sheets, no console
+errors, tall trees and the Bastion hide some road from some sides, as expected
+of a 3D view). The sideways views (90 and 270 degrees) make a landscape map
+smaller, because the map is wider than it is tall; that is the cost of fixed
+quarter turns. Four turns return the camera to the starting position exactly.
+Nine new harness checks cover the button sizes, saving, direction, picking in a
+turned view, camera-facing glows, Q and E, a full circle and a tap in a turned
+view. Known and unchanged: at 667px wide the HUD row already overlapped the wave
+button before this change.
+
 **Graphics roadmap**: see `GRAPHICS-ROADMAP.md` for the approved list of
 further graphics work, its priority order, the performance budget and the
 current test status. Read it before starting any graphics task. Its numbered list is the one the

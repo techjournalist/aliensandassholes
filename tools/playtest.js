@@ -222,6 +222,41 @@ async function enterLevel(page, levelId) {
   check('placeTower refuses when broke', !(await page.evaluate(() => GameState.placeTower('slinger').ok)));
   check('tower on occupied tile refused', await page.evaluate(() => { GameState.selectTile(6, 5); return GameState.state.selected.kind === 'tower'; }));
 
+  // ---- P3-V14: the player can turn the view in four fixed steps ----
+  const turned = () => page.waitForFunction(() => !Renderer.viewTurning(), null, { timeout: 30000 }).then(() => true, () => false);
+  const cam0 = await page.evaluate(() => Renderer.debugCamera());
+  check('rotate buttons are 44px targets', await page.evaluate(() => ['rot-left-btn', 'rot-right-btn'].every((id) => { const r = document.getElementById(id).getBoundingClientRect(); return r.width >= 44 && r.height >= 44; })));
+  const gate0 = await page.evaluate(() => Renderer.worldToScreen(GameState.gate.x, 0, GameState.gate.z));
+  await page.locator('#rot-right-btn').click(); await turned();
+  const v1 = await page.evaluate(() => ({ idx: Renderer.viewIndex(), cam: Renderer.debugCamera(), saved: localStorage.getItem('bb-view'), gate: Renderer.worldToScreen(GameState.gate.x, 0, GameState.gate.z) }));
+  check('the clockwise button turns to the next view and remembers it', v1.idx === 1 && Math.abs(v1.cam.deg - 90) < 1e-6 && v1.saved === '1', JSON.stringify({ idx: v1.idx, deg: v1.cam.deg, saved: v1.saved }));
+  const vp = page.viewportSize();
+  check('the Bastion moves clockwise on screen (bottom right to bottom left)', gate0.x > vp.width / 2 && v1.gate.x < gate0.x && v1.gate.y > vp.height / 2 - 40, JSON.stringify({ from: gate0, to: v1.gate }));
+  check('picking still finds the right tile in a turned view', await page.evaluate(() => [[7, 5], [3, 3], [12, 7]].every(([c, r]) => { const p = Renderer.worldToScreen(GameState.worldX(c), 0, GameState.worldZ(r)); const hit = Renderer.screenToCell(p.x, p.y); return hit && hit.c === c && hit.r === r; })));
+  check('camera-facing glows turn with the view', await page.evaluate(() => {
+    const m = Renderer.debugScene().getObjectByName('glowCam'); if (!m) return false;
+    const a = m.geometry.attributes.position.array, v = (i) => [a[i * 3], a[i * 3 + 1], a[i * 3 + 2]];
+    const p0 = v(0), p1 = v(1), p2 = v(2), u = p1.map((x, i) => x - p0[i]), w = p2.map((x, i) => x - p0[i]);
+    const n = [u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]], nl = Math.hypot(...n);
+    const cam = Renderer.debugCamera(), cl = Math.hypot(cam.x, cam.y, cam.z);
+    return Math.abs((n[0] * cam.x + n[1] * cam.y + n[2] * cam.z) / (nl * cl)) > 0.999;
+  }));
+  await page.keyboard.press('q'); await turned();
+  check('Q turns the view back anticlockwise', await page.evaluate(() => Renderer.viewIndex() === 0));
+  for (let i = 0; i < 4; i++) { await page.keyboard.press('e'); await turned(); }
+  const cam4 = await page.evaluate(() => Renderer.debugCamera());
+  check('four turns of E come all the way round to the starting view', cam4.idx === 0 && Math.hypot(cam4.x - cam0.x, cam4.y - cam0.y, cam4.z - cam0.z) < 1e-6 && cam4.deg === 0, JSON.stringify(cam4));
+  check('a tap on a tile in a turned view still selects that tile', await (async () => {
+    await page.locator('#rot-left-btn').click(); await turned();
+    const pt = await page.evaluate(() => Renderer.worldToScreen(GameState.worldX(12), 0, GameState.worldZ(4)));
+    await page.mouse.click(pt.x, pt.y); await page.waitForTimeout(150);
+    const sel = await page.evaluate(() => GameState.state.selected);
+    await page.locator('#rot-right-btn').click(); await turned();
+    return !!sel && sel.kind === 'tile' && sel.c === 12 && sel.r === 4;
+  })());
+  await page.evaluate(() => GameState.clearSelection && GameState.clearSelection());
+  check('the view ends back at the default so later checks are unaffected', await page.evaluate(() => Renderer.viewIndex() === 0 && localStorage.getItem('bb-view') === '0'));
+
   // wave: start, watch goblins walk, let them all leak
   await page.locator('#wave-btn').click(); await page.waitForTimeout(200);
   st = await S(page);

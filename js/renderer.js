@@ -563,11 +563,15 @@ const Renderer = (() => {
   // leading, and a warm halo spilling onto the wall. `axis` is the wall's
   // normal axis ('z' or 'x'), `sign` its direction.
   const glowGeos = [];
+  // free-standing lights (lanterns, braziers, fires) face the camera, so they
+  // are rebuilt whenever the player turns the view (see refreshCamGlows)
+  const camGlows = [];
+  let camGlowMesh = null;
   let glowMat = null, glowK = 1;
   function glow(x, y, z, { w = 0.5, h = 0.5, axis = 'cam', sign = 1 } = {}) {
+    if (axis === 'cam') { camGlows.push({ x, y, z, w, h }); return; }
     const g = new THREE.PlaneGeometry(w, h).toNonIndexed();
-    if (axis === 'cam') g.applyMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(camera.quaternion));
-    else if (axis === 'x') g.rotateY(sign * Math.PI / 2);
+    if (axis === 'x') g.rotateY(sign * Math.PI / 2);
     else if (sign < 0) g.rotateY(Math.PI);
     g.translate(x, y, z);
     glowGeos.push(g);
@@ -593,8 +597,21 @@ const Renderer = (() => {
     }
   }
   function setGlow(k) { glowK = k; }
+  const QUAD = [[-1, -1], [1, -1], [1, 1], [-1, -1], [1, 1], [-1, 1]];
+  function refreshCamGlows() {
+    if (!camGlowMesh) return;
+    const pos = camGlowMesh.geometry.attributes.position.array;
+    let o = 0;
+    for (const g of camGlows) for (const [sx, sy] of QUAD) {
+      const rx = sx * g.w / 2, uy = sy * g.h / 2;
+      pos[o++] = g.x + camRight.x * rx + camUp.x * uy;
+      pos[o++] = g.y + camRight.y * rx + camUp.y * uy;
+      pos[o++] = g.z + camRight.z * rx + camUp.z * uy;
+    }
+    camGlowMesh.geometry.attributes.position.needsUpdate = true;
+  }
   function flushGlow() {
-    if (!glowGeos.length) return;
+    if (!glowGeos.length && !camGlows.length) return;
     const c = document.createElement('canvas');
     c.width = c.height = 64;
     const ctx = c.getContext('2d');
@@ -608,11 +625,27 @@ const Renderer = (() => {
       color: PALETTE.windowWarm, map: new THREE.CanvasTexture(c), transparent: true,
       blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.55,
     });
-    const mesh = new THREE.Mesh(mergeGeoms(glowGeos), glowMat);
-    mesh.name = 'glow';
-    mesh.renderOrder = 2;
-    mesh.matrixAutoUpdate = false;
-    scene.add(mesh);
+    if (glowGeos.length) {
+      const mesh = new THREE.Mesh(mergeGeoms(glowGeos), glowMat);
+      mesh.name = 'glow';
+      mesh.renderOrder = 2;
+      mesh.matrixAutoUpdate = false;
+      scene.add(mesh);
+    }
+    if (camGlows.length) {
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(camGlows.length * 18), 3));
+      const uv = new Float32Array(camGlows.length * 12);
+      for (let i = 0; i < camGlows.length; i++) QUAD.forEach(([sx, sy], k) => { uv[i * 12 + k * 2] = (sx + 1) / 2; uv[i * 12 + k * 2 + 1] = (sy + 1) / 2; });
+      geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+      camGlowMesh = new THREE.Mesh(geo, glowMat);
+      camGlowMesh.name = 'glowCam';
+      camGlowMesh.renderOrder = 2;
+      camGlowMesh.frustumCulled = false;
+      camGlowMesh.matrixAutoUpdate = false;
+      scene.add(camGlowMesh);
+      refreshCamGlows();
+    }
     animated.push({ update(t) { glowMat.opacity = glowK * (0.52 + 0.07 * Math.sin(t * 7.3) * Math.sin(t * 2.9)); } });
   }
   // Banner cloth: a swallowtailed field with a trim border, a stripe and a
@@ -2230,7 +2263,8 @@ const Renderer = (() => {
       const far = i % 2 === 0;
       const puffs = [];
       for (let k = 0; k < PUFFS_PER; k++) puffs.push({ dx: (k - 2.5) * 0.9 + (rng() - 0.5) * 0.4, dy: (rng() - 0.3) * 0.35, dz: (rng() - 0.5) * 0.7, r: 0.85 + rng() * 0.7 - Math.abs(k - 2.5) * 0.12 });
-      clouds.push({ x: -cols / 2 - 12 + rng() * (cols + 24), z: far ? -(rows / 2 + 3 + rng() * 2.5) : (rows / 2 + 6 + rng() * 2), y: 4.6 + rng() * 1.2, sp: 0.16 + rng() * 0.12, puffs });
+      // u: along the screen's horizontal; vr: how far beyond the valley's far or near edge
+      clouds.push({ u: (rng() - 0.5) * (Math.max(cols, rows) + 26), far, vr: rng(), y: 4.6 + rng() * 1.2, sp: 0.16 + rng() * 0.12, puffs });
     }
     const total = N * PUFFS_PER;
     const tint = lerpColor(0xf6f9ff, vt.backdrop, Math.min(0.5, corrupt * 0.6));
@@ -2238,13 +2272,19 @@ const Renderer = (() => {
     const mesh = new THREE.InstancedMesh(GEO.sphereLo, mat, total);
     mesh.frustumCulled = false; mesh.renderOrder = 4; mesh.name = 'clouds';
     scene.add(mesh);
-    const span = cols + 26, m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new THREE.Vector3(), sc = new THREE.Vector3();
+    const span = Math.max(cols, rows) + 26, m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new THREE.Vector3(), sc = new THREE.Vector3();
     animated.push({ update(t) {
+      // the layout turns with the view, so the clouds always ride the screen's far and near edges
+      const yaw = THREE.MathUtils.degToRad(CONFIG.cameraYaw + view.deg);
+      const rx = Math.cos(yaw), rz = -Math.sin(yaw), fx = -Math.sin(yaw), fz = -Math.cos(yaw);
+      const ext = Math.abs(fx) * cols / 2 + Math.abs(fz) * rows / 2;
       let i = 0;
       for (const c of clouds) {
-        const cx = ((c.x + t * c.sp + span / 2) % span + span) % span - span / 2;
+        const u = ((c.u + t * c.sp + span / 2) % span + span) % span - span / 2;
+        const v = c.far ? ext + 3 + c.vr * 2.5 : -(ext + 6 + c.vr * 2);
         for (const pf of c.puffs) {
-          p.set(cx + pf.dx, c.y + pf.dy, c.z + pf.dz); sc.set(pf.r * 1.25, pf.r * 0.75, pf.r * 0.9);
+          const pu = u + pf.dx, pv = v + pf.dz;
+          p.set(rx * pu + fx * pv, c.y + pf.dy, rz * pu + fz * pv); sc.set(pf.r * 1.25, pf.r * 0.75, pf.r * 0.9);
           m4.compose(p, q, sc); mesh.setMatrixAt(i++, m4);
         }
       }
@@ -2759,9 +2799,39 @@ const Renderer = (() => {
 
   // -------- camera --------
   const camBase = new THREE.Vector3(), camRight = new THREE.Vector3(), camUp = new THREE.Vector3();
+  // The player can turn the view in four fixed steps of 90 degrees around the
+  // valley. `deg` is the extra yaw on top of CONFIG.cameraYaw, eased while it
+  // turns; `idx` (0 to 3) is the step, saved so a reload keeps it.
+  const VIEW_KEY = 'bb-view';
+  const view = { idx: 0, deg: 0, from: 0, to: 0, t: 1, dur: 0.55 };
+  function savedView() { try { const v = parseInt(localStorage.getItem(VIEW_KEY), 10); return v >= 0 && v < 4 ? v : 0; } catch (e) { return 0; } }
+  function saveView() { try { localStorage.setItem(VIEW_KEY, String(view.idx)); } catch (e) { /* storage may be blocked */ } }
+  // dir +1 turns the valley clockwise as seen from above, -1 anticlockwise
+  function rotateView(dir) {
+    dir = dir < 0 ? -1 : 1;
+    view.idx = (view.idx + dir + 4) % 4;
+    view.from = view.deg; view.to = view.to + dir * 90; view.t = 0;
+    saveView();
+    return view.idx;
+  }
+  function setView(idx, instant = true) {
+    idx = ((idx % 4) + 4) % 4;
+    if (instant) { view.idx = idx; view.deg = view.from = view.to = idx * 90; view.t = 1; saveView(); placeCamera(); fitCamera(); return idx; }
+    let step = idx - view.idx; if (step === 3) step = -1; if (step === -3) step = 1;
+    for (let k = 0; k < Math.abs(step); k++) rotateView(Math.sign(step));
+    return view.idx;
+  }
+  function updateView(dt) {
+    if (view.t >= 1) return;
+    view.t = Math.min(1, view.t + dt / view.dur);
+    view.deg = view.from + (view.to - view.from) * easeS(view.t);
+    if (view.t >= 1) { view.deg = view.to = view.from = view.idx * 90; }   // keep the angle from drifting over many turns
+    placeCamera();
+    fitCamera();
+  }
   function placeCamera() {
     const el = THREE.MathUtils.degToRad(CONFIG.cameraElevation);
-    const yaw = THREE.MathUtils.degToRad(CONFIG.cameraYaw);
+    const yaw = THREE.MathUtils.degToRad(CONFIG.cameraYaw + view.deg);
     const dir = new THREE.Vector3(Math.sin(yaw) * Math.cos(el), Math.sin(el), Math.cos(yaw) * Math.cos(el));
     camera.position.copy(dir.multiplyScalar(40));
     camera.lookAt(0, 0, 0);
@@ -2769,6 +2839,7 @@ const Renderer = (() => {
     camBase.copy(camera.position);
     camRight.setFromMatrixColumn(camera.matrixWorld, 0);
     camUp.setFromMatrixColumn(camera.matrixWorld, 1);
+    refreshCamGlows();
   }
   function fitCamera() {
     const aspect = cssW / cssH;
@@ -2954,6 +3025,7 @@ const Renderer = (() => {
     // per unit of -z, so this starts just past the grid's top edge.
     const fogNear = 40 + (rows / 2 - 0.5) * 0.63;
     scene.fog = new THREE.Fog(vt.backdrop, fogNear, fogNear + 7);
+    view.idx = savedView(); view.deg = view.from = view.to = view.idx * 90; view.t = 1;
     placeCamera();
     buildGround();
     GameState.currentLevel().buildScene(makeKit());
@@ -2991,6 +3063,7 @@ const Renderer = (() => {
       shake.x = (fxRand() - 0.5) * 2 * shake.amp;
       shake.y = (fxRand() - 0.5) * 2 * shake.amp;
     } else { shake.x = shake.y = 0; }
+    updateView(dirDt);
     updateHealthBars(dirDt);
     updateCameraDirector(dirDt);
     camera.position.copy(camBase).addScaledVector(camRight, shake.x + camState.px).addScaledVector(camUp, shake.y + camState.py);
@@ -3002,5 +3075,5 @@ const Renderer = (() => {
     return { calls: r.calls, triangles: r.triangles };
   }
 
-  return { init, render, resize, setPixelScale, pixelScale: () => pixelScale, screenToCell, worldToScreen, stats, shakeCamera, puff, debugScene: () => scene, debugViews: () => ({ bars: barBack ? barBack.count : -1, enemyViews: enemyViews.size, dying: dying.map((d) => [+d.t.toFixed(3), d.dur]), towerViews: towerViews.size }) };
+  return { init, render, resize, rotateView, setView, viewIndex: () => view.idx, viewTurning: () => view.t < 1, debugCamera: () => ({ x: camBase.x, y: camBase.y, z: camBase.z, deg: view.deg, idx: view.idx }), setPixelScale, pixelScale: () => pixelScale, screenToCell, worldToScreen, stats, shakeCamera, puff, debugScene: () => scene, debugViews: () => ({ bars: barBack ? barBack.count : -1, enemyViews: enemyViews.size, dying: dying.map((d) => [+d.t.toFixed(3), d.dur]), towerViews: towerViews.size }) };
 })();

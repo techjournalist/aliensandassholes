@@ -12,6 +12,9 @@ Read `AGENTS.md` first, then the file named in each item below.
   Levels 9 and 10 (the dawn levels) also use `js/dawn-kit.js`. Levels 1 to 8 set
   `curveKeepsPace`, so walkers slow to match the shorter curved road (AGENTS.md
   P3-V12).
+- View rotation: the player can turn the view in four fixed 90 degree steps (HUD
+  button, Q and E; saved as `bb-view`). AGENTS.md P3-V14. The sideways views make a
+  wide map smaller. At 667px wide the HUD row overlaps the wave button (older issue).
 - Victory screens: every win has a ribbon, counted stats and confetti, and the last
   level has a finale with fireworks and a campaign recap (AGENTS.md P3-V13,
   `js/celebrate.js`). Timing was judged only at 2 to 3 fps in the sandbox, so check

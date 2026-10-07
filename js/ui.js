@@ -585,6 +585,10 @@ const UI = (() => {
     $('pause-map-btn').addEventListener('click', () => { $('pause').classList.remove('show'); enterWorldMap(); });
     $('resume-btn').addEventListener('click', () => { Audio.unlock(); GameState.resume(); });
     const NEXT_SPEED = { 1: 2, 2: 4, 4: 1 };   // the speed button cycles 1x, 2x, 4x
+    // four fixed views of the valley; the angle is remembered between visits
+    const turnView = (dir) => { Audio.unlock(); try { Audio.sfx.select(); } catch (e) { /* audio is optional */ } Renderer.rotateView(dir); };
+    $('rot-left-btn').addEventListener('click', () => turnView(-1));
+    $('rot-right-btn').addEventListener('click', () => turnView(1));
     $('speed-btn').addEventListener('click', () => { Audio.unlock(); GameState.setSpeed(NEXT_SPEED[GameState.state.speed] || 1); });
     GameState.on('paused', () => {
       const s = GameState.state;
@@ -616,6 +620,8 @@ const UI = (() => {
         else if (s.phase === 'playing' && !s.paused && !s.waveActive) { e.preventDefault(); Audio.unlock(); GameState.sendWave(); }
       } else if (e.key === 'f' || e.key === 'F') {
         if (s.phase === 'playing') GameState.setSpeed({ 1: 2, 2: 4, 4: 1 }[s.speed] || 1);
+      } else if (e.key === 'q' || e.key === 'Q' || e.key === 'e' || e.key === 'E') {
+        if (s.phase === 'playing') turnView(e.key === 'q' || e.key === 'Q' ? -1 : 1);
       }
     });
     const syncMute = () => { const m = Audio.isMuted(); $('mute-btn').classList.toggle('muted', m); $('mute-btn').querySelector('.icon').innerHTML = m ? '&#128263;' : '&#128266;'; $('mute-btn').setAttribute('aria-label', m ? 'Sound off' : 'Sound on'); };
