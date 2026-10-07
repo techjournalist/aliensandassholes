@@ -1431,6 +1431,51 @@ the real `GameState` in a Node `vm`, about a second per 30 runs) replaces slow
 browser runs for tuning. Scratchpad only, not committed. It matched the
 browser on frostpine-camp and sunken-market over 30 identical seeds.
 
+**P3-V13 - Victory screens and the Level 10 finale** *(on branch
+`claude/fervent-wright-jeojom`, user-requested: "more exciting victory screens
+after each level, and especially after level 10")*. The win screen was a plain
+card with a title, three stars and a line of text. Every win now gets: a
+ribbon that follows the star rating (Flawless!, Well held!, Victory!); stars
+that land one at a time with a rising bell each; stat chips that count up
+(lives left, foes beaten, waves held); confetti cannons from both corners and
+a drizzle of paper; a warm glow behind the card; and a richer fanfare with a
+sparkle tail. A 3-star win adds three gold fireworks and two more cannon
+bursts, each with a boom.
+
+**The finale (the last level of the campaign, found from `LEVELS`, so it moves
+if a Level 11 is ever added).** The title becomes "The Hollow is healed!" with
+a "Dawn breaks!" ribbon, a shimmering gold logotype, a dawn-glow backdrop and a
+pulsing card. It shows a recap of all ten levels with their stars and a total
+(a perfect 30 gets its own line), and a long synthesized fanfare. Fireworks
+keep launching into the open sky on either side of the card until the screen
+closes, and every burst has its own whistle, boom and crackle, so sound and
+picture stay in step. A separate `sfx.finale()` replaces `sfx.win()` there.
+
+**How it is built.** New `js/celebrate.js` (`Celebrate`, loaded before
+`ui.js`) is one 2D canvas above the card with `pointer-events: none`, so taps
+still reach the buttons. It is visual only: it never touches `GameState`, has
+its own random stream (the balance tests seed `Math.random`), stops itself the
+moment `#end` loses `show`, is capped at about 340 particles, and does nothing
+under `prefers-reduced-motion` (the CSS entrance animations are also off).
+`showEnd` in `ui.js` restarts the entrance animation each time the screen
+opens, but star bells and firework sounds play only for a fresh win (a flag set
+by `gameWon`), not when the pause button reopens the screen. The `lit` class on
+the stars is still set immediately (the stagger is pure CSS delay), so the
+existing star-count checks hold. The card has `max-height` with scrolling as a
+safety net and a compact layout under 460px of height (the finale drops its
+flavor line and the badge stars there; measured 296px of 390 on a phone).
+
+**Caught while building it.** The first pass left the stars dark: a more
+specific selector (`#end.win #stars span`) overrode the lit color. The finale
+card was taller than the screen (733px on 720, 419px on 390), now 553 and 296.
+The first fireworks burst over the title and read as nothing; they now burst in
+the margins beside the card (anywhere in the upper part on narrow screens) and
+are bigger. This sandbox renders at 2 to 3 frames a second under software
+rendering and the loop caps each step at 50ms, so the show runs in slow motion
+here: judge timing on a real device. Eight new harness checks cover the
+ribbon, the counted stats, the non-finale title, a click-through canvas, the
+finale title and recap, ten badges, running fireworks and the card fitting.
+
 **Graphics roadmap**: see `GRAPHICS-ROADMAP.md` for the approved list of
 further graphics work, its priority order, the performance budget and the
 current test status. Read it before starting any graphics task. Its numbered list is the one the

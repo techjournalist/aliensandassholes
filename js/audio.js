@@ -211,10 +211,33 @@ const Audio = (() => {
     tickLast() {
       voice({ type: 'sine', freq: 1320, to: 1320, dur: 0.12, vol: 0.2, cutoff: 5000, jitter: 0 });
     },
-    win() {
-      [523, 659, 784, 1047].forEach((f, i) => voice({ type: 'triangle', freq: f, to: f, dur: i === 3 ? 0.8 : 0.2, vol: 0.26, cutoff: 3000, delay: i * 0.16, jitter: 0 }));
-      [392, 523].forEach((f, i) => voice({ type: 'sawtooth', freq: f, to: f, dur: 0.8, vol: 0.1, cutoff: 1200, delay: 0.48 + i * 0.05, jitter: 0.005 }));
-      noise({ dur: 0.6, vol: 0.1, freq: 7000, q: 0.5, delay: 0.5 });
+    win() {      // a brass fanfare with a sparkle tail over a warm chord
+      [523, 659, 784, 1047].forEach((f, i) => voice({ type: 'triangle', freq: f, to: f, dur: i === 3 ? 1.1 : 0.2, vol: 0.28, cutoff: 3200, delay: i * 0.15, jitter: 0 }));
+      [262, 392, 523].forEach((f, i) => voice({ type: 'sawtooth', freq: f, to: f, dur: 1.1, vol: 0.09, cutoff: 1300, delay: 0.45 + i * 0.03, jitter: 0.004 }));
+      [1568, 1976, 2349, 2637, 3136].forEach((f, i) => voice({ type: 'sine', freq: f, to: f, dur: 0.28, vol: 0.09, cutoff: 6000, delay: 0.7 + i * 0.07, jitter: 0 }));
+      noise({ dur: 0.8, vol: 0.1, freq: 7000, q: 0.5, delay: 0.5 });
+    },
+    star(i = 0) {   // a bell for each star as it lands, rising with every one
+      const f = [784, 988, 1319][i % 3];
+      voice({ type: 'sine', freq: f, to: f, dur: 0.7, vol: 0.26, cutoff: 5000, jitter: 0 });
+      voice({ type: 'triangle', freq: f * 2, to: f * 2, dur: 0.4, vol: 0.1, cutoff: 6000, jitter: 0 });
+      voice({ type: 'sine', freq: f * 3, to: f * 3, dur: 0.18, vol: 0.05, cutoff: 7000, delay: 0.02, jitter: 0 });
+      noise({ dur: 0.1, vol: 0.07, freq: 6500, q: 1.5 });
+    },
+    firework() {    // a rising whistle, a boom and a crackle
+      voice({ type: 'sine', freq: 520 + Math.random() * 200, to: 1700, dur: 0.28, vol: 0.07, cutoff: 5000, key: 'firework', gap: 0.12, jitter: 0 });
+      noise({ dur: 0.55, vol: 0.2, freq: 2600, to: 500, q: 0.6, delay: 0.28 });
+      voice({ type: 'triangle', freq: 130, to: 55, dur: 0.35, vol: 0.2, cutoff: 500, delay: 0.28, jitter: 0 });
+      for (let i = 0; i < 5; i++) noise({ dur: 0.03, vol: 0.09, freq: 4500 + Math.random() * 2500, q: 2, delay: 0.5 + i * 0.07 + Math.random() * 0.05 });
+    },
+    finale() {   // the campaign is won: two rising phrases, a held chord and a bell run
+      const phrase = (notes, t0, last) => notes.forEach((f, i) => voice({ type: 'triangle', freq: f, to: f, dur: i === notes.length - 1 ? last : 0.2, vol: 0.28, cutoff: 3400, delay: t0 + i * 0.17, jitter: 0 }));
+      phrase([392, 523, 659, 784], 0, 0.6);
+      phrase([523, 659, 784, 1047, 1319], 1.1, 1.6);
+      [[262, 330, 392], [330, 392, 523], [392, 523, 659]].forEach((ch, k) => ch.forEach((f) => voice({ type: 'sawtooth', freq: f, to: f, dur: k === 2 ? 2.4 : 1.0, vol: 0.075, cutoff: 1400, delay: k === 2 ? 2.0 : k * 1.1 + 0.4, jitter: 0.004 })));
+      [1319, 1568, 1976, 2349, 2637, 3136, 2637, 3136, 3951].forEach((f, i) => voice({ type: 'sine', freq: f, to: f, dur: 0.45, vol: 0.09, cutoff: 7000, delay: 2.2 + i * 0.13, jitter: 0 }));
+      noise({ dur: 1.6, vol: 0.12, freq: 7000, q: 0.5, delay: 1.9 });
+      voice({ type: 'triangle', freq: 98, to: 98, dur: 2.6, vol: 0.2, cutoff: 400, delay: 2.0, jitter: 0 });
     },
     lose() {
       [330, 311, 294, 220].forEach((f, i) => voice({ type: 'sawtooth', freq: f, to: f * 0.97, dur: i === 3 ? 1.0 : 0.3, vol: 0.18, cutoff: 1100, delay: i * 0.28, jitter: 0.005 }));
@@ -359,7 +382,7 @@ const Audio = (() => {
     GameState.on('enemyKilled', (e) => { if (e.boss) sfx.bossDeath(); else sfx.death(); sfx.gold(); });
     GameState.on('enemyLeaked', () => sfx.leak());
     GameState.on('endpointStateChanged', () => sfx.crumble());
-    GameState.on('gameWon', () => sfx.win());
+    GameState.on('gameWon', () => { if (LEVELS.some((l) => l.index === GameState.currentLevel().index + 1)) sfx.win(); else sfx.finale(); });
     GameState.on('gameLost', () => sfx.lose());
     GameState.on('paused', () => { if (ctx && ctx.state === 'running') ctx.suspend(); });
     GameState.on('resumed', () => { if (ctx && ctx.state === 'suspended') ctx.resume(); });

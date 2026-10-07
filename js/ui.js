@@ -177,17 +177,51 @@ const UI = (() => {
     }
   }
 
+  // A win has just happened (not a reopened end screen): play the star
+  // bells and firework sounds once, not every time the screen comes back.
+  let celebrateFresh = false;
+  function countUp(el, to, ms, delay) {
+    el.textContent = '0';
+    if (!to || reducedMotion()) { el.textContent = String(to); return; }
+    const t0 = performance.now() + delay;
+    const tick = (now) => {
+      if (!el.isConnected) return;
+      const k = Math.max(0, Math.min(1, (now - t0) / ms));
+      el.textContent = String(Math.round(to * (1 - (1 - k) ** 3)));
+      if (k < 1) requestAnimationFrame(tick); else el.textContent = String(to);
+    };
+    requestAnimationFrame(tick);
+  }
+  const RIBBON = { 3: 'Flawless!', 2: 'Well held!', 1: 'Victory!' };
+  function fillFinale() {
+    const data = Progress.load().levels;
+    let total = 0;
+    const badges = LEVELS.map((lv) => {
+      const n = (data[lv.id] && data[lv.id].stars) || 0;
+      total += n;
+      return `<div class="fb" title="${lv.name}"><b>${lv.index}</b><i>${[1, 2, 3].map((k) => `<span class="${k <= n ? 'on' : ''}">&#9733;</span>`).join('')}</i></div>`;
+    });
+    const max = LEVELS.length * 3;
+    $('finale-line').textContent = 'The last shadow-bloom has withered. Light pours back into every cracked stump and the whole valley wakes to a fine, warm morning.';
+    $('finale-badges').innerHTML = badges.join('');
+    $('finale-total').textContent = total === max
+      ? `${total} of ${max} stars. A perfect campaign. Every Bastion stood untouched.`
+      : `${total} of ${max} stars across the campaign. Replay any level to earn the rest.`;
+  }
   function showEnd(won) {
     const s = GameState.state, level = GameState.currentLevel();
-    $('end-title').textContent = won ? `${level.endpoint.properName} holds!` : `${level.endpoint.properName} has fallen`;
+    // Right after a win, the next level is already unlocked: offer to
+    // continue straight to it instead of a generic "pick something" label.
+    const next = LEVELS.find((l) => l.index === level.index + 1);
+    const finale = won && !next;     // the last level of the campaign gets the big one
+    const end = $('end');
+    $('end-title').textContent = finale ? 'The Hollow is healed!' : won ? `${level.endpoint.properName} holds!` : `${level.endpoint.properName} has fallen`;
     const stars = won ? GameState.stars() : 0;
     const text = won ? level.endScreenText[stars](s) : level.endScreenText.lose(s);
     $('end-text').textContent = text;
     $('stars').classList.toggle('show', won);
     $('stars').querySelectorAll('span').forEach((el, i) => el.classList.toggle('lit', i < stars));
-    // Right after a win, the next level is already unlocked: offer to
-    // continue straight to it instead of a generic "pick something" label.
-    const next = LEVELS.find((l) => l.index === level.index + 1);
+    $('end-ribbon-text').textContent = finale ? 'Dawn breaks!' : (RIBBON[stars] || 'Victory!');
     const mapBtn = $('end-map-btn');
     if (won && next) {
       mapBtn.textContent = 'Continue';
@@ -196,7 +230,24 @@ const UI = (() => {
       mapBtn.textContent = 'Choose another battle';
       delete mapBtn.dataset.nextLevel;
     }
-    $('end').classList.add('show');
+    if (finale) fillFinale();
+    // restart the entrance animations each time the screen opens
+    end.classList.toggle('win', won);
+    end.classList.toggle('finale', finale);
+    end.classList.remove('show');
+    void end.offsetWidth;
+    end.classList.add('show');
+    if (won) {
+      const fresh = celebrateFresh; celebrateFresh = false;
+      countUp($('stat-lives'), s.lives, 900, 700);
+      countUp($('stat-kills'), s.kills || 0, 1100, 800);
+      countUp($('stat-waves'), GameState.totalWaves(), 700, 900);
+      Celebrate.start({ mode: finale ? 'finale' : 'win', stars, onBurst: fresh && finale ? () => { try { Audio.sfx.firework(); } catch (e) { /* audio is optional */ } } : null });
+      if (fresh) {
+        for (let i = 0; i < stars; i++) setTimeout(() => { if (end.classList.contains('show')) { try { Audio.sfx.star(i); } catch (e) { /* audio is optional */ } } }, 800 + i * 450);
+        if (stars === 3 && !finale) for (let i = 0; i < 3; i++) setTimeout(() => { if (end.classList.contains('show')) { try { Audio.sfx.firework(); } catch (e) { /* audio is optional */ } } }, 900 + i * 700);
+      }
+    } else Celebrate.stop();
   }
   function waveBanner(n) {
     const info = GameState.waveInfo(n);
@@ -618,6 +669,7 @@ const UI = (() => {
     });
     GameState.on('enemyKilled', (e) => floater(e.x, 0.9, e.z, `+${e.bounty}`, 'gold'));
     GameState.on('gameWon', () => {
+      celebrateFresh = true;
       firstWin = Progress.starsFor(GameState.currentLevel().id) === 0 ? GameState.currentLevel().id : null;
       Progress.recordWin(GameState.currentLevel().id, GameState.stars(), GameState.state.lives);
       // only if the result still stands when the timer fires (a stale

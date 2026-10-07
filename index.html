@@ -259,7 +259,7 @@
   #stars span.lit { color: var(--gold); text-shadow: 0 3px 0 var(--ink); animation: starpop 0.5s cubic-bezier(0.3, 1.6, 0.5, 1) forwards; opacity: 1; }
   #stars span.lit:nth-child(2) { animation-delay: 0.25s; }
   #stars span.lit:nth-child(3) { animation-delay: 0.5s; }
-  @keyframes starpop { 0% { transform: scale(0.2) rotate(-30deg); } 100% { transform: scale(1) rotate(0); } }
+  @keyframes starpop { 0% { transform: scale(0.2) rotate(-30deg); opacity: 0; } 100% { transform: scale(1) rotate(0); opacity: 1; } }
   #tip {
     position: absolute; display: none; pointer-events: none; transform: translate(-50%, 0);
     align-items: center; flex-direction: column; gap: 2px;
@@ -573,6 +573,78 @@
     .set-sub { display: none; }
   }
   @media (prefers-reduced-motion: reduce) { .switch, .switch .knob { transition: none; } }
+
+  /* ---- victory screens: ribbon, staggered stars, stats, confetti, the finale ---- */
+  #celebrate { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 2; }
+  #end .card { position: relative; z-index: 1; max-height: calc(100vh - 16px); overflow-y: auto; overscroll-behavior: contain; }
+  #end.win { background: radial-gradient(ellipse at 50% 38%, rgba(242, 193, 78, 0.2), rgba(27, 20, 16, 0.74) 68%); }
+  #end.win .card { animation: endpop 0.6s cubic-bezier(0.3, 1.45, 0.5, 1) both; box-shadow: 0 8px 0 rgba(0, 0, 0, 0.45), var(--trim), 0 0 90px rgba(242, 193, 78, 0.35); }
+  @keyframes endpop { 0% { transform: translateY(28px) scale(0.84); opacity: 0; } 100% { transform: none; opacity: 1; } }
+  #end-ribbon { display: none; align-items: center; gap: 10px; padding: 5px 20px 6px; margin: 0 0 4px; border: 3px solid var(--ink); border-radius: 12px;
+    background: linear-gradient(180deg, #ffe08a, var(--gold) 55%, #d89a2a); color: var(--ink); font-size: 20px; font-weight: 900; letter-spacing: 3px; text-transform: uppercase;
+    box-shadow: 0 4px 0 var(--ink), inset 0 2px 0 rgba(255, 255, 255, 0.6); transform: rotate(-1.5deg); }
+  #end.win #end-ribbon { display: inline-flex; animation: ribbonin 0.7s 0.2s cubic-bezier(0.3, 1.6, 0.5, 1) both; }
+  #end-ribbon .rb-star { font-size: 16px; color: #8a6420; }
+  @keyframes ribbonin { 0% { transform: scale(0.2) rotate(-14deg); opacity: 0; } 100% { transform: rotate(-1.5deg); opacity: 1; } }
+  #end.win #stars { gap: 12px; font-size: clamp(50px, 9vw, 68px); margin: 4px 0 12px; }
+  #end.win #stars span { color: #54483d; transform: scale(0.8); opacity: 0.55; text-shadow: 0 3px 0 var(--ink); }
+  #end.win #stars span.lit { color: var(--gold); opacity: 0; animation: starpop 0.55s cubic-bezier(0.3, 1.9, 0.5, 1) both; text-shadow: 0 3px 0 var(--ink), 0 0 26px rgba(242, 193, 78, 0.9); }
+  #end.win #stars span.lit:nth-child(1) { animation-delay: 0.75s; }
+  #end.win #stars span.lit:nth-child(2) { animation-delay: 1.2s; }
+  #end.win #stars span.lit:nth-child(3) { animation-delay: 1.65s; }
+  #end-stats { display: none; justify-content: center; gap: 10px; margin: 0 0 14px; flex-wrap: wrap; }
+  #end.win #end-stats { display: flex; animation: statsin 0.5s 0.5s ease-out both; }
+  @keyframes statsin { 0% { transform: translateY(10px); opacity: 0; } 100% { transform: none; opacity: 1; } }
+  .stat { min-width: 96px; padding: 8px 12px 7px; border: 2px solid rgba(242, 193, 78, 0.55); border-radius: 12px; background: rgba(0, 0, 0, 0.3); }
+  .stat b { display: block; font-size: 28px; line-height: 1.1; color: var(--gold); font-variant-numeric: tabular-nums; text-shadow: 0 2px 0 var(--ink); }
+  .stat span { font-size: 11px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; opacity: 0.8; }
+  /* the Level 10 finale */
+  #finale { display: none; margin: 0 0 12px; }
+  #end.finale #finale { display: block; animation: statsin 0.6s 1.9s ease-out both; }
+  #end.finale #stars { font-size: clamp(40px, 7vw, 52px); margin: 0 0 8px; }
+  #end.finale .stat { padding: 5px 10px 4px; }
+  #end.finale .stat b { font-size: 24px; }
+  #end.finale #end-stats { margin-bottom: 10px; }
+  #end.finale .stakes { font-size: 16px; margin-bottom: 12px; }
+  #finale-line { margin: 0 auto 8px; max-width: 520px; font-size: 16px; line-height: 1.45; font-style: italic; color: var(--cream); }
+  #finale-badges { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin-bottom: 8px; }
+  .fb { width: 48px; padding: 4px 0 3px; border: 2px solid rgba(242, 193, 78, 0.5); border-radius: 10px; background: rgba(0, 0, 0, 0.3); }
+  .fb b { display: block; font-size: 14px; line-height: 1.2; color: var(--cream); }
+  .fb i { display: block; font-style: normal; font-size: 12px; line-height: 1.1; letter-spacing: 1px; color: #54483d; }
+  .fb i .on { color: var(--gold); text-shadow: 0 0 6px rgba(242, 193, 78, 0.8); }
+  #finale-total { margin: 0; font-size: 15px; font-weight: 800; letter-spacing: 0.5px; color: var(--gold); }
+  #end.finale { background: radial-gradient(ellipse at 50% 24%, rgba(255, 226, 150, 0.4), rgba(120, 60, 140, 0.34) 38%, rgba(27, 20, 16, 0.84) 76%); }
+  #end.finale .card { max-width: 700px; padding-top: 20px; padding-bottom: 20px; border-width: 4px; animation: endpop 0.9s cubic-bezier(0.25, 1.3, 0.5, 1) both, finaleglow 3.2s 1s ease-in-out infinite; }
+  @keyframes finaleglow { 0%, 100% { box-shadow: 0 8px 0 rgba(0, 0, 0, 0.45), var(--trim), 0 0 70px rgba(242, 193, 78, 0.35); } 50% { box-shadow: 0 8px 0 rgba(0, 0, 0, 0.45), var(--trim), 0 0 130px rgba(255, 214, 120, 0.7); } }
+  #end.finale h1 { font-size: clamp(30px, 5.2vw, 48px); margin: 2px 0 6px; white-space: nowrap; background: linear-gradient(100deg, #ffd25a 0%, #fff6d0 38%, #ffd25a 52%, #f2a93a 100%); background-size: 220% 100%;
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; text-shadow: none;
+    filter: drop-shadow(0 3px 0 #1b1410) drop-shadow(0 8px 14px rgba(0, 0, 0, 0.5)); animation: shine 3.4s linear infinite; }
+  @keyframes shine { 0% { background-position: 120% 0; } 100% { background-position: -100% 0; } }
+  #end.finale #end-ribbon { background: linear-gradient(180deg, #ffd0ee, #e68bd2 55%, #b95fb0); }
+  @media (max-height: 460px) {
+    #end.win .card { padding-top: 10px; }
+    #end-ribbon { font-size: 15px; padding: 2px 14px 3px; letter-spacing: 2px; }
+    #end.win #stars { font-size: 38px; margin: 0 0 6px; }
+    #end-stats { gap: 6px; margin-bottom: 8px; }
+    .stat { min-width: 80px; padding: 4px 8px 3px; }
+    .stat b { font-size: 20px; }
+    #finale { margin-bottom: 6px; }
+    #finale-line { font-size: 14px; margin-bottom: 6px; }
+    .fb { width: 38px; padding: 2px 0; }
+    .fb b { font-size: 12px; }
+    #finale-total { font-size: 13px; }
+    #end.finale h1 { font-size: 26px; white-space: normal; }
+    #end.finale .card { padding-top: 8px; padding-bottom: 8px; }
+    #end.finale #stars { font-size: 30px; margin: 0 0 4px; }
+    #end.finale .stakes { display: none; }
+    #finale-line { display: none; }
+    .fb i { display: none; }
+    .fb { width: 30px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #end.win .card, #end.finale .card, #end-ribbon, #end-stats, #finale, #end.finale h1 { animation: none !important; }
+    #end.win #stars span.lit { animation: none !important; opacity: 1; }
+  }
 </style>
 </head>
 <body>
@@ -720,9 +792,21 @@
 </div>
 
 <div id="end" class="screen">
+  <canvas id="celebrate" aria-hidden="true"></canvas>
   <div class="card">
+    <div id="end-ribbon" aria-hidden="true"><span class="rb-star">&#9733;</span><span id="end-ribbon-text">Victory!</span><span class="rb-star">&#9733;</span></div>
     <h1 id="end-title">The Bastion holds!</h1>
     <div id="stars"><span>&#9733;</span><span>&#9733;</span><span>&#9733;</span></div>
+    <div id="end-stats">
+      <div class="stat"><b id="stat-lives">0</b><span>Lives left</span></div>
+      <div class="stat"><b id="stat-kills">0</b><span>Foes beaten</span></div>
+      <div class="stat"><b id="stat-waves">0</b><span>Waves held</span></div>
+    </div>
+    <div id="finale">
+      <p id="finale-line"></p>
+      <div id="finale-badges"></div>
+      <p id="finale-total"></p>
+    </div>
     <p id="end-text" class="stakes"></p>
     <div class="row">
       <button id="restart-btn" type="button">Play again</button>
@@ -792,6 +876,7 @@
 <script src="js/renderer-fx.js"></script>
 <script src="js/renderer.js"></script>
 <script src="js/input.js"></script>
+<script src="js/celebrate.js"></script>
 <script src="js/title-art.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/audio.js"></script>
