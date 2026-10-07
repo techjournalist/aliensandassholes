@@ -1555,6 +1555,19 @@ synthetic two-finger pinch zooms and selects nothing; screenshots at both ends.
 Twelve new harness checks cover these. Not done: saving the zoom, a zoom
 indicator, and a double-tap to reset (0 and zooming out do the job).
 
+**Found by the full run, not by zoom.** The full harness's random Level 10
+mixed-bot run lost once (20 lives, the boss wave leaked 5). The bots run in pure
+game logic, so zoom could not touch them. The seeded runner put Level 10 at 56
+of 60 wins (93%, 7.1 lives) with the Heartbloom leaking in 11 of 30 runs at the
+same 16% hp every time: a damage ceiling again (a leak costs 5 lives, the defense
+reaches wave 13 with about 7). The Heartbloom's base hp went from 200 to 150 (240
+at wave 13): 0 leaks in 40 runs, 80 of 80 won, 8.2 lives. A phone-size touch-tap
+check also failed once in that same run: leaving the title snaps the camera from
+its title zoom to 1 on the next rendered frame, and under software rendering that
+frame can be seconds away, so a tile measured before it and tapped after it was
+about 15px off. The first desktop and phone taps now wait for the camera to
+settle (a harness fix; a person cannot tap inside the first frame).
+
 **Graphics roadmap**: see `GRAPHICS-ROADMAP.md` for the approved list of
 further graphics work, its priority order, the performance budget and the
 current test status. Read it before starting any graphics task. Its numbered list is the one the
