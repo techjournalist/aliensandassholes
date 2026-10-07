@@ -1382,3 +1382,5 @@ current test status. Read it before starting any graphics task. Its numbered lis
 user was given in chat and is authoritative.
 
 **Endless mode, difficulty tiers and daily run**: designed, not built. See `ENDLESS-MODE.md` for the plan, build order, save-format notes and itch.io and Steam hosting notes. Read it before starting any of that work.
+
+**What is left to do**: see `NEXT-STEPS.md` for the current open items in priority order and the working notes from the last long session. Read it at the start of a new chat.
