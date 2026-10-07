@@ -1,13 +1,17 @@
 # Next steps (handoff for a new chat)
 
-Written 2026-10-07 at the end of a long session. Branch: `graphics-pass-units-tiers`
-(all work is committed and pushed; nothing is merged to `main`). Playable build:
+Written 2026-10-07 at the end of a long session, updated after the curving roads
+work. Branches: `graphics-pass-units-tiers` (the graphics and levels 9 and 10 work)
+and `claude/fervent-wright-jeojom` (that plus curving roads on Levels 1 to 8). All work
+is committed and pushed; nothing is merged to `main`. Playable build:
 artifact `https://claude.ai/artifact/TGe33pgijELWBrzFao13TR` (version 14).
 Read `AGENTS.md` first, then the file named in each item below.
 
 ## State of the game
-- 10 levels, each with a finale boss except Level 2. Levels 9 and 10 (the dawn
-  levels) use `curvyRoads` and `js/dawn-kit.js`.
+- 10 levels, each with a finale boss except Level 2. All 10 use `curvyRoads`.
+  Levels 9 and 10 (the dawn levels) also use `js/dawn-kit.js`. Levels 1 to 8 set
+  `curveKeepsPace`, so walkers slow to match the shorter curved road (AGENTS.md
+  P3-V12).
 - Diorama look: sRGB + ACES color pipeline, toon lighting patch, violet baked cast
   shadows, softer glow, haze gradient, resolution governor (AGENTS.md P3-V11).
 - World map has a bridge where roads cross (hills, mountain shadows and a river
@@ -33,9 +37,9 @@ Read `AGENTS.md` first, then the file named in each item below.
 5. **Endless mode, then the daily run.** `ENDLESS-MODE.md` sections 2 and 3.
 6. **New enemies:** Spore-Medic, Sapper, Digger (one each for Levels 8, 9 and 10).
    Pod-Bearer and Magpie were dropped by the user. `ENDLESS-MODE.md` section 7.
-7. **Curving roads on Levels 1 to 8.** The `curvyRoads` flag is ready; each level
-   needs its waves retuned afterward because the curve shortens the path and shifts
-   tower coverage. The user clearly likes curved roads.
+7. ~~Curving roads on Levels 1 to 8.~~ **Done** (AGENTS.md P3-V12). Level 3 plays a
+   little easier than before (14 lives against 10 in seeded bot runs). Tune it
+   if it feels too easy.
 8. **Player spells** (Call the Burrow Guard, Bramble Burst): designed in
    `AGENTS.md` (M6) but the user paused them. Only start if asked.
 9. **Smaller items:** a boss for Level 2; hero unit (M10); a colorblind check on

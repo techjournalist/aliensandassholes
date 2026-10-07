@@ -1376,6 +1376,61 @@ still alive ("N coming"), so a tap during a wave does nothing by design; if
 players expect to call the next wave early, that is a design change (call
 early for a gold bonus), not a bug.
 
+**P3-V12 - Curving roads on Levels 1 to 8** *(on branch
+`claude/fervent-wright-jeojom`, user-requested: NEXT-STEPS item 7)*. Every
+level now sets `curvyRoads: true`, so the road is a smooth ribbon and enemies
+walk the curve. Screenshots of all eight levels were checked: bridges and
+crossings line up with the ribbon and no prop sits on the road.
+
+**Pace compensation (new engine flag `curveKeepsPace`).** Rounding corners
+shortens a road by 11% to 17%, so enemies spent less time in tower range and
+every level got harder (seeded bot runs: Level 2 from 7.2 lives to 4.9, Level 3
+lost 7 of 30, Levels 6 and 8 lost every run). Instead of retuning eight wave
+tables by hand, each route now has `pace = curved length / straight length`
+and enemies move at `speed * pace`. Time from spawn to gate is the same as on
+the straight road, so the tuned wave tables and boss margins stay valid.
+Levels 1 to 8 set the flag. Levels 9 and 10 do not (they were tuned on their
+curves). `tools/validate-levels.js` proves it: a grunt takes the same time on
+the curved and straight version of every route (within 1%).
+
+**Long legs.** Chaikin rounding cuts a bigger corner when the legs are long.
+Elderroot Ward (legs up to 11 cells) and Frostpine's Scree Path cut 1.12 and
+0.94 cells off their cells, past the 0.75 rule, so the road ribbon would have
+crossed build plots. Collinear waypoints on the long legs fix it with no change
+to the shape or the cells. Keep runs under about 5 cells on any new curvy level.
+New validator checks cover curve deviation, exact spawn and gate ends, and
+walking time for every curvy level (284 checks).
+
+**Balance (seeded bot runs, 30 to 60 per level, browser and vm runner agreed on
+the same seeds).** With pace compensation Levels 1, 2, 5, 7 and 8 match their
+straight-road results. Level 3 is a little easier than before (14 lives
+against 10), left as is. Level 4 lost about 5 of 30 runs at waves 10 and 11,
+so those two waves lost one or two units each (59 of 60 won, 5.6 lives, was
+5.8). Level 6 was already failing on straight roads on this branch (3 of 30
+won), which is why the full harness kept losing it and locking Levels 7 to 10.
+Waves 4, 9, 10, 11 and 12 were eased and the Drowned Swarm boss softened to
+hp 360 and speed 0.62: it leaked at about 53% hp in every run, even on straight
+roads, because Level 6 has the shortest roads and the boss spends too little
+time in range. Now 60 of 60 won, 9.4 lives, boss leaks 1 run in 30 (9 hp short).
+The single-tower-type stress test (5 types x 2 branches) tops out at 7 of 10
+clean waves on Level 2 and never wins a level alone, so no dominant strategy.
+Lesson that repeated: a boss that leaks at the same hp in every run is a
+damage ceiling, not bad luck. Measure its hp at the leak before touching waves.
+
+**Fixed along the way.** The first full harness pass with Level 6 beatable
+reached Levels 7 to 10 for the first time in a while and found three older
+issues: the world map reclaim animation could set a negative circle radius
+(the frame timestamp can precede `performance.now()` by a few ms, now clamped,
+a real console error); the safety-net check waited a fixed 2.3s but the net
+needs 1.5s of wall-clock plus slow software frames (measured 0.8 to 2.8s, now
+waits up to 15s); and the Level 1 spread check expected 6 path units after 9s,
+which a 0.86 pace makes 5.2 (now > 5).
+
+**Browser-free bot runner.** A seeded runner (the harness bot logic over
+the real `GameState` in a Node `vm`, about a second per 30 runs) replaces slow
+browser runs for tuning. Scratchpad only, not committed. It matched the
+browser on frostpine-camp and sunken-market over 30 identical seeds.
+
 **Graphics roadmap**: see `GRAPHICS-ROADMAP.md` for the approved list of
 further graphics work, its priority order, the performance budget and the
 current test status. Read it before starting any graphics task. Its numbered list is the one the

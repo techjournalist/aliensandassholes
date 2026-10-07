@@ -382,7 +382,7 @@ const UI = (() => {
     cut.setAttribute('r', 0);
     const step = (now) => {
       if (!cut.isConnected) return;
-      const k = Math.min(1, (now - t0) / dur), e = 1 - (1 - k) ** 3;
+      const k = Math.max(0, Math.min(1, (now - t0) / dur)), e = 1 - (1 - k) ** 3;   // the frame timestamp can precede t0 by a few ms
       cut.setAttribute('r', (full * e).toFixed(1));
       if (k < 1) requestAnimationFrame(step);
     };
