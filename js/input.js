@@ -2,13 +2,15 @@
 // Input  (Pointer Events: mouse and touch share one path, handleTap)
 //   A short press with little movement is a tap (place or select).
 //   Dragging pans the view when it is zoomed in, two fingers pinch to zoom
-//   and the wheel (or a trackpad pinch) zooms toward the pointer.
+//   (and swipe up or down to tilt the camera), the wheel (or a trackpad
+//   pinch) zooms toward the pointer and a right-button drag tilts it.
 // ===================================================================
 const Input = (() => {
   let down = null, lastTap = -1e9;
   const TAP_SLOP = 12;   // px of movement still counted as a tap
   const pts = new Map(); // every pointer currently pressed: id -> { x, y }
   let pinchDist = 0, dragging = false;
+  let swipeAcc = 0, swiping = false;   // two-finger vertical travel; a pinch's small drift must not tilt
 
   const playing = () => GameState.state.phase === 'playing';
 
@@ -27,8 +29,8 @@ const Input = (() => {
     canvas.addEventListener('pointerdown', (e) => {
       Audio.unlock();
       pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      if (pts.size === 1) { down = { x: e.clientX, y: e.clientY, id: e.pointerId }; dragging = false; }
-      else { down = null; pinchDist = pts.size === 2 ? pair().d : 0; }   // a second finger makes it a pinch, never a tap
+      if (pts.size === 1) { down = { x: e.clientX, y: e.clientY, id: e.pointerId, tilt: e.button === 2 }; dragging = false; }
+      else { down = null; pinchDist = pts.size === 2 ? pair().d : 0; swipeAcc = 0; swiping = false; }   // a second finger makes it a pinch, never a tap
       if (canvas.setPointerCapture) { try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* older browsers */ } }
     });
     canvas.addEventListener('pointermove', (e) => {
@@ -41,11 +43,18 @@ const Input = (() => {
       if (pts.size === 2 && before && pinchDist > 0) {
         const now = pair();
         Renderer.zoomAt(now.d / pinchDist, now.cx, now.cy);
-        Renderer.panBy(now.cx - before.cx, now.cy - before.cy);
+        // swiping both fingers down looks more from above, up lowers the camera
+        swipeAcc += now.cy - before.cy;
+        if (!swiping && Math.abs(swipeAcc) > 14) swiping = true;
+        if (swiping) Renderer.tiltBy((now.cy - before.cy) * 0.25, true);
+        Renderer.panBy(now.cx - before.cx, 0);
         pinchDist = now.d;
       } else if (pts.size === 1 && down && down.id === e.pointerId) {
-        if (!dragging && Math.hypot(e.clientX - down.x, e.clientY - down.y) > TAP_SLOP) dragging = true;
-        if (dragging) Renderer.panBy(dx, dy);
+        if (down.tilt) Renderer.tiltBy(dy * 0.25, true);    // right-button drag: down looks more from above
+        else {
+          if (!dragging && Math.hypot(e.clientX - down.x, e.clientY - down.y) > TAP_SLOP) dragging = true;
+          if (dragging) Renderer.panBy(dx, dy);
+        }
       }
     });
     const release = (e) => {
@@ -55,9 +64,9 @@ const Input = (() => {
     canvas.addEventListener('pointerup', (e) => {
       release(e);
       if (!down || down.id !== e.pointerId) return;
-      const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y);
+      const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y), wasTilt = down.tilt;
       down = null;
-      if (moved <= TAP_SLOP) { lastTap = performance.now(); handleTap(e.clientX, e.clientY); }
+      if (!wasTilt && moved <= TAP_SLOP) { lastTap = performance.now(); handleTap(e.clientX, e.clientY); }
     });
     canvas.addEventListener('pointercancel', (e) => { release(e); down = null; });
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());

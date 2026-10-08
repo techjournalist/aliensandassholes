@@ -312,6 +312,52 @@ async function enterLevel(page, levelId) {
   check('zoom ends back at the default so later checks are unaffected', await (async () => { const l = await lookNow(); return Math.abs(l.zoom - 1) < 0.003 && Math.abs(l.cam - 1) < 0.003; })());
   await page.evaluate(() => GameState.clearSelection && GameState.clearSelection());
 
+  // ---- P3-V16: the player can tilt the camera ----
+  const tiltDone = () => page.waitForFunction(() => !Renderer.tiltTurning() && !Renderer.viewTurning(), null, { timeout: 30000 }).then(() => true, () => false);
+  const camNow = () => page.evaluate(() => Renderer.debugCamera());
+  const pickOk = () => page.evaluate(() => [[7, 5], [3, 3], [12, 7]].every(([c, r]) => { const p = Renderer.worldToScreen(GameState.worldX(c), 0, GameState.worldZ(r)); const h = Renderer.screenToCell(p.x, p.y); return h && h.c === c && h.r === r; }));
+  check('tilt buttons are 44px targets', await page.evaluate(() => ['tilt-up-btn', 'tilt-down-btn'].every((id) => { const r = document.getElementById(id).getBoundingClientRect(); return r.width >= 44 && r.height >= 44; })));
+  const t0 = await camNow();
+  await page.locator('#tilt-down-btn').click(); await tiltDone();
+  check('the lower button lowers the camera by one step', t0.tilt === 50 && Math.abs((await camNow()).tilt - 44) < 1e-6, JSON.stringify({ from: t0.tilt, to: (await camNow()).tilt }));
+  for (let i = 0; i < 12; i++) await page.locator('#tilt-down-btn').click();
+  await tiltDone();
+  check('the camera cannot go lower than 30 degrees', Math.abs((await camNow()).tilt - 30) < 1e-6 && await pickOk());
+  for (let i = 0; i < 25; i++) await page.locator('#tilt-up-btn').click();
+  await tiltDone();
+  check('the camera cannot go higher than 80 degrees, and picking is right there too', Math.abs((await camNow()).tilt - 80) < 1e-6 && await pickOk());
+  check('the tilt is remembered', await page.evaluate(() => localStorage.getItem('bb-tilt')) === '80');
+  await page.keyboard.press('0'); await tiltDone();
+  const tr = await camNow();
+  check('the 0 key puts the tilt (and its fog distance) back to the start', Math.abs(tr.tilt - t0.tilt) < 0.01 && Math.abs(tr.fogNear - t0.fogNear) < 0.01, JSON.stringify({ tr, t0 }));
+  await page.keyboard.press('['); await tiltDone(); const tk1 = (await camNow()).tilt;
+  await page.keyboard.press(']'); await page.keyboard.press(']'); await tiltDone();
+  check('the [ and ] keys tilt the camera down and up', Math.abs(tk1 - 44) < 1e-6 && Math.abs((await camNow()).tilt - 56) < 1e-6);
+  await page.keyboard.press('0'); await tiltDone();
+  const tsel = await page.evaluate(() => JSON.stringify(GameState.state.selected));
+  await page.mouse.move(640, 400); await page.mouse.down({ button: 'right' }); await page.mouse.move(640, 480, { steps: 6 }); await page.mouse.up({ button: 'right' });
+  await page.waitForTimeout(250);
+  check('a right-button drag tilts the camera and selects nothing', Math.abs((await camNow()).tilt - 70) < 0.5 && tsel === await page.evaluate(() => JSON.stringify(GameState.state.selected)), JSON.stringify((await camNow()).tilt));
+  await page.keyboard.press('0'); await tiltDone();
+  const swipe = (id1, id2, dyEach, n) => page.evaluate(([i1, i2, dy, steps]) => {
+    const c = document.getElementById('game'), ev = (type, id, x, y) => c.dispatchEvent(new PointerEvent(type, { pointerId: id, clientX: x, clientY: y, bubbles: true, pointerType: 'touch' }));
+    ev('pointerdown', i1, 500, 500); ev('pointerdown', i2, 600, 500);
+    for (let i = 1; i <= steps; i++) { ev('pointermove', i1, 500, 500 + i * dy); ev('pointermove', i2, 600, 500 + i * dy); }
+    ev('pointerup', i1, 500, 500 + steps * dy); ev('pointerup', i2, 600, 500 + steps * dy);
+  }, [id1, id2, dyEach, n]);
+  await swipe(41, 42, 1, 6); await page.waitForTimeout(200);
+  check('a small two-finger drift does not tilt', Math.abs((await camNow()).tilt - 50) < 1e-6);
+  await swipe(43, 44, -4, 8); await page.waitForTimeout(200);
+  check('a two-finger swipe up lowers the camera', (await camNow()).tilt < 46, String((await camNow()).tilt));
+  await page.keyboard.press('0'); await tiltDone();
+  await page.locator('#tilt-down-btn').click(); await tiltDone();
+  await page.locator('#rot-right-btn').click(); await turned(); await tiltDone();
+  check('turning the view keeps the tilt, and picking is right in the turned, tilted view', Math.abs((await camNow()).tilt - 44) < 1e-6 && await pickOk());
+  await page.locator('#rot-left-btn').click(); await turned();
+  await page.keyboard.press('0'); await tiltDone(); await page.keyboard.press('0'); await settled();
+  check('tilt ends back at the default so later checks are unaffected', Math.abs((await camNow()).tilt - 50) < 1e-6 && await page.evaluate(() => localStorage.getItem('bb-tilt')) === '50');
+  await page.evaluate(() => GameState.clearSelection && GameState.clearSelection());
+
   // wave: start, watch goblins walk, let them all leak
   await page.locator('#wave-btn').click(); await page.waitForTimeout(200);
   st = await S(page);

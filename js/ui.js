@@ -593,6 +593,10 @@ const UI = (() => {
     const zoomView = (dir) => { Audio.unlock(); try { Audio.sfx.select(); } catch (e) { /* audio is optional */ } Renderer.zoomStep(dir); };
     $('zoom-in-btn').addEventListener('click', () => zoomView(1));
     $('zoom-out-btn').addEventListener('click', () => zoomView(-1));
+    // tilt the camera (higher = looking more from above); right-drag and a two-finger swipe are in input.js
+    const tiltView = (dir) => { Audio.unlock(); try { Audio.sfx.select(); } catch (e) { /* audio is optional */ } Renderer.tiltStep(dir); };
+    $('tilt-up-btn').addEventListener('click', () => tiltView(1));
+    $('tilt-down-btn').addEventListener('click', () => tiltView(-1));
     $('speed-btn').addEventListener('click', () => { Audio.unlock(); GameState.setSpeed(NEXT_SPEED[GameState.state.speed] || 1); });
     GameState.on('paused', () => {
       const s = GameState.state;
@@ -630,8 +634,10 @@ const UI = (() => {
         if (s.phase === 'playing') zoomView(1);
       } else if (e.key === '-' || e.key === '_') {
         if (s.phase === 'playing') zoomView(-1);
+      } else if (e.key === ']' || e.key === '[') {
+        if (s.phase === 'playing') tiltView(e.key === ']' ? 1 : -1);
       } else if (e.key === '0') {
-        if (s.phase === 'playing') Renderer.resetLook();
+        if (s.phase === 'playing') { Renderer.resetLook(); Renderer.resetTilt(); }
       }
     });
     const syncMute = () => { const m = Audio.isMuted(); $('mute-btn').classList.toggle('muted', m); $('mute-btn').querySelector('.icon').innerHTML = m ? '&#128263;' : '&#128266;'; $('mute-btn').setAttribute('aria-label', m ? 'Sound off' : 'Sound on'); };

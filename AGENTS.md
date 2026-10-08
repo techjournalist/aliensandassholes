@@ -1568,6 +1568,45 @@ frame can be seconds away, so a tile measured before it and tapped after it was
 about 15px off. The first desktop and phone taps now wait for the camera to
 settle (a harness fix; a person cannot tap inside the first frame).
 
+**P3-V16 - Camera tilt** *(on branch `claude/fervent-wright-jeojom`,
+user-requested: "adjust the camera tilt")*. The tilt is the camera's elevation
+above the ground, fixed at 50 degrees (`CONFIG.cameraElevation`) until now. The
+player can set it from 30 degrees (the valley seen from the side, units large
+and dramatic) to 80 (nearly straight down, the whole layout at a glance). It
+follows the same pattern as the turn: an eased animation over 0.4s of wall-clock
+time, a drag follows at once, the value is saved under `bb-tilt` (try/catch, the
+default restores if storage is blocked) and the default view is exactly what it
+was, so nothing changes until the player tilts. Picking, framing and the
+camera-facing glows already derived from the camera, and the turn, the zoom and
+the pan all keep working at every tilt (a check turns the view while tilted).
+
+**Controls.** Buttons in the HUD row from 1180px width up (a triangle up for a
+higher camera, down for a lower one); `]` raises and `[` lowers by 6 degrees;
+a right-button drag (down looks more from above); a two-finger vertical swipe on
+touch (down looks more from above), the same gesture map apps use. The swipe
+only counts after 14px of travel, so a pinch's small vertical drift does not
+tilt. The 0 key now resets the zoom, the pan and the tilt together. Right-drag
+never selects a tile. Phones tilt by swipe (the HUD row has no room for
+buttons, see P3-V14). Not done: a tilt indicator, a tilt per level, and a hint
+for the gestures beyond the title card's key line (hidden on touch).
+
+**Two things were tied to the old angle.** The fog starts just past the
+valley's far edge, computed once for 50 degrees; at 30 it would have hazed the
+far rows and at 80 the far rim would never fade into the backdrop. It is now
+refreshed with every turn and tilt as the default distance plus the change in
+the far edge's depth, so the default view keeps its exact value (43.15 on
+Level 1) and a reset returns to it. The near clouds sit high, so at a low tilt
+they project up over the front rows of the valley; their distance now grows with
+the cotangent of the tilt (the same as before at 50).
+
+**Checked.** In a real page on four levels: limits at exactly 30 and 80, picking
+right at both ends, the saved value, a reset that restores the fog distance,
+both keys, right-drag, swipe, pinch drift ignored, no console errors, and
+screenshots at both ends on Levels 1 and 10 (nothing hidden that matters at 30,
+the keep and the brook still read). Twelve new harness checks cover the buttons,
+the step, both limits with picking, saving, the 0 key and its fog distance, the
+keys, right-drag, the drift and the swipe, and turning while tilted.
+
 **Graphics roadmap**: see `GRAPHICS-ROADMAP.md` for the approved list of
 further graphics work, its priority order, the performance budget and the
 current test status. Read it before starting any graphics task. Its numbered list is the one the

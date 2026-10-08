@@ -2281,7 +2281,8 @@ const Renderer = (() => {
       let i = 0;
       for (const c of clouds) {
         const u = ((c.u + t * c.sp + span / 2) % span + span) % span - span / 2;
-        const v = c.far ? ext + 3 + c.vr * 2.5 : -(ext + 6 + c.vr * 2);
+        // near clouds sit high, so at a low tilt they project up over the valley unless they sit further out
+        const v = c.far ? ext + 3 + c.vr * 2.5 : -(ext + 2 + c.y / Math.tan(THREE.MathUtils.degToRad(tilt.deg)) + c.vr * 2);
         for (const pf of c.puffs) {
           const pu = u + pf.dx, pv = v + pf.dz;
           p.set(rx * pu + fx * pv, c.y + pf.dy, rz * pu + fz * pv); sc.set(pf.r * 1.25, pf.r * 0.75, pf.r * 0.9);
@@ -2848,6 +2849,23 @@ const Renderer = (() => {
   // turns; `idx` (0 to 3) is the step, saved so a reload keeps it.
   const VIEW_KEY = 'bb-view';
   const view = { idx: 0, deg: 0, from: 0, to: 0, t: 1, dur: 0.55 };
+  // The tilt is the camera's elevation above the ground: low shows the valley
+  // from the side, high looks nearly straight down. It eases like a turn does,
+  // follows a drag at once, and is saved like the view.
+  const TILT_KEY = 'bb-tilt', TILT_MIN = 30, TILT_MAX = 80, TILT_STEP = 6;
+  const tilt = { deg: 50, from: 50, to: 50, t: 1, dur: 0.4 };
+  const clampTilt = (d) => Math.min(TILT_MAX, Math.max(TILT_MIN, d));
+  function savedTilt() { try { const v = parseFloat(localStorage.getItem(TILT_KEY)); return Number.isFinite(v) ? clampTilt(v) : CONFIG.cameraElevation; } catch (e) { return CONFIG.cameraElevation; } }
+  function saveTilt() { try { localStorage.setItem(TILT_KEY, String(Math.round(tilt.to * 10) / 10)); } catch (e) { /* storage may be blocked */ } }
+  // degrees to add; `instant` follows a drag with no easing
+  function tiltBy(d, instant = false) {
+    const to = clampTilt(tilt.to + d);
+    if (instant) { tilt.deg = tilt.from = tilt.to = to; tilt.t = 1; placeCamera(); fitCamera(); }
+    else { tilt.from = tilt.deg; tilt.to = to; tilt.t = 0; }
+    saveTilt();
+    return tilt.to;
+  }
+  function resetTilt() { return tiltBy(CONFIG.cameraElevation - tilt.to); }
   function savedView() { try { const v = parseInt(localStorage.getItem(VIEW_KEY), 10); return v >= 0 && v < 4 ? v : 0; } catch (e) { return 0; } }
   function saveView() { try { localStorage.setItem(VIEW_KEY, String(view.idx)); } catch (e) { /* storage may be blocked */ } }
   // dir +1 turns the valley clockwise as seen from above, -1 anticlockwise
@@ -2867,16 +2885,36 @@ const Renderer = (() => {
     return view.idx;
   }
   function updateView(dt) {
-    if (view.t >= 1) return;
-    view.t = Math.min(1, view.t + dt / view.dur);
-    view.deg = view.from + (view.to - view.from) * easeS(view.t);
-    if (view.t >= 1) { view.deg = view.to = view.from = view.idx * 90; }   // keep the angle from drifting over many turns
+    if (view.t >= 1 && tilt.t >= 1) return;
+    if (view.t < 1) {
+      view.t = Math.min(1, view.t + dt / view.dur);
+      view.deg = view.from + (view.to - view.from) * easeS(view.t);
+      if (view.t >= 1) { view.deg = view.to = view.from = view.idx * 90; }   // keep the angle from drifting over many turns
+    }
+    if (tilt.t < 1) {
+      tilt.t = Math.min(1, tilt.t + dt / tilt.dur);
+      tilt.deg = tilt.from + (tilt.to - tilt.from) * easeS(tilt.t);
+      if (tilt.t >= 1) tilt.deg = tilt.from = tilt.to;
+    }
     placeCamera();
     fitCamera();
   }
+  // The fog starts just past the valley's far edge. How far that edge is from the
+  // camera depends on the turn and the tilt, so it is refreshed with them; at the
+  // default view it is exactly the distance the look was tuned with.
+  let fogBase = 0, fogRef = 0;
+  const farDepth = (yawDeg, elDeg) => {
+    const y = THREE.MathUtils.degToRad(yawDeg), e = THREE.MathUtils.degToRad(elDeg);
+    return (Math.abs(Math.sin(y)) * cols / 2 + Math.abs(Math.cos(y)) * rows / 2) * Math.cos(e);
+  };
   function placeCamera() {
-    const el = THREE.MathUtils.degToRad(CONFIG.cameraElevation);
+    const el = THREE.MathUtils.degToRad(tilt.deg);
     const yaw = THREE.MathUtils.degToRad(CONFIG.cameraYaw + view.deg);
+    if (scene && scene.fog) {
+      if (!fogRef) { fogBase = scene.fog.near; fogRef = farDepth(CONFIG.cameraYaw, CONFIG.cameraElevation); }
+      scene.fog.near = fogBase + farDepth(CONFIG.cameraYaw + view.deg, tilt.deg) - fogRef;
+      scene.fog.far = scene.fog.near + 7;
+    }
     const dir = new THREE.Vector3(Math.sin(yaw) * Math.cos(el), Math.sin(el), Math.cos(yaw) * Math.cos(el));
     camera.position.copy(dir.multiplyScalar(40));
     camera.lookAt(0, 0, 0);
@@ -3073,6 +3111,7 @@ const Renderer = (() => {
     const fogNear = 40 + (rows / 2 - 0.5) * 0.63;
     scene.fog = new THREE.Fog(vt.backdrop, fogNear, fogNear + 7);
     view.idx = savedView(); view.deg = view.from = view.to = view.idx * 90; view.t = 1;
+    tilt.deg = tilt.from = tilt.to = savedTilt(); tilt.t = 1;
     placeCamera();
     buildGround();
     GameState.currentLevel().buildScene(makeKit());
@@ -3122,5 +3161,5 @@ const Renderer = (() => {
     return { calls: r.calls, triangles: r.triangles };
   }
 
-  return { init, render, resize, zoomAt, zoomStep: (dir) => zoomAt(dir > 0 ? 1.25 : 0.8), panBy, resetLook, zoomLevel: () => look.tz, debugLook: () => ({ zoom: look.zoom, tz: look.tz, px: look.px, py: look.py, tx: look.tx, ty: look.ty, hw: fit.hw, hh: fit.hh, cam: camera.zoom }), ZOOM_MIN, ZOOM_MAX, rotateView, setView, viewIndex: () => view.idx, viewTurning: () => view.t < 1, debugCamera: () => ({ x: camBase.x, y: camBase.y, z: camBase.z, deg: view.deg, idx: view.idx }), setPixelScale, pixelScale: () => pixelScale, screenToCell, worldToScreen, stats, shakeCamera, puff, debugScene: () => scene, debugViews: () => ({ bars: barBack ? barBack.count : -1, enemyViews: enemyViews.size, dying: dying.map((d) => [+d.t.toFixed(3), d.dur]), towerViews: towerViews.size }) };
+  return { init, render, resize, tiltBy, tiltStep: (dir) => tiltBy(dir * TILT_STEP), resetTilt, tiltDeg: () => tilt.to, tiltTurning: () => tilt.t < 1, TILT_MIN, TILT_MAX, zoomAt, zoomStep: (dir) => zoomAt(dir > 0 ? 1.25 : 0.8), panBy, resetLook, zoomLevel: () => look.tz, debugLook: () => ({ zoom: look.zoom, tz: look.tz, px: look.px, py: look.py, tx: look.tx, ty: look.ty, hw: fit.hw, hh: fit.hh, cam: camera.zoom }), ZOOM_MIN, ZOOM_MAX, rotateView, setView, viewIndex: () => view.idx, viewTurning: () => view.t < 1, debugCamera: () => ({ x: camBase.x, y: camBase.y, z: camBase.z, deg: view.deg, idx: view.idx, tilt: tilt.deg, fogNear: scene.fog.near }), setPixelScale, pixelScale: () => pixelScale, screenToCell, worldToScreen, stats, shakeCamera, puff, debugScene: () => scene, debugViews: () => ({ bars: barBack ? barBack.count : -1, enemyViews: enemyViews.size, dying: dying.map((d) => [+d.t.toFixed(3), d.dur]), towerViews: towerViews.size }) };
 })();

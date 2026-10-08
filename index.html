@@ -70,6 +70,8 @@
   @media (max-width: 899px) { #rot-left-btn { display: none; } }
   /* zoom buttons only where the HUD row has room; phones pinch, desktops scroll or use + and - */
   @media (max-width: 999px) { #zoom-in-btn, #zoom-out-btn { display: none; } }
+  /* the tilt buttons need the most room; everywhere else a right-drag or two-finger swipe tilts, and [ and ] */
+  @media (max-width: 1179px) { #tilt-up-btn, #tilt-down-btn { display: none; } }
   #speed-btn { font-weight: 900; font-size: 17px; }
   #speed-btn.fast { color: var(--gold); border-color: var(--gold); }
   #speed-btn.faster { color: #ffb0c8; border-color: #ff8fb3; box-shadow: 0 3px 0 rgba(0, 0, 0, 0.45), 0 0 10px rgba(255, 143, 179, 0.45); }
@@ -669,6 +671,8 @@
     <button id="rot-right-btn" class="pill iconbtn" type="button" aria-label="Turn the view clockwise (E)" title="Turn the view (E)"><span class="icon">&#8635;</span></button>
     <button id="zoom-out-btn" class="pill iconbtn" type="button" aria-label="Zoom out (minus key)" title="Zoom out (-)"><span class="icon">&#8722;</span></button>
     <button id="zoom-in-btn" class="pill iconbtn" type="button" aria-label="Zoom in (plus key)" title="Zoom in (+)"><span class="icon">+</span></button>
+    <button id="tilt-up-btn" class="pill iconbtn" type="button" aria-label="Raise the camera, looking more from above (] key)" title="Camera higher (])"><span class="icon">&#9650;</span></button>
+    <button id="tilt-down-btn" class="pill iconbtn" type="button" aria-label="Lower the camera, looking more from the side ([ key)" title="Camera lower ([)"><span class="icon">&#9660;</span></button>
   </div>
   <button id="wave-btn" type="button"><span id="wave-btn-main">Send the first wave</span><span id="wave-btn-sub" class="sub"></span></button>
   <div id="boss-bar"><div id="boss-name" class="boss-name">Shadow-Crow Swarm</div><div class="boss-track"><div class="boss-fill"></div></div></div>
@@ -795,7 +799,7 @@
       <button id="pause-map-btn" type="button" class="secondary">World map</button>
       <button id="pause-settings-btn" type="button" class="secondary">Settings</button>
     </div>
-    <p class="keys">Desktop: P or Esc pauses. Space sends the next wave. Q and E turn the view. Scroll or pinch to zoom, drag to look around.</p>
+    <p class="keys">Desktop: P or Esc pauses. Space sends the next wave. Q and E turn the view. Scroll or pinch to zoom, drag to look around. [ and ] tilt the camera.</p>
   </div>
 </div>
 
