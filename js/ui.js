@@ -650,6 +650,7 @@ const UI = (() => {
     const setChecked = (btn, on) => btn.setAttribute('aria-checked', on ? 'true' : 'false');
     function syncSettings() {
       const a = Audio.getSettings();
+      setChecked($('set-camui'), !document.body.classList.contains('hide-camui'));
       setChecked($('set-master'), !Audio.isMuted());
       setChecked($('set-sfx'), a.sfxOn);
       setChecked($('set-music'), a.musicOn);
@@ -659,6 +660,15 @@ const UI = (() => {
       $('set-music-vol').disabled = !a.musicOn || Audio.isMuted();
       syncMute();
     }
+    // the camera buttons in the top bar can be hidden; the choice is saved (keys and gestures stay on)
+    const CAMUI_KEY = 'bb-camui';
+    function setCamUi(show, save) {
+      document.body.classList.toggle('hide-camui', !show);
+      setChecked($('set-camui'), show);
+      if (save) { try { localStorage.setItem(CAMUI_KEY, show ? '1' : '0'); } catch (e) { /* storage may be blocked */ } }
+    }
+    try { if (localStorage.getItem(CAMUI_KEY) === '0') setCamUi(false, false); } catch (e) { /* ignore */ }
+    $('set-camui').addEventListener('click', () => { Audio.unlock(); setCamUi(document.body.classList.contains('hide-camui'), true); try { Audio.sfx.select(); } catch (e) { /* audio is optional */ } });
     function openSettings() {
       Audio.unlock();
       // opening it mid-battle pauses first, so the screen never covers a live fight

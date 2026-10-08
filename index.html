@@ -72,6 +72,8 @@
   @media (max-width: 999px) { #zoom-in-btn, #zoom-out-btn { display: none; } }
   /* the tilt buttons need the most room; everywhere else a right-drag or two-finger swipe tilts, and [ and ] */
   @media (max-width: 1179px) { #tilt-up-btn, #tilt-down-btn { display: none; } }
+  /* Settings can hide the camera buttons; the keys and gestures keep working */
+  body.hide-camui .cam-btn { display: none; }
   #speed-btn { font-weight: 900; font-size: 17px; }
   #speed-btn.fast { color: var(--gold); border-color: var(--gold); }
   #speed-btn.faster { color: #ffb0c8; border-color: #ff8fb3; box-shadow: 0 3px 0 rgba(0, 0, 0, 0.45), 0 0 10px rgba(255, 143, 179, 0.45); }
@@ -667,12 +669,12 @@
     <button id="settings-btn" class="pill iconbtn" type="button" aria-label="Settings" title="Settings"><span class="icon">&#9881;</span></button>
     <button id="speed-btn" class="pill iconbtn" type="button" aria-label="Game speed" title="Speed">1&times;</button>
     <button id="pause-btn" class="pill iconbtn" type="button" aria-label="Pause" title="Pause"><span class="icon">&#10074;&#10074;</span></button>
-    <button id="rot-left-btn" class="pill iconbtn" type="button" aria-label="Turn the view anticlockwise (Q)" title="Turn the view (Q)"><span class="icon">&#8634;</span></button>
-    <button id="rot-right-btn" class="pill iconbtn" type="button" aria-label="Turn the view clockwise (E)" title="Turn the view (E)"><span class="icon">&#8635;</span></button>
-    <button id="zoom-out-btn" class="pill iconbtn" type="button" aria-label="Zoom out (minus key)" title="Zoom out (-)"><span class="icon">&#8722;</span></button>
-    <button id="zoom-in-btn" class="pill iconbtn" type="button" aria-label="Zoom in (plus key)" title="Zoom in (+)"><span class="icon">+</span></button>
-    <button id="tilt-up-btn" class="pill iconbtn" type="button" aria-label="Raise the camera, looking more from above (] key)" title="Camera higher (])"><span class="icon">&#9650;</span></button>
-    <button id="tilt-down-btn" class="pill iconbtn" type="button" aria-label="Lower the camera, looking more from the side ([ key)" title="Camera lower ([)"><span class="icon">&#9660;</span></button>
+    <button id="rot-left-btn" class="pill iconbtn cam-btn" type="button" aria-label="Turn the view anticlockwise (Q)" title="Turn the view (Q)"><span class="icon">&#8634;</span></button>
+    <button id="rot-right-btn" class="pill iconbtn cam-btn" type="button" aria-label="Turn the view clockwise (E)" title="Turn the view (E)"><span class="icon">&#8635;</span></button>
+    <button id="zoom-out-btn" class="pill iconbtn cam-btn" type="button" aria-label="Zoom out (minus key)" title="Zoom out (-)"><span class="icon">&#8722;</span></button>
+    <button id="zoom-in-btn" class="pill iconbtn cam-btn" type="button" aria-label="Zoom in (plus key)" title="Zoom in (+)"><span class="icon">+</span></button>
+    <button id="tilt-up-btn" class="pill iconbtn cam-btn" type="button" aria-label="Raise the camera, looking more from above (] key)" title="Camera higher (])"><span class="icon">&#9650;</span></button>
+    <button id="tilt-down-btn" class="pill iconbtn cam-btn" type="button" aria-label="Lower the camera, looking more from the side ([ key)" title="Camera lower ([)"><span class="icon">&#9660;</span></button>
   </div>
   <button id="wave-btn" type="button"><span id="wave-btn-main">Send the first wave</span><span id="wave-btn-sub" class="sub"></span></button>
   <div id="boss-bar"><div id="boss-name" class="boss-name">Shadow-Crow Swarm</div><div class="boss-track"><div class="boss-fill"></div></div></div>
@@ -846,6 +848,10 @@
         <div class="set-label"><span class="set-name">Music</span><span class="set-sub">The score that follows the battle</span></div>
         <button id="set-music" class="switch" type="button" role="switch" aria-checked="true" aria-label="Music"><span class="knob"></span></button>
         <input id="set-music-vol" class="slider" type="range" min="0" max="100" step="5" aria-label="Music volume">
+      </div>
+      <div class="set-row">
+        <div class="set-label"><span class="set-name">Camera buttons</span><span class="set-sub">Turn, zoom and tilt in the top bar. Keys and gestures always work</span></div>
+        <button id="set-camui" class="switch" type="button" role="switch" aria-checked="true" aria-label="Camera buttons"><span class="knob"></span></button>
       </div>
     </div>
     <button id="settings-done" type="button">Done</button>

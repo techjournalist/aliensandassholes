@@ -12,6 +12,8 @@ Read `AGENTS.md` first, then the file named in each item below.
   Levels 9 and 10 (the dawn levels) also use `js/dawn-kit.js`. Levels 1 to 8 set
   `curveKeepsPace`, so walkers slow to match the shorter curved road (AGENTS.md
   P3-V12).
+- Camera buttons: Settings has a switch to hide the six camera buttons (saved as
+  `bb-camui`); keys and gestures always work. AGENTS.md P3-V17.
 - Tilt: the player can tilt the camera 30 to 80 degrees (buttons from 1180px, [ and ],
   right-drag, two-finger swipe; saved as `bb-tilt`; 0 resets zoom, pan and tilt).
   AGENTS.md P3-V16.

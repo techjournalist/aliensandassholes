@@ -1607,6 +1607,23 @@ the keep and the brook still read). Twelve new harness checks cover the buttons,
 the step, both limits with picking, saving, the 0 key and its fog distance, the
 keys, right-drag, the drift and the swipe, and turning while tilted.
 
+**P3-V17 - Hide or show the camera buttons (Settings)** *(on branch
+`claude/fervent-wright-jeojom`, user-requested: "an option in the settings menu to
+display (or hide) the camera settings")*. Settings has a fourth row, "Camera
+buttons", with a switch like the others (role `switch`, `aria-checked`, a 44px
+target). It hides or shows the six camera buttons in the top bar (turn left and
+right, zoom out and in, tilt up and down) by toggling a `hide-camui` class on
+`body`; the buttons share one `cam-btn` class and one CSS rule. The choice is
+saved under `bb-camui` (`0` hidden, `1` shown, shown by default and if storage is
+blocked). Only the buttons go: the keys (Q, E, plus, minus, `[`, `]`, 0), the wheel,
+pinch, drag, right-drag and swipe all keep working, and the row says so. Hiding
+them also gives a phone's top bar back its room. Checked in a real page on
+desktop and an 844x390 phone (the card is 359px of 390 with four rows, no
+scrolling): the buttons hide and return, the saved choice survives a reload, and
+E still turns the view with the buttons hidden. Four new harness checks cover the
+default state and the 44px switch, hiding and saving, the keys with the buttons
+hidden, and showing them again.
+
 **Graphics roadmap**: see `GRAPHICS-ROADMAP.md` for the approved list of
 further graphics work, its priority order, the performance budget and the
 current test status. Read it before starting any graphics task. Its numbered list is the one the

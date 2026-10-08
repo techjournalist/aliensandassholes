@@ -165,6 +165,19 @@ async function enterLevel(page, levelId) {
   await page.evaluate(() => Audio.setMusicVolume(0.6));
   const tall = await page.evaluate(() => ['set-master', 'set-sfx', 'set-music', 'set-sfx-vol', 'set-music-vol', 'settings-done'].every((id) => { const r = document.getElementById(id).getBoundingClientRect(); return r.height >= 44; }));
   check('every settings control is at least 44px tall', tall);
+  // P3-V17: Settings can hide the camera buttons; keys and gestures keep working
+  const camIds = ['rot-left-btn', 'rot-right-btn', 'zoom-out-btn', 'zoom-in-btn', 'tilt-up-btn', 'tilt-down-btn'];
+  const camShown = () => page.evaluate((ids) => ids.map((id) => getComputedStyle(document.getElementById(id)).display !== 'none'), camIds);
+  check('Settings has a Camera buttons switch, on by default, with the buttons showing', (await page.locator('#set-camui').getAttribute('aria-checked')) === 'true' && (await page.locator('#set-camui').boundingBox()).height >= 44 && (await camShown()).every(Boolean));
+  await page.locator('#set-camui').click(); await page.waitForTimeout(150);
+  check('switching it off hides every camera button and saves the choice', (await camShown()).every((v) => !v) && (await page.locator('#set-camui').getAttribute('aria-checked')) === 'false' && await page.evaluate(() => localStorage.getItem('bb-camui')) === '0');
+  await page.keyboard.press('e');
+  await page.waitForFunction(() => !Renderer.viewTurning(), null, { timeout: 30000 }).catch(() => {});
+  check('the camera keys still work with the buttons hidden', await page.evaluate(() => Renderer.viewIndex()) === 1);
+  await page.keyboard.press('q');
+  await page.waitForFunction(() => !Renderer.viewTurning(), null, { timeout: 30000 }).catch(() => {});
+  await page.locator('#set-camui').click(); await page.waitForTimeout(150);
+  check('switching it back on shows the buttons again and saves it', (await camShown()).every(Boolean) && await page.evaluate(() => localStorage.getItem('bb-camui')) === '1' && await page.evaluate(() => Renderer.viewIndex()) === 0);
   await page.keyboard.press('Escape'); await page.waitForTimeout(150);
   check('Escape closes Settings (and the game stays paused behind it)', await page.evaluate(() => !document.getElementById('settings').classList.contains('show') && GameState.state.paused));
   await page.locator('#resume-btn').click(); await page.waitForTimeout(200);
