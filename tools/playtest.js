@@ -1268,7 +1268,10 @@ async function enterLevel(page, levelId) {
   // this same level; its button used to "Hold" it, which did nothing.
   // Level 10 is the currently-last level, so this is where that scenario lives.
   if (mixed10.phase === 'won') {
-    await page.locator('#pause-btn').click(); await page.waitForTimeout(200);
+    // hide the screen and press Pause in one step: the safety net can bring the screen back within
+    // 1.5s, and a pointer click would then land on it instead of the button
+    await page.evaluate(() => { document.getElementById('end').classList.remove('show'); document.getElementById('pause-btn').click(); });
+    await page.waitForTimeout(200);
     check('after a win the pause button brings back the end screen', await page.locator('#end').isVisible());
     await page.evaluate(() => { document.getElementById('end').classList.remove('show'); });
     // the net waits 1.5s of wall-clock time; heavy software-rendered frames after a no-frame bot run can delay it
