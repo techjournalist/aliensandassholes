@@ -214,6 +214,9 @@ const UI = (() => {
     // continue straight to it instead of a generic "pick something" label.
     const next = LEVELS.find((l) => l.index === level.index + 1);
     const finale = won && !next;     // the last level of the campaign gets the big one
+    // Showing a win records it again. recordWin only ever adds, so this is harmless when the
+    // gameWon listener already did it, and it saves the win if that listener failed to run.
+    if (won) { try { Progress.recordWin(level.id, GameState.stars(), s.lives); } catch (e) { /* never block the win screen */ } }
     const end = $('end');
     $('end-title').textContent = finale ? 'The Hollow is healed!' : won ? `${level.endpoint.properName} holds!` : `${level.endpoint.properName} has fallen`;
     const stars = won ? GameState.stars() : 0;

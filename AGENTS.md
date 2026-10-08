@@ -1624,6 +1624,33 @@ E still turns the view with the buttons hidden. Four new harness checks cover th
 default state and the 44px switch, hiding and saving, the keys with the buttons
 hidden, and showing them again.
 
+**P3-FIX3 - A finished level did not unlock the next one** *(user-reported:
+"I finished level 6 and hit Continue, level 7 still shows as locked")*. The
+user's screenshot of the world map showed Level 6 with no stars and no flag, so
+the win itself had not been recorded, and a "Return to The Sunken Market" battle
+at Prep behind it. I could not reproduce the failure: finishing Level 6, pressing
+Continue and marching to Level 7 worked on a clean page, with every saved camera
+setting, at several screen sizes, with the real published files (their sizes match
+the repo), and the progress code (`Progress.recordWin`) had not been touched by any
+of the recent camera, victory-screen or curved-road work. The cause on the
+player's device is therefore unconfirmed. Whatever it is, a finished level must
+never fail to open the next, so progress is now hard to lose:
+`js/progress.js` keeps three copies and merges them on every read (localStorage,
+a sessionStorage backup that survives a reload when localStorage refuses a write,
+and the page's own memory), and merging only ever adds (unlocked if any copy says
+so, highest stars and best lives); a level with stars always opens the next one;
+and `showEnd(true)` records the win again (`recordWin` only adds, so twice is
+harmless), which saves the win if the `gameWon` listener never ran. Eight
+validator checks cover a normal win, localStorage refusing writes (same page and
+after a reload), a stale read, a half-saved win, a worse replay, a corrupt save
+and recording twice. In a real page with `localStorage.setItem` throwing for the
+progress key, Level 7 still unlocks and starts after Continue.
+
+**Not fixed, to be honest about:** a win that was already lost in the player's
+saved data is not recovered, because nothing records it. They need to beat the
+level once more. What would still help is knowing the device and what the win
+screen showed.
+
 **Graphics roadmap**: see `GRAPHICS-ROADMAP.md` for the approved list of
 further graphics work, its priority order, the performance budget and the
 current test status. Read it before starting any graphics task. Its numbered list is the one the

@@ -226,6 +226,61 @@ function paceTests(G, LEVELS) {
   return out;
 }
 
+// ---- 3d. progress: a win is never lost (P3-FIX3) ----
+function progressTests() {
+  const out = [];
+  const add = (name, ok, detail = '') => out.push({ name: `progress: ${name}`, ok, detail });
+  const store = (opts = {}) => {
+    const m = new Map();
+    return {
+      m,
+      getItem: (k) => (opts.nullRead ? null : (m.has(k) ? m.get(k) : null)),
+      setItem: (k, v) => { if (opts.failWrite) throw new Error('quota'); m.set(k, String(v)); },
+      removeItem: (k) => m.delete(k),
+    };
+  };
+  const make = (local, session) => {
+    const src = FILES.concat(['progress.js']).map((f) => fs.readFileSync(path.join(ROOT, 'js', f), 'utf8')).join('\n;\n') + '\n;this.__p = Progress;';
+    const ctx = { Math, console, localStorage: local, sessionStorage: session };
+    vm.createContext(ctx); vm.runInContext(src, ctx, { filename: 'progress-bundle.js' });
+    return ctx.__p;
+  };
+  const NEXT = 'amber-terraces', WON = 'sunken-market';
+
+  let local = store(), session = store(), P = make(local, session);
+  P.recordWin(WON, 2, 8);
+  add('a win unlocks the next level and saves it', P.isUnlocked(NEXT) && P.starsFor(WON) === 2 && JSON.parse(local.m.get('bb-progress')).levels[NEXT].unlocked === true);
+
+  local = store({ failWrite: true }); session = store(); P = make(local, session);
+  P.recordWin(WON, 2, 8);
+  add('a win survives localStorage refusing the write (same page)', P.isUnlocked(NEXT) && P.starsFor(WON) === 2);
+  const reloaded = make(store({ failWrite: true }), session);
+  add('and survives a reload through the session backup', reloaded.isUnlocked(NEXT) && reloaded.starsFor(WON) === 2);
+
+  local = store({ nullRead: true }); session = store(); P = make(local, session);
+  P.recordWin(WON, 3, 12);
+  add('a win survives localStorage reading back empty or stale', P.isUnlocked(NEXT) && P.starsFor(WON) === 3);
+
+  local = store(); session = store();
+  local.m.set('bb-progress', JSON.stringify({ v: 1, levels: { [WON]: { unlocked: true, stars: 2, bestLives: 5 }, [NEXT]: { unlocked: false, stars: 0, bestLives: null } } }));
+  P = make(local, session);
+  add('a level with stars always opens the next one (a half-saved win heals)', P.isUnlocked(NEXT));
+
+  local = store(); session = store(); P = make(local, session);
+  P.recordWin(WON, 3, 12); P.recordWin(WON, 1, 4);
+  add('a worse replay never lowers stars or best lives', P.starsFor(WON) === 3 && P.load().levels[WON].bestLives === 12);
+
+  local = store(); session = store(); local.m.set('bb-progress', '{not json');
+  let threw = false, ok = false;
+  try { P = make(local, session); P.recordWin(WON, 1, 3); ok = P.isUnlocked(NEXT); } catch (e) { threw = true; }
+  add('a corrupt save does not throw and a new win still counts', !threw && ok);
+
+  local = store(); session = store(); P = make(local, session);
+  P.recordWin(WON, 2, 8); P.recordWin(WON, 2, 8);
+  add('recording the same win twice changes nothing', P.starsFor(WON) === 2 && P.load().levels[WON].bestLives === 8);
+  return out;
+}
+
 // ---- 4. a failing listener can never stop the game from ending ----
 // (P3-FIX1: GameState.emit used to call listeners with no protection, so one
 // exception during the last wave's end would have skipped the win entirely.)
@@ -256,6 +311,7 @@ function validate() {
   results.push(...legacyTests(GameState, LEVELS));
   results.push(...curveTests(GameState, LEVELS));
   results.push(...paceTests(GameState, LEVELS));
+  results.push(...progressTests());
   results.push(...engineTests(GameState));
   results.push(...isolationTests());
   return results;
