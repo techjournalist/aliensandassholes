@@ -14,6 +14,9 @@ Read `AGENTS.md` first, then the file named in each item below.
   P3-V12).
 - Camera buttons: Settings has a switch to hide the six camera buttons (saved as
   `bb-camui`); keys and gestures always work. AGENTS.md P3-V17.
+- Save code: Settings has a "Save code" panel that copies the campaign as text
+  (`BB1-...`) and loads one pasted from another device. Loading only adds. AGENTS.md
+  P3-V18. "Resume a level" (mid-level save) was explained to the user and not built.
 - Tilt: the player can tilt the camera 30 to 80 degrees (buttons from 1180px, [ and ],
   right-drag, two-finger swipe; saved as `bb-tilt`; 0 resets zoom, pan and tilt).
   AGENTS.md P3-V16.
@@ -30,7 +33,7 @@ Read `AGENTS.md` first, then the file named in each item below.
   shadows, softer glow, haze gradient, resolution governor (AGENTS.md P3-V11).
 - World map has a bridge where roads cross (hills, mountain shadows and a river
   bridge were tried and reverted at the user's request; do not redo them).
-- Tests: `node tools/validate-levels.js` passes (284 checks). The full
+- Tests: `node tools/validate-levels.js` passes (306 checks). The full
   `tools/playtest.js` passed 617 of 617 on the curving roads work, with all 10
   levels won by the mixed bot, so the old Level 6 cascade that locked Levels 7 to
   10 is gone (Level 6 was rebalanced; the root cause, unseeded `Math.random`, is

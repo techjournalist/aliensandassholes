@@ -1651,6 +1651,54 @@ saved data is not recovered, because nothing records it. They need to beat the
 level once more. What would still help is knowing the device and what the win
 screen showed.
 
+**P3-V18 - Save code** *(on branch `claude/fervent-wright-jeojom`,
+user-approved: "I like the save code idea")*. Progress lives in the browser,
+so a new device, a cleared browser or another browser starts from nothing. The
+player can now copy their campaign as text and paste it elsewhere. Settings has
+a "Save code" button that opens a panel (`#savecode`) with the player's code, a
+Copy button (clipboard API, with a select-and-`execCommand` fallback), a paste
+box and a Load button (Enter also loads), and a plain status line. The title
+link now reads "Settings and save code".
+
+**Format.** `BB1-` then, per level in `LEVELS` order, two characters: a state
+digit (0 locked, 1 open, 2 to 4 for one to three stars) and best lives in base
+36; then two check characters (a small polynomial hash mod 1296), all uppercase
+in groups of four. Ten levels give `BB1-xxxx-xxxx-xxxx-xxxx-xxxx-xx`. A changed
+single character always fails the check (31 is coprime to 1296); two swapped
+characters usually do but are not guaranteed to. `Progress.exportCode()` and
+`Progress.importCode(text)` live in `js/progress.js`. Import accepts lowercase,
+spaces and missing dashes, and returns `{ ok, changed }` or `{ ok: false,
+reason: 'empty' | 'format' | 'check' }`. **Loading only ever adds**, using the
+same `merge()` as every other copy, so an older code can never lower stars,
+best lives or unlocks. A code from a build with fewer levels fills what it has.
+The code is not secret or signed: anyone can write one that unlocks levels.
+That is fine for a single-player game and is stated here so nobody mistakes it
+for protection.
+
+**One real hazard handled.** A text box under a game that listens for keys on
+`window` would have turned typing into game actions (e and q turn the view, 0
+resets the camera, f changes speed, space or Enter sends a wave, + and - zoom).
+The key handler in `ui.js` and the arrow-key handler in `input.js` now ignore
+key presses whose target is an input, textarea or select (arrow keys on the
+settings sliders also work for the first time). Escape closes the Save code
+panel first, then Settings, through the same capture handler. On a 390px-tall
+phone the panel hides its intro text and measures 263px, no scrolling.
+
+**Checked.** 14 new validator checks (round trip, regenerates identically,
+lowercase and spaces, typo, missing character, empty and wrong-prefix input,
+garbage, a refused code changes nothing, an older code never lowers progress,
+levels in and out of range, length). 306 validator checks pass. In a real page
+on desktop and an 844x390 phone: copy, empty, junk, typo, typing the hotkey
+letters into the box (view and speed unchanged), load with Enter, load again
+("nothing new"), Escape order, no console errors. Harness checks cover the panel,
+the 44px controls, typing safety, the refusal messages, loading a code with
+nothing new and the Escape order; they deliberately do not load a more advanced
+code, since that would unlock later levels for the rest of the run.
+
+**Not built, offered:** "Resume a level" (remember the wave, gold, lives and
+towers at the start of the current wave and offer Resume on the map). The user
+did not ask for it after it was explained.
+
 **Graphics roadmap**: see `GRAPHICS-ROADMAP.md` for the approved list of
 further graphics work, its priority order, the performance budget and the
 current test status. Read it before starting any graphics task. Its numbered list is the one the

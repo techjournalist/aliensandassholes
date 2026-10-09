@@ -78,5 +78,48 @@ const Progress = (() => {
     return data;
   }
 
-  return { load, isUnlocked, starsFor, recordWin };
+  // ---- save code: your campaign progress as a short piece of text ----
+  // "BB1-" then, per level in order, two characters (0 locked, 1 open, 2 to 4 for
+  // one to three stars; then best lives in base 36), then two check characters,
+  // all in groups of four. Loading a code only ever adds, like every other merge.
+  const CODE = 'BB1';
+  const check = (str) => { let h = 7; for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) % 1296; return h.toString(36).toUpperCase().padStart(2, '0'); };
+  function exportCode() {
+    const data = load();
+    let body = '';
+    for (const lv of LEVELS) {
+      const e = data.levels[lv.id];
+      const st = !e.unlocked ? 0 : e.stars >= 3 ? 4 : e.stars === 2 ? 3 : e.stars === 1 ? 2 : 1;
+      body += st + Math.max(0, Math.min(35, e.bestLives || 0)).toString(36).toUpperCase();
+    }
+    return CODE + '-' + (body + check(CODE + body)).match(/.{1,4}/g).join('-');
+  }
+  // { ok: true, changed: levels that gained something } or { ok: false, reason }
+  function importCode(raw) {
+    const text = String(raw || '').toUpperCase().replace(/[\s_]/g, '');
+    if (!text) return { ok: false, reason: 'empty' };
+    if (!text.startsWith(CODE + '-')) return { ok: false, reason: 'format' };
+    const all = text.slice(CODE.length + 1).replace(/-/g, '');
+    if (!/^[0-9A-Z]+$/.test(all) || all.length < 4 || all.length % 2) return { ok: false, reason: 'check' };
+    const body = all.slice(0, -2);
+    if (check(CODE + body) !== all.slice(-2)) return { ok: false, reason: 'check' };
+    const incoming = defaults();
+    for (let i = 0; i < LEVELS.length && i * 2 < body.length; i++) {
+      const st = parseInt(body[i * 2], 10), lives = parseInt(body[i * 2 + 1], 36);
+      if (!(st >= 0 && st <= 4)) return { ok: false, reason: 'check' };
+      incoming.levels[LEVELS[i].id] = { unlocked: st >= 1, stars: st >= 2 ? st - 1 : 0, bestLives: st >= 2 && lives > 0 ? lives : null };
+    }
+    const before = load();
+    const data = load();
+    merge(data, incoming);
+    let changed = 0;
+    for (const lv of LEVELS) {
+      const a = before.levels[lv.id], b = data.levels[lv.id];
+      if ((b.unlocked && !a.unlocked) || b.stars > a.stars) changed++;
+    }
+    save(data);
+    return { ok: true, changed };
+  }
+
+  return { load, isUnlocked, starsFor, recordWin, exportCode, importCode };
 })();

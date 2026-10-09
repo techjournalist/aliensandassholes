@@ -178,6 +178,24 @@ async function enterLevel(page, levelId) {
   await page.waitForFunction(() => !Renderer.viewTurning(), null, { timeout: 30000 }).catch(() => {});
   await page.locator('#set-camui').click(); await page.waitForTimeout(150);
   check('switching it back on shows the buttons again and saves it', (await camShown()).every(Boolean) && await page.evaluate(() => localStorage.getItem('bb-camui')) === '1' && await page.evaluate(() => Renderer.viewIndex()) === 0);
+  // save code: campaign progress as text; typing in it must never reach the game's hotkeys
+  await page.locator('#savecode-btn').click(); await page.waitForTimeout(200);
+  const sc0 = await page.evaluate(() => ({ open: document.getElementById('savecode').classList.contains('show'), code: document.getElementById('savecode-out').value, h: ['savecode-copy', 'savecode-load', 'savecode-done', 'savecode-in'].map((id) => document.getElementById(id).getBoundingClientRect().height) }));
+  check('Settings opens a Save code panel with a BB1 code and 44px controls', sc0.open && /^BB1-/.test(sc0.code) && sc0.h.every((v) => v >= 44), JSON.stringify(sc0));
+  const viewBefore = await page.evaluate(() => Renderer.viewIndex());
+  await page.locator('#savecode-in').click(); await page.keyboard.type('eq0 -+[]f', { delay: 5 });
+  check('typing in the code box leaves the camera, speed and wave alone', await page.evaluate(() => document.getElementById('savecode-in').value === 'eq0 -+[]f' && Renderer.viewIndex() === 0 && GameState.state.speed === 1 && !GameState.state.waveActive) && viewBefore === 0);
+  await page.fill('#savecode-in', 'nonsense'); await page.locator('#savecode-load').click();
+  check('a non-code is refused with a plain message', (await page.locator('#savecode-msg').innerText()).includes("doesn't look like"));
+  const scCode = await page.evaluate(() => document.getElementById('savecode-out').value);
+  const scTypo = scCode.slice(0, 6) + (scCode[6] === '2' ? '3' : '2') + scCode.slice(7);
+  await page.fill('#savecode-in', scTypo); await page.locator('#savecode-load').click();
+  check('a mistyped code is caught and changes nothing', (await page.locator('#savecode-msg').innerText()).includes("doesn't match") && await page.evaluate((c) => Progress.exportCode() === c, scCode));
+  // loading a code that adds nothing must leave this run's progress untouched (the real load paths are covered in validate-levels.js)
+  await page.fill('#savecode-in', scCode.toLowerCase()); await page.keyboard.press('Enter'); await page.waitForTimeout(150);
+  check('pasting a lowercase code with Enter loads it and says it has nothing new', (await page.locator('#savecode-msg').innerText()).includes('nothing new') && await page.evaluate((c) => Progress.exportCode() === c, scCode));
+  await page.keyboard.press('Escape'); await page.waitForTimeout(150);
+  check('Escape closes the Save code panel first and leaves Settings open', await page.evaluate(() => !document.getElementById('savecode').classList.contains('show') && document.getElementById('settings').classList.contains('show')));
   await page.keyboard.press('Escape'); await page.waitForTimeout(150);
   check('Escape closes Settings (and the game stays paused behind it)', await page.evaluate(() => !document.getElementById('settings').classList.contains('show') && GameState.state.paused));
   await page.locator('#resume-btn').click(); await page.waitForTimeout(200);

@@ -278,6 +278,38 @@ function progressTests() {
   local = store(); session = store(); P = make(local, session);
   P.recordWin(WON, 2, 8); P.recordWin(WON, 2, 8);
   add('recording the same win twice changes nothing', P.starsFor(WON) === 2 && P.load().levels[WON].bestLives === 8);
+
+  // ---- save code ----
+  const FIRST = 'shadow-hollow';
+  local = store(); session = store(); P = make(local, session);
+  P.recordWin(FIRST, 3, 17); P.recordWin('millbrook-watch', 2, 9); P.recordWin(WON, 1, 3);
+  const code = P.exportCode();
+  add('save code has the BB1 prefix and dash groups', /^BB1(-[0-9A-Z]{1,4})+$/.test(code), code);
+  const fresh = make(store(), store());
+  const r1 = fresh.importCode(code);
+  const a = P.load().levels, b = fresh.load().levels;
+  add('a code round-trips stars, best lives and unlocks to a fresh device', r1.ok && r1.changed >= 3 && Object.keys(a).every((id) => a[id].unlocked === b[id].unlocked && a[id].stars === b[id].stars && (a[id].stars === 0 || a[id].bestLives === b[id].bestLives)), JSON.stringify(r1));
+  add('the same code regenerates identically after loading', fresh.exportCode() === code);
+  add('lowercase and stray spaces are accepted', make(store(), store()).importCode('  ' + code.toLowerCase().replace(/-/g, ' - ') + ' \n').ok);
+  const typo = code.slice(0, 6) + (code[6] === '2' ? '3' : '2') + code.slice(7);
+  add('a single mistyped character is caught', make(store(), store()).importCode(typo).reason === 'check', typo);
+  add('a missing character is caught', make(store(), store()).importCode(code.slice(0, -1)).ok === false);
+  const bad = make(store(), store());
+  add('empty input says empty', bad.importCode('   ').reason === 'empty');
+  add('other text says format', bad.importCode('hello there').reason === 'format' && bad.importCode(null).reason === 'empty' && bad.importCode('BB2-AAAA').reason === 'format');
+  add('garbage after the prefix says check, never throws', bad.importCode('BB1-!!!!').reason === 'check' && bad.importCode('BB1-').reason === 'check');
+  add('a rejected code changes nothing', JSON.stringify(bad.load()) === JSON.stringify(make(store(), store()).load()));
+  // loading never takes anything away
+  local = store(); session = store(); const rich = make(local, session);
+  rich.recordWin(FIRST, 3, 20); rich.recordWin('millbrook-watch', 3, 18);
+  const lowCode = make(store(), store()); lowCode.recordWin(FIRST, 1, 2);
+  const r2 = rich.importCode(lowCode.exportCode());
+  add('loading an older code never lowers stars or best lives', r2.ok && r2.changed === 0 && rich.starsFor(FIRST) === 3 && rich.load().levels[FIRST].bestLives === 20 && rich.starsFor('millbrook-watch') === 3);
+  // a code from a build with fewer or more levels
+  const body = code.slice(4).replace(/-/g, '');
+  add('a code with every level locked loads without effect', (() => { const z = make(store(), store()); const c = z.exportCode(); return z.importCode(c).ok; })());
+  add('a code that is first-level-only still works', (() => { const z = make(store(), store()); z.recordWin(FIRST, 2, 5); const f = make(store(), store()); const res = f.importCode(z.exportCode()); return res.ok && f.starsFor(FIRST) === 2 && f.isUnlocked('millbrook-watch'); })());
+  add('save code holds two characters per level plus two check characters', body.length === 2 * Object.keys(make(store(), store()).load().levels).length + 2, `${body.length} chars`);
   return out;
 }
 

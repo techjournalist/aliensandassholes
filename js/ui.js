@@ -3,6 +3,8 @@
 // ===================================================================
 const UI = (() => {
   const $ = (id) => document.getElementById(id);
+  // true while a key press is going into a text box or slider (game hotkeys must stay out of the way)
+  const typingTarget = (e) => { const t = e.target; return !!(t && t.tagName && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)); };
   let toastTimer = 0;
   let debugOn = false, fpsAcc = 0, fpsFrames = 0, fpsShown = 0;
   const shown = { gold: null, lives: null, wave: null, waveBtn: null, bossName: null };
@@ -621,6 +623,7 @@ const UI = (() => {
     window.addEventListener('blur', () => GameState.pause());
     window.addEventListener('keydown', (e) => {
       if (e.repeat) return;
+      if (typingTarget(e)) return;   // typing a save code must never turn the camera or send a wave
       const s = GameState.state;
       if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') {
         if (s.phase !== 'playing') return;
@@ -692,8 +695,50 @@ const UI = (() => {
     $('set-sfx-vol').addEventListener('input', (e) => Audio.setSfxVolume(e.target.value / 100));
     $('set-sfx-vol').addEventListener('change', () => Audio.sfx.select());   // a sample, so the level can be judged
     $('set-music-vol').addEventListener('input', (e) => Audio.setMusicVolume(e.target.value / 100));
+    // ---- save code: campaign progress as text, to keep or to carry to another device ----
+    const codeEl = $('savecode');
+    const codeMsg = (text, kind) => { const m = $('savecode-msg'); m.textContent = text; m.className = 'sc-msg' + (kind ? ' ' + kind : ''); };
+    function openSaveCode() {
+      Audio.unlock();
+      $('savecode-out').value = Progress.exportCode();
+      $('savecode-in').value = '';
+      codeMsg('');
+      codeEl.classList.add('show');
+      $('savecode-copy').focus();
+    }
+    function closeSaveCode() { codeEl.classList.remove('show'); const b = $('savecode-btn'); if (settingsEl.classList.contains('show') && b) b.focus(); }
+    function copySaveCode() {
+      const out = $('savecode-out'), text = out.value;
+      const fallback = () => {
+        try { out.focus(); out.select(); out.setSelectionRange(0, text.length); return document.execCommand && document.execCommand('copy'); } catch (e) { return false; }
+      };
+      const done = (ok) => codeMsg(ok ? 'Copied. Keep it somewhere safe.' : 'Could not copy. Select the code and copy it by hand.', ok ? 'ok' : 'bad');
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(() => done(true), () => done(fallback()));
+      else done(fallback());
+    }
+    function loadSaveCode() {
+      const r = Progress.importCode($('savecode-in').value);
+      if (!r.ok) {
+        codeMsg({ empty: 'Paste a code first.', format: "That doesn't look like a Briar & Bastion save code.", check: "That code doesn't match. Check for a typo or a missing character." }[r.reason], 'bad');
+        return;
+      }
+      $('savecode-out').value = Progress.exportCode();
+      $('savecode-in').value = '';
+      if (r.changed) { codeMsg(`Loaded. ${r.changed} ${r.changed === 1 ? 'level' : 'levels'} updated.`, 'ok'); try { Audio.sfx.select(); } catch (e) { /* audio is optional */ } }
+      else codeMsg('That code has nothing new for this device.', 'ok');
+      if ($('worldmap').classList.contains('show')) renderWorldMap();
+    }
+    $('savecode-btn').addEventListener('click', openSaveCode);
+    $('savecode-done').addEventListener('click', closeSaveCode);
+    $('savecode-copy').addEventListener('click', copySaveCode);
+    $('savecode-load').addEventListener('click', loadSaveCode);
+    $('savecode-in').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); loadSaveCode(); } });
+    $('savecode-out').addEventListener('focus', (e) => e.target.select());
+    codeEl.addEventListener('pointerdown', (e) => { if (e.target === codeEl) closeSaveCode(); });
     window.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && settingsEl.classList.contains('show')) { e.preventDefault(); e.stopImmediatePropagation(); closeSettings(); }
+      if (e.key !== 'Escape') return;
+      if (codeEl.classList.contains('show')) { e.preventDefault(); e.stopImmediatePropagation(); closeSaveCode(); }
+      else if (settingsEl.classList.contains('show')) { e.preventDefault(); e.stopImmediatePropagation(); closeSettings(); }
     }, true);
     GameState.on('enemyHit', ({ enemy, amount, armored, x, z }) => floater(x, enemy.boss ? 1.6 : enemy.flying ? 1.2 : 0.7, z, armored ? `${amount} clink` : amount, armored ? 'armored' : ''));
     GameState.on('waveEnded', ({ bonus }) => floater(GameState.gate.x, 1.4, GameState.gate.z, `+${bonus} wave bonus`, 'bonus'));

@@ -569,7 +569,29 @@
   .switch:focus-visible, .slider:focus-visible, .screen button:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
   .slider { grid-column: 1 / -1; width: 100%; height: 44px; margin: 4px 0 0; accent-color: var(--gold); cursor: pointer; }
   .slider:disabled { opacity: 0.4; cursor: default; }
-  #settings .card > button#settings-done { display: block; margin: 0 auto; }
+  .set-foot { display: flex; justify-content: center; flex-wrap: wrap; gap: 12px; }
+  .set-foot button { margin: 0; min-height: 44px; }
+
+  /* ---- save code screen ---- */
+  #savecode { z-index: 21; background: rgba(10, 7, 5, 0.92); }
+  #savecode .card { max-width: 520px; text-align: left; background-color: #2a1d14; max-height: calc(100vh - 16px); overflow-y: auto; overscroll-behavior: contain; }
+  #savecode h1, #savecode .eyebrow { text-align: center; }
+  .sc-help { margin: 0 0 12px; font-size: 15px; opacity: 0.85; line-height: 1.4; }
+  .sc-label { display: block; margin: 10px 0 4px; font-size: 14px; font-weight: 800; color: var(--gold); }
+  .sc-line { display: flex; gap: 10px; align-items: stretch; }
+  .sc-field { flex: 1; min-width: 0; min-height: 44px; padding: 0 12px; font: 700 16px/1 ui-monospace, Menlo, Consolas, monospace; letter-spacing: 1px; color: var(--cream); background: #1b1410; border: 3px solid #1b1410; border-radius: 10px; box-shadow: inset 0 2px 0 rgba(0, 0, 0, 0.5); outline: 1px solid rgba(246, 236, 212, 0.25); }
+  .sc-field:focus { outline: 3px solid var(--gold); }
+  .sc-line button { margin: 0; min-height: 44px; min-width: 84px; padding-left: 16px; padding-right: 16px; }
+  .sc-msg { min-height: 22px; margin: 10px 0 6px; font-size: 15px; font-weight: 700; text-align: center; }
+  .sc-msg.ok { color: #9fe08a; } .sc-msg.bad { color: #ff9a8a; }
+  #savecode .card > button#savecode-done { display: block; margin: 6px auto 0; min-height: 44px; }
+  @media (max-height: 460px) {
+    #savecode .card { padding: 12px 20px; }
+    #savecode h1 { margin: 2px 0 4px; font-size: 24px; }
+    #savecode .eyebrow, .sc-help { display: none; }
+    .sc-label { margin: 4px 0 2px; }
+    .sc-msg { min-height: 18px; margin: 4px 0 2px; }
+  }
   @media (max-height: 460px) {
     #settings .card { padding: 14px 20px 14px; }
     #settings h1 { margin: 2px 0 6px; font-size: 26px; }
@@ -711,7 +733,7 @@
       <li><span class="ico">&#9873;</span>Send the next wave when you're ready and hold the line.</li>
     </ul>
     <button id="start-btn" type="button">Begin the Campaign</button>
-    <div class="title-links"><button id="title-settings-btn" class="linkbtn" type="button">&#9881; Sound settings</button></div>
+    <div class="title-links"><button id="title-settings-btn" class="linkbtn" type="button">&#9881; Settings and save code</button></div>
   </div>
 </div>
 
@@ -854,7 +876,30 @@
         <button id="set-camui" class="switch" type="button" role="switch" aria-checked="true" aria-label="Camera buttons"><span class="knob"></span></button>
       </div>
     </div>
-    <button id="settings-done" type="button">Done</button>
+    <div class="set-foot">
+      <button id="savecode-btn" class="secondary" type="button">Save code</button>
+      <button id="settings-done" type="button">Done</button>
+    </div>
+  </div>
+</div>
+
+<div id="savecode" class="screen" role="dialog" aria-modal="true" aria-labelledby="savecode-title">
+  <div class="card">
+    <div class="eyebrow">Take your campaign with you</div>
+    <h1 id="savecode-title">Save code</h1>
+    <p class="sc-help">Your stars and unlocked levels as a short code. Copy it somewhere safe. Paste it on another device or browser to carry on.</p>
+    <label class="sc-label" for="savecode-out">Your code</label>
+    <div class="sc-line">
+      <input id="savecode-out" class="sc-field" type="text" readonly spellcheck="false" autocomplete="off" aria-label="Your save code">
+      <button id="savecode-copy" type="button">Copy</button>
+    </div>
+    <label class="sc-label" for="savecode-in">Have a code? Paste it here</label>
+    <div class="sc-line">
+      <input id="savecode-in" class="sc-field" type="text" spellcheck="false" autocomplete="off" autocapitalize="characters" placeholder="BB1-...." aria-label="Paste a save code">
+      <button id="savecode-load" type="button">Load</button>
+    </div>
+    <div id="savecode-msg" class="sc-msg" role="status" aria-live="polite"></div>
+    <button id="savecode-done" type="button">Done</button>
   </div>
 </div>
 

@@ -80,6 +80,8 @@ const Input = (() => {
     // arrow keys look around while zoomed in (held keys repeat)
     window.addEventListener('keydown', (e) => {
       if (!playing()) return;
+      const t = e.target;
+      if (t && t.tagName && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return;   // arrows belong to the text box or slider
       const step = { ArrowLeft: [48, 0], ArrowRight: [-48, 0], ArrowUp: [0, 48], ArrowDown: [0, -48] }[e.key];
       if (step && Renderer.zoomLevel() > 1.001) { e.preventDefault(); Renderer.panBy(step[0], step[1]); }
     });
