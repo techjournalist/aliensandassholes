@@ -1699,6 +1699,20 @@ code, since that would unlock later levels for the rest of the run.
 towers at the start of the current wave and offer Resume on the map). The user
 did not ask for it after it was explained.
 
+**P3-V19 - 8x game speed** *(on branch `claude/fervent-wright-jeojom`,
+user-requested)*. The speed button and the F key now cycle 1x, 2x, 4x, 8x.
+`GameState.setSpeed` accepts 1, 2, 4 or 8 and treats anything else as 1. The
+button turns a hot pink with a stronger glow at 8x (`#speed-btn.fastest`). The
+loop in `js/boot.js` still steps in slices of at most 1/60 second, so 8x plays the
+same battle as 1x, only sooner (up to 24 steps a frame at the 0.05s frame cap).
+It now also stops stepping after about 30 ms in one frame, so a slow device runs
+a little under 8x instead of freezing the page. Measured: 24 steps cost about
+0.1 ms mid-wave on this machine, so the budget should never trigger on real
+hardware; the sandbox's low frame rate (software rendering) is what limits the
+rate here. Music tempo and effects stay at normal speed, so dense fights may
+sound busy at 8x. The harness speed checks now cover the 8x step, the cycle back to 1x and
+the valid-speed rule (8 is valid, 16 is not).
+
 **Graphics roadmap**: see `GRAPHICS-ROADMAP.md` for the approved list of
 further graphics work, its priority order, the performance budget and the
 current test status. Read it before starting any graphics task. Its numbered list is the one the

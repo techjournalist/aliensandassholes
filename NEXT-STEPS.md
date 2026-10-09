@@ -14,6 +14,7 @@ Read `AGENTS.md` first, then the file named in each item below.
   P3-V12).
 - Camera buttons: Settings has a switch to hide the six camera buttons (saved as
   `bb-camui`); keys and gestures always work. AGENTS.md P3-V17.
+- Speed: the speed button and F cycle 1x, 2x, 4x and 8x (AGENTS.md P3-V10 and P3-V19).
 - Save code: Settings has a "Save code" panel that copies the campaign as text
   (`BB1-...`) and loads one pasted from another device. Loading only adds. AGENTS.md
   P3-V18. "Resume a level" (mid-level save) was explained to the user and not built.

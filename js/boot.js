@@ -36,7 +36,13 @@
     const gdt = dt * GameState.state.speed;
     // fast-forward in small fixed steps (at most 1/60 s, the size the tests use),
     // so 4x plays the same battle as 1x, only sooner, and never one big jump
-    for (let left = gdt; left > 1e-6;) { const step = Math.min(left, 1 / 60); GameState.update(step); left -= step; }
+    // 8x can ask for 24 steps a frame; on a slow device stop after about 30 ms of
+    // stepping and let the game run a little under 8x rather than freeze the page
+    const t0 = performance.now();
+    for (let left = gdt; left > 1e-6;) {
+      const step = Math.min(left, 1 / 60); GameState.update(step); left -= step;
+      if (performance.now() - t0 > 30) break;
+    }
     Renderer.render(GameState.state.time, GameState.state.paused ? 0 : gdt);
     UI.frame(dt);
     Audio.update(dt);

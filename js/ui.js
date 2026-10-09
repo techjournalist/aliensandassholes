@@ -589,7 +589,7 @@ const UI = (() => {
     });
     $('pause-map-btn').addEventListener('click', () => { $('pause').classList.remove('show'); enterWorldMap(); });
     $('resume-btn').addEventListener('click', () => { Audio.unlock(); GameState.resume(); });
-    const NEXT_SPEED = { 1: 2, 2: 4, 4: 1 };   // the speed button cycles 1x, 2x, 4x
+    const NEXT_SPEED = { 1: 2, 2: 4, 4: 8, 8: 1 };   // the speed button cycles 1x, 2x, 4x, 8x
     // four fixed views of the valley; the angle is remembered between visits
     const turnView = (dir) => { Audio.unlock(); try { Audio.sfx.select(); } catch (e) { /* audio is optional */ } Renderer.rotateView(dir); };
     $('rot-left-btn').addEventListener('click', () => turnView(-1));
@@ -616,6 +616,7 @@ const UI = (() => {
       $('speed-btn').textContent = x + '×';
       $('speed-btn').classList.toggle('fast', x === 2);
       $('speed-btn').classList.toggle('faster', x === 4);
+      $('speed-btn').classList.toggle('fastest', x === 8);
       $('speed-btn').setAttribute('aria-label', `Game speed ${x}×`);
     });
     // the tab going away pauses the fight, so nobody comes back to an empty endpoint
@@ -633,7 +634,7 @@ const UI = (() => {
         if (s.phase === 'title') { e.preventDefault(); $('start-btn').click(); }
         else if (s.phase === 'playing' && !s.paused && !s.waveActive) { e.preventDefault(); Audio.unlock(); GameState.sendWave(); }
       } else if (e.key === 'f' || e.key === 'F') {
-        if (s.phase === 'playing') GameState.setSpeed({ 1: 2, 2: 4, 4: 1 }[s.speed] || 1);
+        if (s.phase === 'playing') GameState.setSpeed(NEXT_SPEED[s.speed] || 1);
       } else if (e.key === 'q' || e.key === 'Q' || e.key === 'e' || e.key === 'E') {
         if (s.phase === 'playing') turnView(e.key === 'q' || e.key === 'Q' ? -1 : 1);
       } else if (e.key === '+' || e.key === '=') {

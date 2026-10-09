@@ -260,7 +260,7 @@ const GameState = (() => {
     return true;
   }
   function setSpeed(x) {
-    state.speed = x === 2 || x === 4 ? x : 1;   // 1x, 2x or 4x
+    state.speed = x === 2 || x === 4 || x === 8 ? x : 1;   // 1x, 2x, 4x or 8x
     emit('speedChanged', state.speed);
     return state.speed;
   }
