@@ -1713,6 +1713,12 @@ rate here. Music tempo and effects stay at normal speed, so dense fights may
 sound busy at 8x. The harness speed checks now cover the 8x step, the cycle back to 1x and
 the valid-speed rule (8 is valid, 16 is not).
 
+**Heartbloom hp reverted to 200** *(user decision)*. The P3-V15 note above
+describes lowering it to 150 after the seeded runner showed it leaking in 11 of 30
+runs. The user chose to revert it. Expect the Level 10 mixed-bot run to lose
+occasionally again (about 56 of 60 won at hp 200 in that measurement). If it is ever
+tuned again, measure hp at the leak first.
+
 **Graphics roadmap**: see `GRAPHICS-ROADMAP.md` for the approved list of
 further graphics work, its priority order, the performance budget and the
 current test status. Read it before starting any graphics task. Its numbered list is the one the
