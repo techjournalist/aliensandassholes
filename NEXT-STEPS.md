@@ -4,7 +4,7 @@ Written 2026-10-07 at the end of a long session, updated after the curving roads
 work. Branches: `graphics-pass-units-tiers` (the graphics and levels 9 and 10 work)
 and `claude/fervent-wright-jeojom` (that plus curving roads on Levels 1 to 8). All work
 is committed and pushed; nothing is merged to `main`. Playable build:
-artifact `https://claude.ai/artifact/TGe33pgijELWBrzFao13TR` (version 14).
+artifact `https://claude.ai/artifact/MsACgADTeeWUG153ocLaiy` (version 7, with the save code; the older TGe33p... link is a stale copy).
 Read `AGENTS.md` first, then the file named in each item below.
 
 ## State of the game
