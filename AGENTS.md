@@ -1789,7 +1789,8 @@ the user's call.
 checks and 10 Meadow golden runs. Harness: 12 new browser checks at 844x390 by
 touch (picker size and fit, defaults, thorn ring, old save, Bramble applied
 and remembered, HUD mark, picker locked mid-battle, Bramble win stored apart,
-win ribbon).
+win ribbon). Full `tools/playtest.js`: 739 of 739 passed, every level won
+by the mixed bot on Meadow, no console errors or warnings.
 
 **Graphics roadmap**: see `GRAPHICS-ROADMAP.md` for the approved list of
 further graphics work, its priority order, the performance budget and the
