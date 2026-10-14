@@ -387,6 +387,7 @@ const UI = (() => {
     const sel0 = LEVELS.find((l) => l.id === mapSelected);
     const inBattle = !!sel0 && sel0.id === GameState.currentLevel().id && GameState.state.phase === 'playing';
     const tier = inBattle ? GameState.state.difficulty : Progress.tier();
+    $('wm-tier').querySelector('.bramble .tier-sub').textContent = `Tougher, ${GameState.DIFFICULTY.bramble.lives} lives`;
     document.querySelectorAll('#wm-tier .tier-btn').forEach((b) => {
       b.setAttribute('aria-checked', String(b.dataset.tier === tier));
       b.tabIndex = b.dataset.tier === tier ? 0 : -1;

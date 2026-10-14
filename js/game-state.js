@@ -80,9 +80,12 @@ const GameState = (() => {
   // the level's own lives apply, so it plays exactly as before tiers existed.
   // Bramble is the harder tier. hp, speed and bounty apply to each enemy as
   // it spawns, gold and lives when a level loads. Waves and maps never change.
+  // Tuned with seeded bot runs (tools/bot-runner.js, 30 per level): the first
+  // draft (hp 1.25, speed 1.1, gold 0.85, 15 lives, bounty 0.9) lost all 200
+  // runs by wave 9. These numbers win 192 of 300 (AGENTS.md P3-D1).
   const DIFFICULTY = {
-    meadow:  { id: 'meadow',  name: 'Meadow',  hp: 1,    speed: 1,    gold: 1,    lives: null, bounty: 1 },
-    bramble: { id: 'bramble', name: 'Bramble', hp: 1.25, speed: 1.10, gold: 0.85, lives: 15,   bounty: 0.9 },
+    meadow:  { id: 'meadow',  name: 'Meadow',  hp: 1,    speed: 1, gold: 1, lives: null, bounty: 1 },
+    bramble: { id: 'bramble', name: 'Bramble', hp: 1.05, speed: 1, gold: 1, lives: 16,   bounty: 0.95 },
   };
   let difficulty = DIFFICULTY.meadow;
 

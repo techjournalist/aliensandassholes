@@ -365,7 +365,7 @@ function difficultyTests(G, LEVELS) {
   const add = (name, ok, detail = '') => out.push({ name: `difficulty: ${name}`, ok, detail });
   const D = G.DIFFICULTY, M = D.meadow, B = D.bramble;
   add('Meadow is every multiplier at 1 and the level\'s own lives', M.hp === 1 && M.speed === 1 && M.gold === 1 && M.bounty === 1 && !M.lives);
-  add('Bramble is harder on every axis', B.hp > 1 && B.speed >= 1 && B.gold < 1 && B.bounty <= 1 && B.lives < 20, JSON.stringify(B));
+  add('Bramble is never easier on any axis, and has tougher foes and fewer lives', B.hp > 1 && B.speed >= 1 && B.gold <= 1 && B.bounty <= 1 && B.lives < 20, JSON.stringify(B));
 
   // Meadow: the same numbers as each level file
   G.setDifficulty('meadow');
