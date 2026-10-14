@@ -7,12 +7,18 @@ const UI = (() => {
   const typingTarget = (e) => { const t = e.target; return !!(t && t.tagName && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)); };
   let toastTimer = 0;
   let debugOn = false, fpsAcc = 0, fpsFrames = 0, fpsShown = 0;
-  const shown = { gold: null, lives: null, wave: null, waveBtn: null, bossName: null };
+  const shown = { gold: null, lives: null, tier: null, wave: null, waveBtn: null, bossName: null };
 
   function updateHud() {
     const s = GameState.state, total = GameState.totalWaves();
     if (shown.gold !== s.gold) { $('hud-gold').textContent = s.gold; shown.gold = s.gold; }
     if (shown.lives !== s.lives) { $('hud-lives').textContent = s.lives; shown.lives = s.lives; }
+    if (shown.tier !== s.difficulty) {
+      const pill = $('hud-lives').parentElement;
+      pill.classList.toggle('bramble', s.difficulty === 'bramble');
+      pill.setAttribute('aria-label', s.difficulty === 'bramble' ? `${s.lives} lives, Bramble` : `${s.lives} lives`);
+      shown.tier = s.difficulty;
+    }
     const wave = s.wave > 0 ? `Wave ${s.wave}/${total}` : 'Prep';
     if (shown.wave !== wave) { $('hud-wave').textContent = wave; shown.wave = wave; }
     const btn = $('wave-btn');
@@ -196,19 +202,21 @@ const UI = (() => {
   }
   const RIBBON = { 3: 'Flawless!', 2: 'Well held!', 1: 'Victory!' };
   function fillFinale() {
-    const data = Progress.load().levels;
+    const data = Progress.load().levels, bramble = GameState.state.difficulty === 'bramble';
     let total = 0;
     const badges = LEVELS.map((lv) => {
-      const n = (data[lv.id] && data[lv.id].stars) || 0;
+      const e = data[lv.id];
+      const n = (e && (bramble ? e.bramble && e.bramble.stars : e.stars)) || 0;
       total += n;
       return `<div class="fb" title="${lv.name}"><b>${lv.index}</b><i>${[1, 2, 3].map((k) => `<span class="${k <= n ? 'on' : ''}">&#9733;</span>`).join('')}</i></div>`;
     });
     const max = LEVELS.length * 3;
     $('finale-line').textContent = 'The last shadow-bloom has withered. Light pours back into every cracked stump and the whole valley wakes to a fine, warm morning.';
     $('finale-badges').innerHTML = badges.join('');
+    const on = bramble ? ' on Bramble' : '';
     $('finale-total').textContent = total === max
-      ? `${total} of ${max} stars. A perfect campaign. Every Bastion stood untouched.`
-      : `${total} of ${max} stars across the campaign. Replay any level to earn the rest.`;
+      ? `${total} of ${max} stars${on}. A perfect campaign. Every Bastion stood untouched.`
+      : `${total} of ${max} stars across the campaign${on}. Replay any level to earn the rest.`;
   }
   function showEnd(won) {
     const s = GameState.state, level = GameState.currentLevel();
@@ -218,7 +226,7 @@ const UI = (() => {
     const finale = won && !next;     // the last level of the campaign gets the big one
     // Showing a win records it again. recordWin only ever adds, so this is harmless when the
     // gameWon listener already did it, and it saves the win if that listener failed to run.
-    if (won) { try { Progress.recordWin(level.id, GameState.stars(), s.lives); } catch (e) { /* never block the win screen */ } }
+    if (won) { try { Progress.recordWin(level.id, GameState.stars(), s.lives, s.difficulty); } catch (e) { /* never block the win screen */ } }
     const end = $('end');
     $('end-title').textContent = finale ? 'The Hollow is healed!' : won ? `${level.endpoint.properName} holds!` : `${level.endpoint.properName} has fallen`;
     const stars = won ? GameState.stars() : 0;
@@ -226,7 +234,7 @@ const UI = (() => {
     $('end-text').textContent = text;
     $('stars').classList.toggle('show', won);
     $('stars').querySelectorAll('span').forEach((el, i) => el.classList.toggle('lit', i < stars));
-    $('end-ribbon-text').textContent = finale ? 'Dawn breaks!' : (RIBBON[stars] || 'Victory!');
+    $('end-ribbon-text').textContent = finale ? 'Dawn breaks!' : (s.difficulty === 'bramble' ? 'Bramble won!' : (RIBBON[stars] || 'Victory!'));
     const mapBtn = $('end-map-btn');
     if (won && next) {
       mapBtn.textContent = 'Continue';
@@ -359,13 +367,31 @@ const UI = (() => {
     }
   }
   let mapSelected = null, firstWin = null;
+  // a ring of hooked thorns around a node beaten on Bramble
+  const THORN_RING = (() => {
+    let d = '';
+    for (let i = 0; i < 9; i++) {
+      const a = (i / 9) * Math.PI * 2 - Math.PI / 2 + 0.2, p = (r, da) => `${(Math.cos(a + da) * r).toFixed(1)} ${(Math.sin(a + da) * r).toFixed(1)}`;
+      d += `M ${p(21.5, -0.2)} L ${p(29, 0.12)} L ${p(21.5, 0.13)} Z `;
+    }
+    return d.trim();
+  })();
   function renderWorldMap() {
     drawMapArt();
     const svg = $('wm-svg');
     svg.querySelectorAll('.wm-node').forEach((n) => n.remove());
     const cuts = $('wm-cuts'), roads = $('wm-roads');
     cuts.innerHTML = ''; roads.innerHTML = '';
-    const won = (lv) => Progress.starsFor(lv.id) > 0;
+    const won = (lv) => Progress.isWon(lv.id);
+    // the tier shown: the battle's own while it is in progress, else the player's pick
+    const sel0 = LEVELS.find((l) => l.id === mapSelected);
+    const inBattle = !!sel0 && sel0.id === GameState.currentLevel().id && GameState.state.phase === 'playing';
+    const tier = inBattle ? GameState.state.difficulty : Progress.tier();
+    document.querySelectorAll('#wm-tier .tier-btn').forEach((b) => {
+      b.setAttribute('aria-checked', String(b.dataset.tier === tier));
+      b.tabIndex = b.dataset.tier === tier ? 0 : -1;
+      b.disabled = inBattle;
+    });
     const ordered = LEVELS.slice().sort((a, b) => a.index - b.index);
     // the next battle to fight: the first unlocked level not yet won
     const next = ordered.find((lv) => Progress.isUnlocked(lv.id) && !won(lv));
@@ -392,20 +418,23 @@ const UI = (() => {
     drawBridges(roads, curves, ordered);
     ordered.forEach((lv, i) => {
       const unlocked = Progress.isUnlocked(lv.id);
-      const stars = Progress.starsFor(lv.id);
+      const stars = Progress.starsFor(lv.id, tier), meadowStars = Progress.starsFor(lv.id), brambleStars = Progress.starsFor(lv.id, 'bramble');
       const { x, y } = mapPos(lv, i);
       const cls = 'wm-node' + (unlocked ? '' : ' locked') + (lv.id === mapSelected ? ' selected' : '') + (next && lv.id === next.id ? ' next' : '');
       const g = svgEl('g', { 'data-level': lv.id, transform: `translate(${x}, ${y})`, tabindex: unlocked ? '0' : '-1', role: 'button' }, cls);
-      g.setAttribute('aria-label', unlocked ? `${lv.name}, ${stars} stars` : `${lv.name}, locked`);
+      g.setAttribute('aria-label', !unlocked ? `${lv.name}, locked`
+        : `${lv.name}, ${meadowStars} stars on Meadow` + (brambleStars ? `, beaten on Bramble with ${brambleStars} stars` : ''));
       const starDots = unlocked
         ? [0, 1, 2].map((k) => `<circle class="wm-star ${k < stars ? 'lit' : ''}" cx="${(k - 1) * 11}" cy="34" r="4"></circle>`).join('')
         : '';
       const glyph = lv.map && GLYPHS[lv.map.icon] ? `<g class="wm-glyph" transform="translate(-36 -16)">${GLYPHS[lv.map.icon]}</g>` : '';
-      const pennant = stars > 0 ? '<line class="wm-pennant-pole" x1="17" y1="-14" x2="17" y2="-40"></line><path class="wm-pennant" d="M 17 -40 L 33 -35 L 17 -30 Z"></path>' : '';
+      // beaten on Bramble: a ring of thorns around the badge
+      const thorn = brambleStars > 0 ? `<g class="wm-thorn"><circle r="22.5"></circle><path d="${THORN_RING}"></path></g>` : '';
+      const pennant = won(lv) ? '<line class="wm-pennant-pole" x1="17" y1="-14" x2="17" y2="-40"></line><path class="wm-pennant" d="M 17 -40 L 33 -35 L 17 -30 Z"></path>' : '';
       g.innerHTML = `
         <circle class="wm-node-hit" r="46"></circle>
         ${next && lv.id === next.id ? '<circle class="wm-next-ring" r="24"></circle>' : ''}
-        ${glyph}${pennant}
+        ${glyph}${pennant}${thorn}
         <circle class="wm-node-badge" r="20"></circle>
         ${unlocked ? `<text class="wm-node-label" text-anchor="middle" dy="6">${lv.index}</text>` : `<text class="wm-lock-icon" text-anchor="middle" dy="6">&#128274;</text>`}
         ${starDots}`;
@@ -572,6 +601,23 @@ const UI = (() => {
       pickNode(e);
     });
     $('wm-play-btn').addEventListener('click', () => { if (mapSelected) commitLevel(mapSelected); });
+    // difficulty: remembered, and applied at once to a level that has not started yet
+    const pickTier = (t) => {
+      Audio.unlock();
+      const v = Progress.setTier(t);
+      if (GameState.difficulty !== v) { try { Audio.sfx.select(); } catch (e) { /* audio is optional */ } }
+      GameState.setDifficulty(v);
+      renderWorldMap();
+      const b = document.querySelector(`#wm-tier .tier-btn[data-tier="${v}"]`);
+      if (b && !b.disabled) b.focus();
+    };
+    $('wm-tier').addEventListener('click', (e) => { const b = e.target.closest('.tier-btn'); if (b && !b.disabled) pickTier(b.dataset.tier); });
+    $('wm-tier').addEventListener('keydown', (e) => {
+      if (!/^Arrow(Left|Right|Up|Down)$/.test(e.key)) return;
+      e.preventDefault(); e.stopPropagation();
+      if (!e.target.closest('.tier-btn') || e.target.disabled) return;
+      pickTier(Progress.tier() === 'meadow' ? 'bramble' : 'meadow');
+    });
     $('restart-btn').addEventListener('click', () => location.reload());
     $('end-map-btn').addEventListener('click', () => {
       const nextId = $('end-map-btn').dataset.nextLevel;
@@ -751,8 +797,8 @@ const UI = (() => {
     GameState.on('enemyKilled', (e) => floater(e.x, 0.9, e.z, `+${e.bounty}`, 'gold'));
     GameState.on('gameWon', () => {
       celebrateFresh = true;
-      firstWin = Progress.starsFor(GameState.currentLevel().id) === 0 ? GameState.currentLevel().id : null;
-      Progress.recordWin(GameState.currentLevel().id, GameState.stars(), GameState.state.lives);
+      firstWin = Progress.isWon(GameState.currentLevel().id) ? null : GameState.currentLevel().id;
+      Progress.recordWin(GameState.currentLevel().id, GameState.stars(), GameState.state.lives, GameState.state.difficulty);
       // only if the result still stands when the timer fires (a stale
       // timer must never put an end screen over a game that's running)
       setTimeout(() => { if (GameState.state.phase === 'won') showEnd(true); }, 900);

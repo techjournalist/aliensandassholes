@@ -76,6 +76,16 @@ const GameState = (() => {
     heartbloom: { id: 'heartbloom', name: 'The Heartbloom',  hp: 200, speed: 0.55, bounty: 170, flying: true,  armor: 1, boss: true },
   };
 
+  // Difficulty tiers. Meadow is the game as tuned: every multiplier is 1 and
+  // the level's own lives apply, so it plays exactly as before tiers existed.
+  // Bramble is the harder tier. hp, speed and bounty apply to each enemy as
+  // it spawns, gold and lives when a level loads. Waves and maps never change.
+  const DIFFICULTY = {
+    meadow:  { id: 'meadow',  name: 'Meadow',  hp: 1,    speed: 1,    gold: 1,    lives: null, bounty: 1 },
+    bramble: { id: 'bramble', name: 'Bramble', hp: 1.25, speed: 1.10, gold: 0.85, lives: 15,   bounty: 0.9 },
+  };
+  let difficulty = DIFFICULTY.meadow;
+
   const listeners = {};
   function on(event, fn) { (listeners[event] = listeners[event] || []).push(fn); }
   // Each listener runs on its own: a failing sound, visual or UI listener
@@ -217,8 +227,9 @@ const GameState = (() => {
     cobbleCells = new Set(primary.slice(Math.max(0, primary.length - def.cobbleTailCells)).map(([c, r]) => key(c, r)));
     spawnCells = new Set(routes.map((rt) => key(rt.cells[0][0], rt.cells[0][1])));
 
+    const startLives = difficulty.lives || def.startLives;
     Object.assign(state, {
-      gold: def.startGold, lives: def.startLives, wave: 0, time: 0,
+      gold: Math.round(def.startGold * difficulty.gold), lives: startLives, startLives, difficulty: difficulty.id, wave: 0, time: 0,
       selected: null, towers: [], enemies: [], waveActive: false, waveQueue: [],
       hpScale: 1, schedule: [], waveTime: 0, prep: 0, endpointState: 0,
       projectiles: [], phase: 'title', paused: false, speed: 1, kills: 0,
@@ -226,6 +237,21 @@ const GameState = (() => {
     emit('levelLoaded', def);
   }
   function currentLevel() { return level; }
+  // Pick the tier for the next level load. On a level that has not started
+  // yet it also resets the starting gold and lives to the new tier's.
+  function setDifficulty(id) {
+    difficulty = DIFFICULTY[id] || DIFFICULTY.meadow;
+    if (level && state.phase === 'title' && state.wave === 0) {
+      state.difficulty = difficulty.id;
+      state.startLives = difficulty.lives || level.startLives;
+      state.lives = state.startLives;
+      state.gold = Math.round(level.startGold * difficulty.gold);
+      emit('livesChanged', state.lives);
+      emit('goldChanged', state.gold);
+    }
+    emit('difficultyChanged', difficulty.id);
+    return difficulty.id;
+  }
   function totalWaves() { return level.waves.length; }
 
   function routeOf(id) {
@@ -398,10 +424,11 @@ const GameState = (() => {
   // -------- enemies --------
   function spawnEnemy(typeId, routeId) {
     const t = ENEMY_TYPES[typeId], route = routeOf(routeId);
-    const hp = Math.round(t.hp * state.hpScale);
+    const d = DIFFICULTY[state.difficulty] || DIFFICULTY.meadow;
+    const hp = Math.round(t.hp * state.hpScale * d.hp);
     const e = {
-      id: nextId++, type: typeId, name: t.name, hp, maxHp: hp, speed: t.speed,
-      flying: t.flying, bounty: t.bounty,
+      id: nextId++, type: typeId, name: t.name, hp, maxHp: hp, speed: t.speed * d.speed,
+      flying: t.flying, bounty: Math.round(t.bounty * d.bounty),
       dist: 0, lane: t.boss ? 0 : (Math.random() - 0.5) * 0.44,   // lateral offset so a crowd doesn't walk single file
       route: route.index, x: route.points[0].x, z: route.points[0].z, dirX: 1, dirZ: 0, age: 0,
       chillUntil: 0, chillMul: 1, rootUntil: 0, speedMul: 1,
@@ -434,15 +461,17 @@ const GameState = (() => {
     e.z = _a.z + dx * lane * funnel;
   }
 
-  // Scale the endpoint's 3 damage-state thresholds to this level's starting
-  // lives, so a level with a different startLives still swaps states at
+  // Scale the endpoint's 3 damage-state thresholds to this run's starting
+  // lives, so a level or tier with a different startLives still swaps states at
   // roughly 65%/30% remaining, matching Level 1's original 13/6-of-20 feel.
   function endpointStateFor(lives) {
-    const L = level.startLives;
+    const L = state.startLives || level.startLives;
     return lives > L * 0.65 ? 0 : lives > L * 0.3 ? 1 : 2;
   }
   function stars() {
-    const [three, two] = level.starThresholds;
+    // a tier with fewer lives scales the thresholds the same way (Bramble: 12 and 6 of 15)
+    const k = (state.startLives || level.startLives) / level.startLives;
+    const three = Math.round(level.starThresholds[0] * k), two = Math.round(level.starThresholds[1] * k);
     return state.lives >= three ? 3 : state.lives >= two ? 2 : 1;
   }
   function leak(e) {
@@ -683,7 +712,7 @@ const GameState = (() => {
     TOWER_TYPES, TOWER_ORDER, TIERS, BRANCHES, ENEMY_TYPES, towerStats, upgradeCost, sellValue, towerById, upgradeTower, sellTower,
     pathPosAt,
     state, on, emit, update, worldX, worldZ, startGame, pause, resume, setSpeed,
-    loadLevel, currentLevel, totalWaves,
+    loadLevel, currentLevel, totalWaves, DIFFICULTY, setDifficulty, get difficulty() { return difficulty.id; },
     selectTile, clearSelection, placeTower, canAfford, towerAt, startWave, sendWave, spawnEnemy, waveInfo, routesForWave, enemiesLeft, stars,
     inGrid, isPath, isStream, isBridge, isBastion, isSpawn, isBuildable, isCobble,
     cellKind, zoneFalloff, pathIndexOf,

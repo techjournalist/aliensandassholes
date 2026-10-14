@@ -31,6 +31,7 @@
     --hollow-wood: #4a3f44;
     --spore: #8a5fc4;
     --canvas: #e9dcc0;
+    --thorn: #9a3f6e;
   }
   * { box-sizing: border-box; }
   html, body {
@@ -387,6 +388,30 @@
   .wm-node.locked .wm-node-badge { stroke: #6d6e66; }
   #wm-blurb { min-height: 44px; }
   #wm-blurb .wm-name { display: block; color: var(--gold); font-weight: 800; }
+  /* difficulty tier picker, next to the Play button */
+  #wm-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px 14px; }
+  #wm-tier { display: inline-flex; gap: 6px; padding: 4px; border-radius: 30px; background: rgba(0, 0, 0, 0.3); }
+  .screen #wm-tier .tier-btn {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+    min-height: 52px; min-width: 104px; padding: 2px 14px; border-radius: 24px; border: 2px solid rgba(246, 236, 212, 0.35);
+    background: linear-gradient(180deg, var(--wood-hi), var(--wood-lo)); color: var(--cream);
+    font-size: 16px; line-height: 1.1; box-shadow: none;
+  }
+  .screen #wm-tier .tier-btn:active { transform: translateY(2px); }
+  .tier-btn .tier-sub { font-size: 11px; font-weight: 700; opacity: 0.8; }
+  .screen #wm-tier .tier-btn[aria-checked="true"] { background: var(--gold); color: var(--ink); border-color: var(--ink); box-shadow: 0 3px 0 var(--ink); }
+  .screen #wm-tier .tier-btn.bramble[aria-checked="true"] { background: var(--thorn); color: var(--cream); }
+  .screen #wm-tier .tier-btn:disabled { opacity: 0.5; cursor: default; transform: none; }
+  .tier-btn.bramble .tier-name::before { content: "\2766\00a0"; }
+  /* a level beaten on Bramble: a thorn mark on its node */
+  .wm-thorn circle { fill: none; stroke: var(--thorn); stroke-width: 4; }
+  .wm-thorn path { fill: var(--thorn); stroke: var(--ink); stroke-width: 1.2; stroke-linejoin: round; }
+  .wm-thorn { pointer-events: none; }
+  .pill.lives.bramble { border-color: var(--thorn); box-shadow: 0 0 0 2px var(--thorn); }
+  @media (max-height: 460px) {
+    .screen #wm-tier .tier-btn { min-height: 44px; min-width: 92px; padding: 0 10px; font-size: 15px; }
+    .tier-btn .tier-sub { font-size: 10px; }
+  }
 
   /* ---- painted UI pass: carved wood panels, gold trim, glossy buttons ----
      Overrides only paint (backgrounds, shadows, text-shadow). No sizes or
@@ -809,7 +834,13 @@
       <g id="wm-fx"></g>
     </svg>
     <p id="wm-blurb" class="stakes">Pick a battle on the map.</p>
-    <button id="wm-play-btn" type="button" disabled>Choose a battle</button>
+    <div id="wm-actions">
+      <div id="wm-tier" role="radiogroup" aria-label="Difficulty">
+        <button type="button" class="tier-btn" role="radio" data-tier="meadow" aria-checked="true"><span class="tier-name">Meadow</span><span class="tier-sub">The usual fight</span></button>
+        <button type="button" class="tier-btn bramble" role="radio" data-tier="bramble" aria-checked="false"><span class="tier-name">Bramble</span><span class="tier-sub">Tougher, 15 lives</span></button>
+      </div>
+      <button id="wm-play-btn" type="button" disabled>Choose a battle</button>
+    </div>
   </div>
 </div>
 

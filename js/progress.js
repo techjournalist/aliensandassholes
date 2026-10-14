@@ -1,5 +1,10 @@
 // ===================================================================
-// Progress  (localStorage: unlocked levels + best star rating per level)
+// Progress  (localStorage: unlocked levels + best star rating per level and tier)
+//
+// Format: { v: 1, levels: { id: { unlocked, stars, bestLives, bramble: { stars,
+// bestLives } } } }. stars and bestLives are the Meadow tier (the only tier
+// before difficulty tiers existed), so an old save is already a valid one; a
+// missing bramble entry is filled in by defaults() like any other field.
 //
 // A win must never be lost. Three copies are kept and merged on every read:
 // localStorage (the saved one), sessionStorage (survives a reload even when
@@ -9,12 +14,13 @@
 // stars always opens the next one, so a half-saved win heals itself.
 // ===================================================================
 const Progress = (() => {
-  const KEY = 'bb-progress', BACKUP = 'bb-progress-session';
+  const KEY = 'bb-progress', BACKUP = 'bb-progress-session', TIER_KEY = 'bb-difficulty';
+  const TIERS = ['meadow', 'bramble'];
   let mem = null;
 
   function defaults() {
     const levels = {};
-    LEVELS.forEach((lv, i) => { levels[lv.id] = { unlocked: i === 0, stars: 0, bestLives: null }; });
+    LEVELS.forEach((lv, i) => { levels[lv.id] = { unlocked: i === 0, stars: 0, bestLives: null, bramble: { stars: 0, bestLives: null } }; });
     return { v: 1, levels };
   }
 
@@ -28,6 +34,7 @@ const Progress = (() => {
   function readStore(store) {
     try { return parse(store.getItem(store === sessionStorage ? BACKUP : KEY)); } catch (e) { return null; }
   }
+  const bestOf = (a, b) => (b === null || b === undefined ? a : a === null || a === undefined ? b : Math.max(a, b));
   // fold `src` into `into`: never takes anything away
   function merge(into, src) {
     for (const id in src.levels) {
@@ -35,17 +42,23 @@ const Progress = (() => {
       if (!a || !b) continue;
       a.unlocked = !!(a.unlocked || b.unlocked);
       a.stars = Math.max(a.stars || 0, b.stars || 0);
-      if (b.bestLives !== null && b.bestLives !== undefined) a.bestLives = a.bestLives === null || a.bestLives === undefined ? b.bestLives : Math.max(a.bestLives, b.bestLives);
+      a.bestLives = bestOf(a.bestLives, b.bestLives);
+      if (b.bramble && typeof b.bramble === 'object') {
+        a.bramble.stars = Math.max(a.bramble.stars || 0, b.bramble.stars || 0);
+        a.bramble.bestLives = bestOf(a.bramble.bestLives, b.bramble.bestLives);
+      }
     }
     return into;
   }
+  const tierOf = (e, tier) => (tier === 'bramble' ? e.bramble : e);
+  const anyStars = (e) => (e.stars || 0) > 0 || ((e.bramble && e.bramble.stars) || 0) > 0;
 
   function load() {
     const data = defaults();
     for (const src of [readStore(localStorage), readStore(sessionStorage), mem]) if (src) merge(data, src);
     // a won level always opens the next one
     for (const lv of LEVELS) {
-      if ((data.levels[lv.id].stars || 0) > 0) {
+      if (anyStars(data.levels[lv.id])) {
         const next = LEVELS.find((l) => l.index === lv.index + 1);
         if (next) data.levels[next.id].unlocked = true;
       }
@@ -59,15 +72,19 @@ const Progress = (() => {
   }
 
   function isUnlocked(id) { return !!load().levels[id]?.unlocked; }
-  function starsFor(id) { return load().levels[id]?.stars || 0; }
+  // stars on one tier (Meadow when no tier is given)
+  function starsFor(id, tier) { const e = load().levels[id]; return (e && tierOf(e, tier).stars) || 0; }
+  // won on any tier
+  function isWon(id) { const e = load().levels[id]; return !!e && anyStars(e); }
 
   // safe to call more than once for the same win: it only ever adds
-  function recordWin(id, stars, lives) {
+  function recordWin(id, stars, lives, tier) {
     const data = load();
-    const entry = data.levels[id] || { unlocked: true, stars: 0, bestLives: null };
+    const entry = data.levels[id] || { unlocked: true, stars: 0, bestLives: null, bramble: { stars: 0, bestLives: null } };
     entry.unlocked = true;
-    entry.stars = Math.max(entry.stars || 0, stars || 0);
-    entry.bestLives = entry.bestLives === null || entry.bestLives === undefined ? lives : Math.max(entry.bestLives, lives);
+    const t = tierOf(entry, tier);
+    t.stars = Math.max(t.stars || 0, stars || 0);
+    t.bestLives = bestOf(t.bestLives, lives);
     data.levels[id] = entry;
     const lv = LEVELS.find((l) => l.id === id);
     if (lv) {
@@ -121,5 +138,17 @@ const Progress = (() => {
     return { ok: true, changed };
   }
 
-  return { load, isUnlocked, starsFor, recordWin, exportCode, importCode };
+  // the difficulty tier the player last picked on the world map
+  function tier() {
+    let t = null;
+    try { t = localStorage.getItem(TIER_KEY); } catch (e) { /* storage may be blocked */ }
+    return TIERS.includes(t) ? t : 'meadow';
+  }
+  function setTier(t) {
+    const v = TIERS.includes(t) ? t : 'meadow';
+    try { localStorage.setItem(TIER_KEY, v); } catch (e) { /* storage may be blocked */ }
+    return v;
+  }
+
+  return { load, isUnlocked, isWon, starsFor, recordWin, exportCode, importCode, tier, setTier };
 })();

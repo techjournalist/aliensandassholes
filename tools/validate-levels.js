@@ -310,6 +310,127 @@ function progressTests() {
   add('a code with every level locked loads without effect', (() => { const z = make(store(), store()); const c = z.exportCode(); return z.importCode(c).ok; })());
   add('a code that is first-level-only still works', (() => { const z = make(store(), store()); z.recordWin(FIRST, 2, 5); const f = make(store(), store()); const res = f.importCode(z.exportCode()); return res.ok && f.starsFor(FIRST) === 2 && f.isUnlocked('millbrook-watch'); })());
   add('save code holds two characters per level plus two check characters', body.length === 2 * Object.keys(make(store(), store()).load().levels).length + 2, `${body.length} chars`);
+
+  // ---- difficulty tiers (P3-D1): stars per tier, old saves still load ----
+  local = store(); session = store();
+  local.m.set('bb-progress', JSON.stringify({ v: 1, levels: { [FIRST]: { unlocked: true, stars: 2, bestLives: 11 } } }));
+  P = make(local, session);
+  const old = P.load().levels[FIRST];
+  add('an old v1 save without tier fields still loads its Meadow stars', old.stars === 2 && old.bestLives === 11 && P.isUnlocked('millbrook-watch'));
+  add('and gets an empty Bramble record filled in', old.bramble && old.bramble.stars === 0 && old.bramble.bestLives === null && P.starsFor(FIRST, 'bramble') === 0);
+  P.recordWin(FIRST, 3, 13, 'bramble');
+  const saved = JSON.parse(local.m.get('bb-progress'));
+  add('a Bramble win is stored apart from Meadow, still as v: 1', saved.v === 1 && saved.levels[FIRST].bramble.stars === 3 && saved.levels[FIRST].bramble.bestLives === 13 && saved.levels[FIRST].stars === 2 && saved.levels[FIRST].bestLives === 11);
+  add('starsFor reads one tier at a time (Meadow by default)', P.starsFor(FIRST) === 2 && P.starsFor(FIRST, 'meadow') === 2 && P.starsFor(FIRST, 'bramble') === 3);
+  P.recordWin(FIRST, 1, 2, 'bramble');
+  add('a worse Bramble replay never lowers Bramble stars or best lives', P.starsFor(FIRST, 'bramble') === 3 && P.load().levels[FIRST].bramble.bestLives === 13);
+  local = store(); session = store(); P = make(local, session);
+  P.recordWin(WON, 1, 4, 'bramble');
+  add('a level won only on Bramble counts as won and opens the next one', P.isWon(WON) && P.starsFor(WON) === 0 && P.isUnlocked(NEXT));
+  // a Bramble-only win that was half saved (no unlock written) still heals
+  local = store(); session = store();
+  local.m.set('bb-progress', JSON.stringify({ v: 1, levels: { [WON]: { unlocked: true, stars: 0, bestLives: null, bramble: { stars: 2, bestLives: 9 } } } }));
+  add('a half-saved Bramble win still opens the next level', make(local, session).isUnlocked(NEXT));
+  // merging copies takes the best of each tier separately
+  local = store(); session = store();
+  local.m.set('bb-progress', JSON.stringify({ v: 1, levels: { [WON]: { unlocked: true, stars: 3, bestLives: 18, bramble: { stars: 1, bestLives: 2 } } } }));
+  session.m.set('bb-progress-session', JSON.stringify({ v: 1, levels: { [WON]: { unlocked: true, stars: 1, bestLives: 5, bramble: { stars: 2, bestLives: 7 } } } }));
+  const mg = make(local, session).load().levels[WON];
+  add('merging copies keeps the best of each tier', mg.stars === 3 && mg.bestLives === 18 && mg.bramble.stars === 2 && mg.bramble.bestLives === 7, JSON.stringify(mg));
+  // a BB1 code (Meadow only) never touches Bramble progress
+  local = store(); session = store(); P = make(local, session);
+  P.recordWin(FIRST, 2, 12, 'bramble');
+  const meadowCode = make(store(), store()); meadowCode.recordWin(FIRST, 3, 18);
+  P.importCode(meadowCode.exportCode());
+  add('loading a BB1 code adds Meadow stars and keeps Bramble stars', P.starsFor(FIRST) === 3 && P.starsFor(FIRST, 'bramble') === 2);
+  // the remembered tier
+  local = store(); session = store(); P = make(local, session);
+  add('the tier defaults to Meadow', P.tier() === 'meadow');
+  P.setTier('bramble');
+  add('a picked tier is remembered across a reload', local.m.get('bb-difficulty') === 'bramble' && make(local, store()).tier() === 'bramble');
+  local.m.set('bb-difficulty', 'nightmare');
+  add('an unknown saved tier reads as Meadow', make(local, store()).tier() === 'meadow');
+  add('blocked storage reads as Meadow and never throws', (() => { const z = make(store({ failWrite: true, nullRead: true }), store()); z.setTier('bramble'); return z.tier() === 'meadow'; })());
+  return out;
+}
+
+// ---- 3e. difficulty tiers (P3-D1) ----
+// Meadow golden runs: the harness mixed bot, seeded, on the engine from before
+// tiers existed (commit 4939813). [lives, gold, kills] for seeds 1 and 2. A
+// deliberate change to a level's waves or economy will move these; regenerate
+// them then with `node tools/bot-runner.js all --seeds 2 --json`.
+const MEADOW_GOLDEN = {"shadow-hollow":[[13,298,172],[8,156,171]],"millbrook-watch":[[9,135,124],[11,99,126]],"cairnwatch":[[7,129,192],[16,300,197]],"splintered-vale":[[4,292,188],[7,346,191]],"elderroot-ward":[[15,316,237],[15,339,237]],"sunken-market":[[10,335,155],[6,289,151]],"amber-terraces":[[2,136,171],[3,175,172]],"frostpine-camp":[[7,140,174],[5,40,172]],"flanked-keep":[[16,317,172],[18,333,174]],"keep-between":[[11,313,147],[3,341,139]]};
+function difficultyTests(G, LEVELS) {
+  const out = [];
+  const add = (name, ok, detail = '') => out.push({ name: `difficulty: ${name}`, ok, detail });
+  const D = G.DIFFICULTY, M = D.meadow, B = D.bramble;
+  add('Meadow is every multiplier at 1 and the level\'s own lives', M.hp === 1 && M.speed === 1 && M.gold === 1 && M.bounty === 1 && !M.lives);
+  add('Bramble is harder on every axis', B.hp > 1 && B.speed >= 1 && B.gold < 1 && B.bounty <= 1 && B.lives < 20, JSON.stringify(B));
+
+  // Meadow: the same numbers as each level file
+  G.setDifficulty('meadow');
+  const bad = [];
+  for (const def of LEVELS) {
+    G.loadLevel(def);
+    if (G.state.gold !== def.startGold || G.state.lives !== def.startLives || G.state.difficulty !== 'meadow') bad.push(def.id);
+  }
+  add('Meadow starts every level with the level file\'s gold and lives', !bad.length, bad.join(' '));
+  const def = LEVELS[0];
+  G.loadLevel(def); G.state.phase = 'playing'; G.state.hpScale = 1.3;
+  const T = G.ENEMY_TYPES;
+  const mOk = Object.keys(T).every((id) => { const e = G.spawnEnemy(id); return e.hp === Math.round(T[id].hp * 1.3) && e.speed === T[id].speed && e.bounty === T[id].bounty; });
+  add('Meadow enemies spawn with their table hp, speed and bounty', mOk);
+  G.state.lives = 16; add('Meadow keeps 16 and 8 lives as the star lines', G.stars() === 3 && ((G.state.lives = 15), G.stars() === 2) && ((G.state.lives = 8), G.stars() === 2) && ((G.state.lives = 7), G.stars() === 1));
+
+  // Bramble: every multiplier applies
+  G.setDifficulty('bramble');
+  const badB = [];
+  for (const d of LEVELS) {
+    G.loadLevel(d);
+    if (G.state.gold !== Math.round(d.startGold * B.gold) || G.state.lives !== B.lives || G.state.startLives !== B.lives || G.state.difficulty !== 'bramble') badB.push(d.id);
+  }
+  add(`Bramble starts every level with ${Math.round(B.gold * 100)}% gold and ${B.lives} lives`, !badB.length, badB.join(' '));
+  G.loadLevel(def); G.state.phase = 'playing'; G.state.hpScale = 1.3;
+  const bOk = Object.keys(T).every((id) => { const e = G.spawnEnemy(id); return e.hp === Math.round(T[id].hp * 1.3 * B.hp) && Math.abs(e.speed - T[id].speed * B.speed) < 1e-9 && e.bounty === Math.round(T[id].bounty * B.bounty); });
+  add('Bramble enemies spawn with scaled hp, speed and bounty', bOk);
+  const grunt = G.spawnEnemy('grunt'), gold0 = G.state.gold;
+  G.state.enemies.length = 0; G.state.enemies.push(grunt); grunt.hp = 1; grunt.armor = 0;
+  // a kill pays the scaled bounty
+  const tw = { x: grunt.x, z: grunt.z };
+  G.state.projectiles.push({ id: 999, towerId: 0, targetId: grunt.id, damage: 5, splash: 0, effect: null, hitsFlying: false, pierce: false, x: tw.x, z: tw.z, sx: tw.x, sz: tw.z, speed: 9, t: 0, total: 1 });
+  G.update(1 / 60);
+  add('a Bramble kill pays the scaled bounty', G.state.gold - gold0 === Math.round(T.grunt.bounty * B.bounty), `${G.state.gold - gold0}`);
+  const k = B.lives / 20, three = Math.round(16 * k), two = Math.round(8 * k);
+  G.state.lives = three; const s3 = G.stars(); G.state.lives = three - 1; const s2 = G.stars(); G.state.lives = two - 1; const s1 = G.stars();
+  add(`Bramble star lines scale with its lives (${three} and ${two} of ${B.lives})`, s3 === 3 && s2 === 2 && s1 === 1);
+  // the endpoint's damage states follow the tier's lives too
+  G.loadLevel(def); G.state.phase = 'playing';
+  const states = [];
+  G.on('endpointStateChanged', (st) => states.push([st, G.state.lives]));
+  for (let i = 0; i < B.lives - 1; i++) { const e = G.spawnEnemy('grunt'); e.dist = 1e9; G.update(1 / 60); }
+  add('the Bastion\'s damage states swap at 65% and 30% of Bramble\'s lives', states.length === 2 && states[0][1] === Math.floor(B.lives * 0.65) && states[1][1] === Math.floor(B.lives * 0.3), JSON.stringify(states));
+
+  // changing tier before a level starts resets its gold and lives; after, it does nothing
+  G.setDifficulty('meadow'); G.loadLevel(def);
+  G.setDifficulty('bramble');
+  add('picking Bramble on a level not yet started applies at once', G.state.lives === B.lives && G.state.gold === Math.round(def.startGold * B.gold) && G.state.difficulty === 'bramble');
+  G.startGame(); G.state.gold = 77; G.setDifficulty('meadow');
+  add('picking a tier mid-battle leaves that battle alone', G.state.gold === 77 && G.state.lives === B.lives && G.state.difficulty === 'bramble');
+  add('an unknown tier falls back to Meadow', G.setDifficulty('nightmare') === 'meadow' && G.difficulty === 'meadow');
+  G.setDifficulty('meadow');
+  return out;
+}
+
+// Meadow must replay today's battles exactly: seeded mixed-bot runs on every
+// level match the pre-tier engine's lives, gold and kills.
+function meadowGoldenTests() {
+  const out = [];
+  const runner = require('./bot-runner');
+  const game = runner.loadGame();
+  for (const [id, runs] of Object.entries(MEADOW_GOLDEN)) {
+    const got = runs.map((_, i) => { const r = runner.runOne(game, id, { seed: i + 1, tier: 'meadow' }); return [r.lives, r.gold, r.kills]; });
+    out.push({ name: `difficulty: Meadow replays ${id} exactly (2 seeded runs: lives, gold, kills)`, ok: JSON.stringify(got) === JSON.stringify(runs), detail: `${JSON.stringify(got)} vs ${JSON.stringify(runs)}` });
+  }
   return out;
 }
 
@@ -344,6 +465,8 @@ function validate() {
   results.push(...curveTests(GameState, LEVELS));
   results.push(...paceTests(GameState, LEVELS));
   results.push(...progressTests());
+  results.push(...difficultyTests(GameState, LEVELS));
+  results.push(...meadowGoldenTests());
   results.push(...engineTests(GameState));
   results.push(...isolationTests());
   return results;
