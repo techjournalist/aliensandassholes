@@ -10,6 +10,11 @@ replay options". They are also thinking about hosting on itch.io or Steam, so
 the design leaves room for a real leaderboard and achievements later.
 
 ## 1. Difficulty tiers (build first)
+**Built** (AGENTS.md P3-D1). The numbers below are the first draft; it lost
+every seeded bot run. Shipped Bramble: hp x1.05, speed x1, gold x1, 16 lives,
+bounty x0.95. Save format as planned (`bramble: { stars, bestLives }`, still
+`v: 1`).
+
 - **Meadow**: exactly today's difficulty. Nothing changes.
 - **Bramble**: the harder tier. Starting numbers, to be tuned with bots:
   - enemy hp x1.25, enemy speed x1.10

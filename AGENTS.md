@@ -1719,11 +1719,83 @@ runs. The user chose to revert it. Expect the Level 10 mixed-bot run to lose
 occasionally again (about 56 of 60 won at hp 200 in that measurement). If it is ever
 tuned again, measure hp at the leak first.
 
+**P3-D1 - Difficulty tiers: Meadow and Bramble** *(on branch
+`claude/fervent-wright-jeojom`, user-requested: ENDLESS-MODE.md section 1)*.
+The player picks a tier on the world map, next to the Play button. Meadow is
+the game as tuned. Bramble is harder. Waves, maps, bosses and level files are
+unchanged.
+
+**Engine.** One table, `GameState.DIFFICULTY`. `loadLevel` reads gold and
+lives from it, `spawnEnemy` reads hp, speed and bounty (each enemy keeps its
+own `bounty`, so the kill code needed no change). `stars()` and the endpoint's
+damage states scale with the run's starting lives (`state.startLives`), so
+Bramble's star lines are 13 and 6 of 16. `GameState.setDifficulty(id)` picks
+the tier for the next load and, on a level still at the title phase, resets
+its gold and lives at once. Mid-battle it changes nothing. The run's tier is
+`state.difficulty`. Meadow is every multiplier at 1 and the level's own lives.
+
+**Meadow is exact.** 200 seeded mixed-bot runs (20 per level) on the engine
+before tiers (`git show 4939813:js/game-state.js`) and after matched on lives,
+gold and kills in every run. The validator now replays two seeds per level and
+compares them to those pinned numbers (`MEADOW_GOLDEN`). A deliberate change
+to a level's waves or economy will move them; regenerate them then.
+
+**Progress.** Still `v: 1`. Each level gains `bramble: { stars, bestLives }`;
+the old `stars` and `bestLives` stay as the Meadow record, so an old save is
+already valid and `defaults()` fills the missing field. Merging takes the best
+of each tier separately and only ever adds. A win on either tier unlocks the
+next level and counts as won for the map's pennant and reclaimed ground.
+`Progress.recordWin(id, stars, lives, tier)`, `starsFor(id, tier)` (Meadow by
+default), `isWon(id)`. The picked tier is saved as `bb-difficulty`
+(`Progress.tier()` and `setTier()`); boot applies it before loading a level.
+The BB1 save code still carries Meadow only and loading one keeps Bramble
+stars. A BB2 code with Bramble stars is not built: the user decides first.
+
+**UI.** Two radio buttons (Meadow, Bramble) beside Play, 52px tall (44px on
+short screens), arrow keys switch them. They show the battle's own tier and
+lock while returning to a battle in progress. Node star dots follow the
+picked tier. A level beaten on Bramble gets a ring of thorns around its node
+(a small badge read as a check mark or a star; the ring reads as thorns). The
+HUD lives pill gets a thorn-colored ring on Bramble, the win ribbon says
+"Bramble won!" and the finale recap counts the tier just played. New color
+`--thorn: #9a3f6e`. At 844x390 the card fits (1 to 389px) with no sideways
+scroll.
+
+**Tuning (seeded runs, `tools/bot-runner.js`, the P3-V12 runner now
+committed).** The starting numbers (hp 1.25, speed 1.1, gold 0.85, 15 lives,
+bounty 0.9) lost all 200 runs, most by wave 5 to 7. Alone, each lever (10
+seeds per level): hp 1.25 won 32 of 100, hp 1.1 63, lives 15 74, speed 1.1 81,
+bounty 0.9 88, gold 0.85 94. Combined they compound: hp 1.05, speed 1.05, gold
+0.9, 15 lives and bounty 0.9 won 11 of 100. Final numbers: **hp 1.05, speed 1,
+gold 1, 16 lives, bounty 0.95**, 192 of 300 wins (64%). Per level, 30 seeds:
+Shadow Hollow 29, Millbrook 30, Cairnwatch 23, Splintered Vale 6, Elderroot 28,
+Sunken Market 24, Amber Terraces 5, Frostpine 10, Flanked Keep 25, Keep Between 12.
+
+**Why the spread, measured before touching anything.** On Amber Terraces,
+Frostpine Camp and Splintered Vale the bot already leaks a fixed enemy type in
+every Meadow run: the Matriarch at 243 to 517 of 960 hp (20 of 20 runs), the
+Rime Swarm at 125 to 219 of 992 (20 of 20), and 5 bats on Splintered's wave 5
+(20 of 20). That is the bot's anti-air ceiling, the AGENTS.md P3-M6/M7
+pattern, and it leaves 3.5 to 6 lives of Meadow margin. Bramble removes that
+margin; on Bramble the Matriarch leaks at 306 to 550 of 1008 and the Rime Swarm
+at 239 to 347 of 1042. No uniform setting tried lifted Amber above 2 of 10
+without making Millbrook and Shadow Hollow trivial. Speed and gold were left
+at 1 because they hurt exactly those levels most. No wave, boss or level
+economy was changed. Per-level trims inside the table, or a bot that builds
+anti-air the way a person would, are the two ways to even the spread; both are
+the user's call.
+
+**Checked.** 342 validator checks, including 13 tier checks, 13 progress
+checks and 10 Meadow golden runs. Harness: 12 new browser checks at 844x390 by
+touch (picker size and fit, defaults, thorn ring, old save, Bramble applied
+and remembered, HUD mark, picker locked mid-battle, Bramble win stored apart,
+win ribbon).
+
 **Graphics roadmap**: see `GRAPHICS-ROADMAP.md` for the approved list of
 further graphics work, its priority order, the performance budget and the
 current test status. Read it before starting any graphics task. Its numbered list is the one the
 user was given in chat and is authoritative.
 
-**Endless mode, difficulty tiers and daily run**: designed, not built. See `ENDLESS-MODE.md` for the plan, build order, save-format notes and itch.io and Steam hosting notes. Read it before starting any of that work.
+**Endless mode, difficulty tiers and daily run**: tiers built (P3-D1), the rest designed, not built. See `ENDLESS-MODE.md` for the plan, build order, save-format notes and itch.io and Steam hosting notes. Read it before starting any of that work.
 
 **What is left to do**: see `NEXT-STEPS.md` for the current open items in priority order and the working notes from the last long session. Read it at the start of a new chat.

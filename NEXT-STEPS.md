@@ -8,6 +8,11 @@ artifact `https://claude.ai/artifact/MsACgADTeeWUG153ocLaiy` (version 7, with th
 Read `AGENTS.md` first, then the file named in each item below.
 
 ## State of the game
+- Difficulty tiers: Meadow (as tuned) and Bramble (hp x1.05, bounty x0.95, 16
+  lives), picked beside the Play button and saved as `bb-difficulty`. Stars are
+  stored per tier, a Bramble win puts a thorn ring on the map node. Bramble wins
+  64% of seeded bot runs but the spread per level is wide (Amber Terraces 5 of
+  30, Millbrook 30 of 30). AGENTS.md P3-D1.
 - 10 levels, each with a finale boss except Level 2. All 10 use `curvyRoads`.
   Levels 9 and 10 (the dawn levels) also use `js/dawn-kit.js`. Levels 1 to 8 set
   `curveKeepsPace`, so walkers slow to match the shorter curved road (AGENTS.md
@@ -34,7 +39,7 @@ Read `AGENTS.md` first, then the file named in each item below.
   shadows, softer glow, haze gradient, resolution governor (AGENTS.md P3-V11).
 - World map has a bridge where roads cross (hills, mountain shadows and a river
   bridge were tried and reverted at the user's request; do not redo them).
-- Tests: `node tools/validate-levels.js` passes (306 checks). The full
+- Tests: `node tools/validate-levels.js` passes (342 checks). The full
   `tools/playtest.js` passed 617 of 617 on the curving roads work, with all 10
   levels won by the mixed bot, so the old Level 6 cascade that locked Levels 7 to
   10 is gone (Level 6 was rebalanced; the root cause, unseeded `Math.random`, is
@@ -53,8 +58,10 @@ Read `AGENTS.md` first, then the file named in each item below.
 3. **Seeded gameplay randomness.** Replace unseeded `Math.random` in gameplay (enemy
    lane jitter, a few effects) with a seeded generator. It fixes the flaky Level 6
    test cascade and is needed for the daily run. See `ENDLESS-MODE.md` section 3.
-4. **Difficulty tiers: Meadow and Bramble.** `ENDLESS-MODE.md` section 1. Moderate:
-   about 1 to 2 hours of code, about half a day of bot tuning across 10 levels.
+4. ~~Difficulty tiers: Meadow and Bramble.~~ **Done** (AGENTS.md P3-D1). Open, for
+   the user to decide: (a) a BB2 save code that carries Bramble stars and still
+   accepts BB1; (b) whether to even out Bramble per level (per-level trims in the
+   difficulty table, or a bot that builds anti-air like a person before judging).
 5. **Endless mode, then the daily run.** `ENDLESS-MODE.md` sections 2 and 3.
 6. **New enemies:** Spore-Medic, Sapper, Digger (one each for Levels 8, 9 and 10).
    Pod-Bearer and Magpie were dropped by the user. `ENDLESS-MODE.md` section 7.
@@ -72,6 +79,10 @@ Read `AGENTS.md` first, then the file named in each item below.
     section 4. Check platform docs before relying on them.
 
 ## Working notes that saved time
+- Seeded bot runner: `node tools/bot-runner.js all --tier bramble --seeds 30`
+  (about 1.5 minutes for all 10 levels; `--leaks` lists leaks by wave and type,
+  `--set hp=1.1,lives=15` overrides a tier for a sweep, `--engine <file>` swaps in
+  another `game-state.js` to compare engines on identical seeds).
 - Balance method: run 10 or more isolated bot runs per level (scratchpad `l4bot.js`
   pattern) and look at the leak type before changing numbers: a constant leak of one
   enemy type is either a damage ceiling or a coverage gap. A boss leak costs 5 lives.
