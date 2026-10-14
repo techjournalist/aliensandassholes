@@ -1319,6 +1319,44 @@ async function enterLevel(page, levelId) {
   await page.evaluate(() => { GameState.state.enemies.length = 0; document.getElementById('end').classList.remove('show'); });
   await ctx.close();
 
+  // ---------------- Difficulty tiers (P3-D1), on a phone-sized landscape screen ----------------
+  ctx = await makeContext(browser, { viewport: { width: 844, height: 390 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
+  page = await ctx.newPage();
+  watch(page, log);
+  // a save from before tiers existed (no bramble fields), plus Level 1 won on Bramble
+  await page.addInitScript(() => { if (!sessionStorage.getItem('tier-seeded')) { sessionStorage.setItem('tier-seeded', '1'); localStorage.setItem('bb-progress', JSON.stringify({ v: 1, levels: { 'shadow-hollow': { unlocked: true, stars: 3, bestLives: 18, bramble: { stars: 2, bestLives: 9 } }, 'millbrook-watch': { unlocked: true, stars: 2, bestLives: 10 } } })); } });
+  await page.goto(PAGE);
+  await page.waitForTimeout(1500);
+  check('tiers: a fresh visit starts on Meadow with the level\'s own gold and lives', await page.evaluate(() => GameState.state.difficulty === 'meadow' && GameState.state.lives === 20 && GameState.state.gold === GameState.currentLevel().startGold));
+  await page.locator('#start-btn').click(); await page.waitForTimeout(300);
+  const tierBoxes = await page.evaluate(() => ['meadow', 'bramble'].map((t) => { const r = document.querySelector(`.tier-btn[data-tier="${t}"]`).getBoundingClientRect(); return { w: r.width, h: r.height, bottom: r.bottom }; }).concat([(() => { const r = document.getElementById('wm-play-btn').getBoundingClientRect(); return { w: r.width, h: r.height, bottom: r.bottom }; })()]));
+  check('tiers: the picker sits beside Play, every button 44px and on screen at 844x390', tierBoxes.every((b) => b.w >= 44 && b.h >= 44 && b.bottom <= 390) && await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), JSON.stringify(tierBoxes));
+  check('tiers: Meadow is checked by default', (await page.locator('.tier-btn[data-tier="meadow"]').getAttribute('aria-checked')) === 'true');
+  check('tiers: a level beaten on Bramble shows the thorn ring, others do not', await page.evaluate(() => !!document.querySelector('.wm-node[data-level="shadow-hollow"] .wm-thorn') && !document.querySelector('.wm-node[data-level="millbrook-watch"] .wm-thorn')));
+  check('tiers: an old save without tier fields keeps its Meadow stars', await page.evaluate(() => Progress.starsFor('millbrook-watch') === 2 && Progress.starsFor('millbrook-watch', 'bramble') === 0));
+  await page.locator('.tier-btn[data-tier="bramble"]').tap(); await page.waitForTimeout(200);
+  const br = await page.evaluate(() => ({ checked: document.querySelector('.tier-btn[data-tier="bramble"]').getAttribute('aria-checked'), saved: localStorage.getItem('bb-difficulty'), s: GameState.state.difficulty, lives: GameState.state.lives, gold: GameState.state.gold, want: Math.round(GameState.currentLevel().startGold * GameState.DIFFICULTY.bramble.gold), wantLives: GameState.DIFFICULTY.bramble.lives, lit: document.querySelectorAll('.wm-node[data-level="shadow-hollow"] .wm-star.lit').length }));
+  check('tiers: tapping Bramble picks it, saves it and applies it to the waiting level', br.checked === 'true' && br.saved === 'bramble' && br.s === 'bramble' && br.lives === br.wantLives && br.gold === br.want, JSON.stringify(br));
+  check('tiers: node stars follow the picked tier', br.lit === 2, JSON.stringify(br));
+  await page.reload(); await page.waitForTimeout(1500);
+  check('tiers: the picked tier is remembered after a reload', await page.evaluate(() => GameState.state.difficulty === 'bramble' && GameState.state.lives === GameState.DIFFICULTY.bramble.lives));
+  await page.locator('#start-btn').click(); await page.waitForTimeout(300);
+  await page.locator('.wm-node[data-level="shadow-hollow"]').tap(); await page.waitForTimeout(150);
+  await page.locator('#wm-play-btn').tap(); await page.waitForTimeout(300);
+  check('tiers: the HUD lives pill marks a Bramble battle', await page.evaluate(() => GameState.state.phase === 'playing' && document.getElementById('hud-lives').parentElement.classList.contains('bramble')));
+  await page.evaluate(() => GameState.pause()); await page.waitForTimeout(150);
+  await page.locator('#pause-map-btn').tap(); await page.waitForTimeout(250);
+  check('tiers: the picker is locked while returning to a battle in progress', await page.evaluate(() => document.getElementById('worldmap').classList.contains('show') && [...document.querySelectorAll('.tier-btn')].every((b) => b.disabled) && document.querySelector('.tier-btn[aria-checked="true"]').dataset.tier === 'bramble'));
+  await page.locator('#wm-play-btn').tap(); await page.waitForTimeout(200);
+  await page.evaluate(() => { document.getElementById('pause').classList.remove('show'); GameState.resume(); });
+  // a Bramble win goes to the Bramble record only
+  await page.evaluate(() => { GameState.state.lives = 14; GameState.state.phase = 'won'; GameState.emit('gameWon'); });
+  check('tiers: a Bramble win is stored as Bramble stars and leaves Meadow stars alone', await page.evaluate(() => Progress.starsFor('shadow-hollow', 'bramble') === 3 && Progress.starsFor('shadow-hollow') === 3 && Progress.load().levels['shadow-hollow'].bestLives === 18 && Progress.load().levels['shadow-hollow'].bramble.bestLives === 14));
+  await page.locator('#end.show').waitFor({ timeout: 10000 }).catch(() => {});
+  check('tiers: the Bramble win screen says so', await page.evaluate(() => document.getElementById('end').classList.contains('show') && document.getElementById('end-ribbon-text').textContent === 'Bramble won!'));
+  await page.screenshot({ path: `${OUT}/tiers-bramble-win.png` });
+  await ctx.close();
+
   // ---------------- Mobile, touch ----------------
   ctx = await makeContext(browser, { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
   page = await ctx.newPage();

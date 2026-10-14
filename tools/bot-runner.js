@@ -43,8 +43,11 @@ function loadGame(enginePath) {
   const ctx = { Math: M, console };
   vm.createContext(ctx);
   vm.runInContext(src, ctx, { filename: 'game-bundle.js' });
-  const game = { ...ctx.__game, M, bossLog: null };
-  game.GameState.on('enemyLeaked', (e) => { if (e.boss && game.bossLog) game.bossLog.push({ wave: game.GameState.state.wave, hp: e.hp, maxHp: e.maxHp }); });
+  const game = { ...ctx.__game, M, bossLog: null, leakLog: null };
+  game.GameState.on('enemyLeaked', (e) => {
+    if (e.boss && game.bossLog) game.bossLog.push({ wave: game.GameState.state.wave, hp: e.hp, maxHp: e.maxHp });
+    if (game.leakLog) game.leakLog.push(`w${game.GameState.state.wave}:${e.type}`);
+  });
   return game;
 }
 
@@ -63,6 +66,7 @@ function runOne(game, levelId, { seed = 1, tier = 'meadow', plan, spots, pick = 
   const S = G.state;
   S.phase = 'playing';
   const bossLeaks = game.bossLog = [];
+  const leakTypes = game.leakLog = [];
   const branchFor = (t) => {
     const keys = Object.keys(G.BRANCHES[t.type]);
     if (pick !== 'alt') return keys[pick];
@@ -96,8 +100,8 @@ function runOne(game, levelId, { seed = 1, tier = 'meadow', plan, spots, pick = 
     leaks.push(l0 - S.lives);
     if (S.phase !== 'playing') break;
   }
-  game.bossLog = null;
-  return { level: levelId, tier, seed, phase: S.phase, won: S.phase === 'won', lives: S.lives, gold: S.gold, kills: S.kills, wave: S.wave, stars: S.phase === 'won' ? G.stars() : 0, leaks, bossLeaks };
+  game.bossLog = null; game.leakLog = null;
+  return { level: levelId, tier, seed, phase: S.phase, won: S.phase === 'won', lives: S.lives, gold: S.gold, kills: S.kills, wave: S.wave, stars: S.phase === 'won' ? G.stars() : 0, leaks, bossLeaks, leakTypes };
 }
 
 function runMany(game, levelId, opts = {}) {
@@ -113,6 +117,7 @@ function runMany(game, levelId, opts = {}) {
     meanLives: wins.length ? +(wins.reduce((a, r) => a + r.lives, 0) / wins.length).toFixed(1) : 0,
     lostAt, bossLeakRuns: runs.filter((r) => r.bossLeaks.length).length,
     bossHpAtLeak: bossLeaks.map((b) => `${b.hp}/${b.maxHp}@w${b.wave}`),
+    leakTypes: runs.flatMap((r) => r.leakTypes).reduce((m, k) => { m[k] = (m[k] || 0) + 1; return m; }, {}),
     detail: runs,
   };
 }
@@ -127,6 +132,9 @@ if (require.main === module) {
   const seeds = +opt('--seeds', 10), from = +opt('--from', 1);
   const engine = opt('--engine', null);
   const game = loadGame(engine && path.resolve(engine));
+  // --set hp=1.1,speed=1,gold=0.9,lives=15,bounty=1 overrides the chosen tier's multipliers for a tuning sweep
+  const set = opt('--set', null);
+  if (set) for (const kv of set.split(',')) { const [k, v] = kv.split('='); game.GameState.DIFFICULTY[tier][k] = +v; }
   const ids = which === 'all' ? game.LEVELS.slice().sort((a, b) => a.index - b.index).map((l) => l.id) : [which];
   const out = [];
   for (const id of ids) {
@@ -134,6 +142,7 @@ if (require.main === module) {
     out.push(r);
     if (!args.includes('--json')) {
       const lost = Object.entries(r.lostAt).map(([w, n]) => `w${w}x${n}`).join(' ');
+      if (args.includes('--leaks')) console.log('   leaks', JSON.stringify(r.leakTypes));
       console.log(`${id.padEnd(16)} ${tier.padEnd(8)} won ${String(r.wins).padStart(2)}/${r.runs}  lives ${String(r.meanLives).padStart(4)}  lost ${lost || '-'}  boss leaks ${r.bossLeakRuns || 0}${r.bossHpAtLeak.length ? '  hp ' + r.bossHpAtLeak.slice(0, 6).join(' ') : ''}`);
     }
   }
