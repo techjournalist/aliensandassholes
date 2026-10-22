@@ -1,4 +1,56 @@
-# Project: Briar & Bastion (original tower defense)
+# Project: Knights & Knaves (medieval fork of Briar & Bastion)
+
+## This branch is a fork
+Knights & Knaves is a medieval reskin of Briar & Bastion. The engine,
+mechanics, design pillars, workflow and quality bar below all still apply;
+only the theme, characters and levels changed. Where the sections below
+name Briar & Bastion content (gnomes, the Shadow Hollow, Levels 1-8), read
+them as the history of the engine this fork is built on.
+
+**World**: the Kingdom of Aldermere, a sunny storybook realm of limestone
+castles and thatched villages (royal blue, heraldic red, gold). The Black
+Baron's knaves march out of war camps at every road mouth; the ground
+around the camps is ash and smoldering embers instead of the Hollow's
+corruption (the engine's `hollow*` palette keys hold those colors). The
+world map's "blight" is the Baron's occupation, rolled back by each win.
+
+**Role ids are unchanged** so the engine, tests and tooling carry over:
+| id | Tower | Branches (tier 3) |
+|---|---|---|
+| slinger | Javelin Squire | Huntsman (marksman) / Skirmisher (bloom) |
+| warden | Pitchpot Friar | Tar Abbot (thicket) / Firepot Friar (briarstorm) |
+| druid | Court Magus | Winter Magus (hoarfrost) / Star Seer (seer) |
+| golem | Hammer Knight | Thunder Knight (earthshaker) / Armorbreaker (mountainheart) |
+| artillery | Longbowman | Fire Archers (oakfall) / Volley Captain (squirrel) |
+
+Enemies: grunt = Brigand, trickster = Cutpurse, troll = Black Knight,
+bat = Gargoyle. Bosses: `ram` (The Siege Ram, the first ground boss: a
+boss that is not flying walks like other ground units and every tower can
+hit it), `stonelord` (The Gargoyle Lord, the swarm rig) and `dragon` (The
+Black Dragon, its own view with wingbeats and fire breath).
+
+**Levels** (`js/level*.js`, shared set dressing in `js/level-common.js`):
+1. Hollybrook Manor: one long winding road that doubles back on itself,
+   the Mill Bridge, Siege Ram finale. 12 waves.
+2. Ravensford: two roads joining before the ford, a beacon watchtower.
+   12 waves.
+3. St Wendel's Abbey: three roads, one a switchback, a covered bridge, the
+   Gargoyle Lord finale. 12 waves.
+4. Castle Aldermere: three looping roads (a hairpin Ridge Road, a Fen
+   loop) joining before the drawbridge, the Black Dragon finale. 14 waves.
+
+Storage keys are `kk-*` (progress, mute, active level) so the fork never
+reads the original game's saves. The original eight Briar & Bastion level
+files are no longer loaded by `index.html`.
+
+**Balance tooling**: besides `tools/playtest.js`, a headless bot that
+replays `runBotOn` over the plain game logic (via `validate-levels.js`'s
+`loadGame`) runs the whole campaign in seconds; use that pattern for
+first-pass wave tuning, then confirm in the browser harness.
+
+---
+
+## Engine history: Briar & Bastion (original tower defense)
 
 ## Goal
 A single-file, browser-playable tower defense game built to AAA-level craft

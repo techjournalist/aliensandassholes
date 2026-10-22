@@ -23,14 +23,14 @@ engine; `renderer-fx.js` holds the shader factories) come after,
 then `js/input.js`/`js/ui.js`/`js/audio.js`/`js/boot.js`.
 
 `tools/level-fixtures.js` holds the tile coordinates, gold amounts, and wave
-counts that are literal to one level's geometry, one entry per level id. As
-of Level 2, `playtest.js` runs Level 1's mechanic-level checks (M1-M9,
-upgrades/sell, flying rule, rooting, boss, pause/speed/mute, resize) inline
-as before — those don't vary by level — then runs a `runBotOn(plan, spots,
-totalWaves)` mixed-defense and single-tower-type pass against each
-additional level, reading its `botBuildSpots`/`waveCount` from this fixture
-table. A third level should extend that same per-level block rather than
-duplicating Level 1's full mechanic suite again.
+counts that are literal to one level's geometry, one entry per level id.
+`playtest.js` runs the mechanic-level checks (tile rules, upgrades/sell,
+the flying rule, rooting, branch duels, boss, pause/speed/mute, resize) on
+Level 1 using its fixture entry, then loops every later level in `LEVELS`
+through the same block: road markers, lone-tower checks, a mixed-defense
+bot, the win screen and a single-tower-type pass. A new level only needs a
+fixture entry; the last level in the list also carries the
+finished-level replay checks.
 
 `validate-levels.js` (plain Node, no browser; `playtest.js` runs it first)
 loads the palette, level files and `GameState` into a `vm` context. It
