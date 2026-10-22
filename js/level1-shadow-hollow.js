@@ -154,6 +154,7 @@ const LEVEL_1 = (() => {
       const cx = worldX((cells[0][0] + cells[cells.length - 1][0]) / 2);
       const cz = worldZ((cells[0][1] + cells[cells.length - 1][1]) / 2);
       const wm = M(cx, 0, cz);
+      batchDecal(cx + 0.1, cz + 0.1, 1.35, 2.2);   // the keep throws a long shadow
       const stone = PALETTE.stone, dark = PALETTE.stoneDark;
       const H = 1.9;   // keep wall height: tall enough that the walls read from the camera angle
       // main keep body, a moss line along the top and a darker stone footing
@@ -480,6 +481,8 @@ const LEVEL_1 = (() => {
       name: 'the Bastion', properName: 'The Bastion',
       cells: [[16, 6], [17, 6], [16, 7], [17, 7], [16, 8], [17, 8]], gateCell: [16, 8],
     },
+    curvyRoads: true,   // the road is a smooth ribbon and enemies follow the curve
+    curveKeepsPace: true,   // shorter road, proportionally slower walkers: same time spawn to gate as the straight road
     cobbleTailCells: 3,
     theme: { center: [0.6, 2.1], radiusOut: { x: 4.1, z: 3.4 }, radiusIn: 1.18, falloffWidth: 0.42 },
     spawnBlockedText: 'Nothing grows on the Hollow stump.',

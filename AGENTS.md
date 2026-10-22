@@ -1,6 +1,15 @@
 # Project: Knights & Knaves (medieval fork of Briar & Bastion)
 
 ## This branch is a fork
+**Base**: forked from `claude/fervent-wright-jeojom`, the most recent active
+Briar & Bastion branch, so it keeps everything that branch has: the settings
+screen (effects and music switches and volumes, a camera-buttons switch),
+generative music, the rotatable, tiltable, zoomable camera, difficulty tiers,
+save codes, 8x speed, victory screens, health bars, endless mode (engine
+only) and the per-limb enemy rig. Lesson from the first attempt: it was
+forked from `main`, which was weeks behind, and every one of those features
+was missing. Always fork from the most recent active branch.
+
 Knights & Knaves is a medieval reskin of Briar & Bastion. The engine,
 mechanics, design pillars, workflow and quality bar below all still apply;
 only the theme, characters and levels changed. Where the sections below
@@ -39,8 +48,16 @@ Black Dragon, its own view with wingbeats and fire breath).
 4. Castle Aldermere: three looping roads (a hairpin Ridge Road, a Fen
    loop) joining before the drawbridge, the Black Dragon finale. 14 waves.
 
-Storage keys are `kk-*` (progress, mute, active level) so the fork never
-reads the original game's saves. The original eight Briar & Bastion level
+All four levels set `curvyRoads: true` and `curveKeepsPace: true`, the base
+branch's curved-road option, so roads bend smoothly through their corners
+instead of turning on the grid. The validator keeps every curve within
+0.75 cells of its road cells; Castle Aldermere's highway needed a wider U
+and two collinear waypoints to pass.
+
+Storage keys are `kk-*` (progress, mute, audio, camera view and tilt,
+difficulty, active level) so the fork never reads the original game's saves.
+Difficulty tiers keep their engine ids (`meadow`, `bramble`) but are named
+Squire and Knight on screen. Save codes start `KK1-` (the BB2 layout). The original eight Briar & Bastion level
 files are no longer loaded by `index.html`.
 
 **Balance tooling**: besides `tools/playtest.js`, a headless bot that
@@ -1112,3 +1129,780 @@ they've already confirmed are solid. `tools/level-fixtures.js`'s
 future full harness run picks up the new wave automatically. A full
 `tools/playtest.js` run has not been done since this change; recommended
 before the next release-quality checkpoint, not required now.
+
+**P3-V3 — Graphics pass 2: presence, terrain, effects, UI** *(on branch
+`graphics-pass-units-tiers`, not yet merged)*. The user asked for the game
+to look closer to AAA and to make upgrades visually distinct, with frame rate
+protected. Measured first: the world was strong but units were tiny beside the
+scenery (about 20px tall at 1280x720). Changes, all render-side (`GameState`
+untouched): towers display 1.25x and ground enemies and bats 1.4x (multiplier
+in the update loop only, ranges and hit logic unchanged); bats got a scalloped
+extruded wing geometry and a lighter `batWing` palette entry; each tower has a
+distinct tier-2 accessory set (`TIER2_PARTS`) and each tier stands 6% taller,
+with tier 3 keeping its branch parts on top; trees come in three species
+(broadleaf, conifer, poplar) that use only the three meadow greens so the
+per-level retints still work, and the two new species are cheaper than the
+broadleaf; build plots stand on low stone plinths; flat moss, earth and clover
+patches dot the meadow and mud and puddles wear the dirt roads (merged, one
+draw call each); the forest rim outside the grid steps up into low hills
+(`rimHeight`/`groundYAt`, the playable grid stays perfectly flat, and props,
+grass and shadows follow the rim height); batched shadows are now stretched
+and pushed away from the sun instead of round; shockwave rings are one
+`InstancedMesh` (additive, fades by darkening) fired on impacts, kills and
+upgrades, plus tiny sparks and a muzzle flash from the existing particle pool;
+enemies twist against their stride and trolls and grunts kick up footfall dust;
+the UI is repainted (wood gradient panels, rivets, trim, glossy buttons, a
+glow on the ready wave button) with CSS only, so no layout or touch target
+changed. Deliberately not done: real shadow maps and full-screen bloom (both
+excluded above for mobile frame rate), and skeletal or per-limb enemy walk
+cycles (each live part costs draw calls per enemy; tower attacks already had
+wind-up and recoil).
+
+Perf, measured with the debug overlay under software rendering: Level 1 title
+view 113 calls and 167.7k triangles (budget 158 and 189k, was 110 and 172.6k);
+a mid-wave scene with 13 goblins and 5 towers 262 calls and 193.9k triangles
+versus 259 and 198.8k on the committed code before this pass. Real-phone frame
+rate has not been measured. Harness note: untouched `main` in this
+environment also loses Level 6's mixed-bot check (the documented unseeded-RNG
+flake), which locks Levels 7 and 8 and fails about 19 checks by cascade.
+
+**P3-V4 — Graphics roadmap items 1 to 4** *(on branch
+`graphics-pass-units-tiers`)*. (1) Boss entrance: a camera director in
+`renderer.js` (`updateCameraDirector`, wall-clock time so a slow frame cannot
+stall it) pans and zooms the ortho frustum toward the boss for about 2.8s,
+and a DOM ribbon banner plus dark purple screen edges play from `ui.js`
+(`bossIntro`). A boss death gives a zoom punch. Picking and outline thickness
+follow the zoom. (2) Living world: instanced birds and butterflies (two draw
+calls each species, flapped by rewriting instance matrices), plus scrolling
+cloud shadows on one quad; mostly-blighted levels get fewer or none. (3) Title
+and map art: an SVG crest, soft sun rays, drifting clouds and CSS fireflies on
+the title; a compass, sea ripples and drifting cloud shadows on the world map.
+(4) Camera polish: a slow drift on the title screen, plus a desktop-only
+tilt-shift blur strip at the top and bottom edges (`pointer: fine`, min width
+900px, so phones never pay for a blur over the canvas). Also fixed: renderer
+effects now draw from their own `fxRand` stream instead of `Math.random`,
+which the balance duel seeds (visuals had been changing gameplay-adjacent
+random draws). Level 1 title view is now 118 draw calls and 167.8k triangles
+(budget 158 and 189k); a boss scene reads about 155 to 158 calls.
+
+**P3-V4 addendum — gaps closed after the user's checklist review.** The
+user's own numbered list (camera polish, boss moments, unit readability,
+living world) was compared against what P3-V4 built and three things were
+missing, so they were added: a screen shake on the boss's arrival (0.14 for
+about 1.1s, alongside the push-in); unit readability (an enemy-only rim glow,
+a shared toon material patched to add a pink-red edge light where a surface
+turns from the camera, no extra draw calls; and health bars that appear on a
+hit and shrink away about 2.2s later, two InstancedMeshes drawn on top,
+bosses keep their own bar); and visible clouds in the game view (instanced
+puffs riding above the far and near edges of the valley, never over the
+towers). A bug found while building the bars: `InstancedMesh.setColorAt`
+sizes its buffer from the current `count`, so `count = 0` must be set after it
+or every color is silently black. Testing note: at 2x device pixel ratio
+software rendering can take seconds per frame, so timing-based checks must use
+1x. Level 1 title view 119 calls and 170.7k triangles; the mid-wave reference
+scene 270 calls and 196.8k triangles (259 and 198.8k before any of this pass).
+
+**P3-V5 — Per-limb enemy animation (roadmap item 7)** *(on branch
+`graphics-pass-units-tiers`)*. Grunts, tricksters, trolls and bats now animate
+arms, legs, ears (and the trickster's leaf) individually, and it cost fewer
+draw calls, not more. The technique: every limb stays inside the enemy's one
+merged mesh but each vertex carries an `aLimb` slot id; a shared GLSL chunk
+(`RIG_GLSL`, injected with `onBeforeCompile` into three per-enemy materials:
+toon plus rim glow, unlit, and the ink outline) rotates a slot about its pivot
+by per-frame uniform angles (`makeRig`, `RIG_PIVOTS`). Materials are per enemy
+so uniforms are per enemy, while constant `customProgramCacheKey`s share the
+compiled programs, and the outline hull shares one `thickness` uniform object
+with the global outline so it follows zoom and resize. Poses: arms counter-swing
+against legs, the grunt carries its club up and chops, trolls knuckle-walk with
+long slow swings, tricksters pump their arms, legs lift on the up-stroke, ears
+flap, rooted enemies flail, bat wings beat through the rig. Bosses keep their
+own rig. Before this, each limb was a separate mesh plus an outline mesh, so a
+troll cost 15 draw calls and a grunt 11; now an enemy is 4 (merged toon,
+unlit, outline, contact shadow). Mid-wave reference scene: 212 calls and
+197.1k triangles (was 270 and 196.8k). Full harness: 382 pass, the 19 failures
+match untouched `main`.
+
+**P3-V6 — Painted title and world map art (roadmap item 6)** *(on branch
+`graphics-pass-units-tiers`)*. New `js/title-art.js` (`TitleArt`, loaded before
+`ui.js`) paints the title backdrop as layered SVG generated from the game's
+own palette: a dawn sky with a sun, rays and drifting clouds, hazy purple
+mountains, rolling hills with a tree line, the blighted Shadow Hollow (a
+cracked glowing stump and dead trees) on the left, the lit Bastion (warm stone,
+red mushroom-cap roofs, glowing windows, a fluttering banner) on the right, a
+road winding between them and a flower-and-mushroom meadow in front, framed by
+dark foreground leaves. Six layers translate by different amounts (`data-d`
+depth) following the pointer with smoothing plus a slow automatic sway, and it
+only runs while the title is showing (reduced motion turns it off). The logo is
+a gold gradient logotype with a dark outline, a ribbon banner for the tagline
+and vine flourishes; the wider title card keeps it on one line. The world map
+gained a painted sea gradient, swells, a gold frame with corner ornaments and a
+small pointer-driven tilt of the map card on desktop. Static SVG plus CSS
+transforms only: no extra WebGL work, Level 1 title view unchanged at 119 calls
+and 170.7k triangles. Full harness: 382 pass, the 19 failures match untouched
+`main`.
+
+**P3-V7 — Finale bosses for Levels 3 and 4** *(on branch
+`graphics-pass-units-tiers`, user-requested: "no boss battle for Level 3 or
+Level 4")*. Levels 3 and 4 had ended on a plain 12th wave. Each now has a
+13th wave with a light escort and a new boss, following the Level 6 to 8
+pattern exactly (a new `ENEMY_TYPES` entry, a `makeBossParts` recipe on the
+shared boss rig, one extra wave, `tools/level-fixtures.js` updated to 13 waves
+with the boss on 13). **The Ashen Swarm** (`ashen`, Level 3, hp 600, speed
+0.88, armor 1, flying): a scorched rock core with curled horns, a red-hot
+heart and embers orbiting; it rises after a bat and grunt escort on the single
+road. **The Leaf-Storm** (`leafstorm`, Level 4, hp 520, speed 0.66, armor 0,
+flying; first drafted at 640 and 0.8, see the tuning note below): a russet whirl of leaf-blades round a gold heart, sent down the Long
+Way with bats on the South Road and grunts on the Shortcut. Boss hp scales
+with the wave number like every boss (about 960 for the Ashen Swarm and 830 for
+the Leaf-Storm at wave 13).
+Everything boss-shaped (camera push, banner, health bar, arrival sting) is
+generic on `e.boss`, so it worked without new code. Verified in the full
+harness: Level 3's mixed defense wins with 7 lives (wave 13 leaked 5, the thin
+spot to watch) and Level 4's with 9, neither single-tower-type run trivializes
+either level, and the failures match untouched `main`. Test labels for
+Levels 3, 4, 6, 7 and 8 now say 13 waves. Level 2 still has no boss (it was not
+part of the request).
+
+**P3-V8 — Layered music (roadmap item 5)** *(on branch
+`graphics-pass-units-tiers`)*. A generative, fully synthesized score lives in
+`js/audio.js` beside the sound effects (no audio files). Five layers, each its
+own gain node on one bus: a soft pad, a plucked lute-like arpeggio, bass, drums
+and a reedy lead. Four mixes crossfade with game state (`musicTarget`): calm
+while on the title, the map and in build time (84 bpm, pad and arpeggio);
+combat once a wave is live (112 bpm, bass, war drums and the lead join, the
+chord order flips to a darker one); boss while a boss is alive (128 bpm, four
+on the floor, sawtooth lead and bass); end, which fades everything out so the
+win and lose stingers play alone. Notes are scheduled on the audio clock about
+0.35s ahead by a 50ms timer (`musicTick`), never from the frame loop, so a slow
+frame cannot make it stutter, and a tab that was hidden skips the gap instead
+of bursting. Each level has its own key and mood (`MUSIC_KEYS`: Hollow in D
+major, Millbrook in G, Cairnwatch in A minor, Splintered Vale in E minor,
+Elderroot in D minor, Sunken Market in F, Amber Terraces in C, Frostpine in B
+minor), and the arpeggio and lead are built once from a seed hashed from the
+level id, so each level has a fixed tune that repeats every four bars. The
+music bus sits at 0.32 so it stays well under the effects (checked against the
+soundboard: music RMS about 0.010 to 0.020, versus 0.004 to 0.05 for effects).
+Music starts on the first user gesture like everything else, follows the mute
+button through the master gain, pauses with the game (the context is
+suspended) and uses no `Math.random`, since the balance tests seed it. Since
+there is no way to listen in this environment, verification is numeric:
+`Audio.renderMusic(state, seconds, levelId)` renders a mix offline; it was
+checked for NaN, clipping and level, and its envelope autocorrelation shows
+the rhythm sits on the beat (strong repeat every bar, four-on-the-floor in the
+boss mix). Four harness checks now cover it, and a live-game run confirmed the
+state sequence calm, combat, boss, combat, end. A real ear should still judge
+taste; the mix constants are all in `MIX` and `MUSIC_KEYS`.
+
+**P3-V9 — Settings: separate effects and music controls** *(on branch
+`graphics-pass-units-tiers`, user-requested after the music was found a bit
+annoying)*. The single mute button became one of three controls on a new
+Settings screen (`#settings`): **All sound** (the old quick mute, still on the
+HUD too), **Sound effects** and **Music**, each with an on/off switch, and the
+last two with a volume slider. Audio now has two volume buses (`sfxOut`,
+`musicOut`) feeding the master gain: every sound effect and the ambience route
+through the first, the score through the second; a switched-off kind skips its
+work entirely (effects return before creating nodes, the music scheduler idles)
+instead of just being silenced. Settings persist in `localStorage` under
+`bb-audio` (`sfxOn`, `sfxVol`, `musicOn`, `musicVol`), alongside the existing
+`bb-muted`; bad or blocked storage falls back to the defaults. Music now
+defaults to 0.6 of its old volume, since continuous music reads louder than
+short effects. Reachable from the title screen ("Sound settings" link), the
+pause menu, and a gear button in the HUD; the gear pauses a live game first so
+the screen never covers a fight, and Done returns to the pause menu. Esc closes
+it, clicking the dark backdrop closes it, changing the effects slider plays a
+sample so the level can be judged, every control is at least 44px (on short
+phone screens each slider moves inline beside its label to stay 44px tall),
+switches use `role="switch"` with `aria-checked`, and reduced motion removes
+the knob animation. Seven harness checks cover it.
+
+**P3-V7 tuning note (found while adding 4x speed)**: a full-harness run then
+showed Level 4's mixed defense losing, and isolated runs of the test bot
+(ten or more per version, in scratchpad `l4bot.js`: untouched `main` 10/10, the
+commit before the boss 18/18, the boss as first drafted about 7/10 to 11/20)
+showed why: a leaking boss costs exactly 5 lives and the defense reaches wave
+13 with only about 6, so a leak often ends the run, and in the losing runs the
+boss reached the gate with about 5% hp left. The escort was cut to 3 bats and 4
+grunts and the Leaf-Storm eased to hp 520 and speed 0.66 (a slower, softer
+boss than the Shadow-Crow, fitting a level where three roads drain gold):
+14/14 wins, the boss never leaked. Level 3's Ashen Swarm needed nothing (10/10,
+the boss died on the road in 9 of 10). Lesson for the next boss: measure win
+rate over 10 or more isolated runs, because a single harness run cannot tell a
+70% level from a 100% one, and look at the boss's remaining hp when it leaks.
+
+**P3-V10 — 4x game speed** *(on branch `graphics-pass-units-tiers`,
+user-requested)*. The speed button (and the F key) now cycles 1x, 2x, 4x.
+`GameState.setSpeed` accepts only 1, 2 or 4. The game loop (`js/boot.js`)
+advances the simulation in fixed steps of at most 1/60 second instead of one
+frame-sized step, so 4x plays the same battle as 1x (the step size the tests
+and balance work use) and never takes one big jump; at most 12 steps a frame.
+Measured in the running game: game time per frame time is exactly 1, 2 and 4.
+The button shows gold at 2x and a glowing pink at 4x, with an updating
+aria-label. Music tempo and effects stay at normal speed. Harness checks cover
+the cycle and the valid-speed rule.
+
+**P3-M9 — Levels 9 and 10: the dawn levels** *(on branch
+`graphics-pass-units-tiers`, user-requested)*. The user loved the title
+splash and asked for new levels that look like it, with curving roads and
+enemies arriving from several divergent points, "so it's harder". Three
+layouts were drawn and validated first; the user picked two. Both reuse the
+multi-route engine unchanged for pathing (`routes`, per-road groups, `at`) and
+share `js/dawn-kit.js`: Level 1's own Bastion (same masonry, mushroom-cap
+towers, banner, 3 damage states, optional banner colors), a cracked Hollow
+stump with a pulsing glow and spores at the head of every road (facing out
+from whichever map edge it stands on), a short brook with a plank bridge
+(`chokepoint.streamRows`), and a splash-style meadow (more flowers and
+mushrooms, props kept off the road). Theme is the splash dawn: warm pink-gold
+key light, purple fill and backdrop, golden-green ground, fireflies.
+**Level 9, The Flanked Keep** (22x14): six spawns. Five roads start on the
+west, north and south edges and join at (12,8); one more starts in the far
+south-east, circles behind the keep and reaches the gate without ever
+crossing the brook, so no single choke point wins. **Level 10, The Keep
+Between** (22x14): the Bastion stands mid-valley; three roads converge from
+the west and cross the brook, two come in from the east behind the keep.
+New bosses: The Gloam-Moths (`gloam`, a rose-winged moth cloud) and The
+Heartbloom (`heartbloom`, a spiked pulsing bloom), both on the shared boss
+rig. 13 waves each.
+
+**Curvy roads (engine feature, opt-in).** The first build kept the grid
+corners and the user rightly rejected it: the design page had smooth wavy
+roads and the game had straight runs. A level may now set `curvyRoads: true`.
+`GameState` then rounds each route's polyline with three Chaikin
+corner-cutting passes (start and gate stay exact), so enemies, flyers and
+targeting all use the curve; the cells (what is road, what is buildable) are
+unchanged and the curve stays within about half a cell of them (a harness
+check enforces 0.75). `Renderer.buildCurvyRoad` draws the road as merged
+ribbons (grass lip, dirt, cobble near the gate, twin ruts) plus mud and
+pebbles along the curve, skips the bridge cell, and colors depend only on
+position so shared tails overlap invisibly. Path cells render as meadow,
+grass and props keep off the curve (`roadDist`, also in the level kit).
+Levels 1 to 8 are untouched.
+
+Balance lessons: the curve shortens and shifts the path, which cost towers
+coverage, so the isolated-bot numbers moved and the waves were retuned after
+the change, not before. Flyers leaked at a constant rate on roads with no
+anti-air in range (the same coverage-gap archetype as Level 7), so bats were
+moved onto the roads the bot's anti-air covers and the flank carries ground
+units. Bosses again had to be softened (hp 340 and 200) because a leak costs
+5 lives. Final isolated runs: Level 9 8/8 won (5 to 13 lives), Level 10 8/8
+(2 to 10). The P3-FIX1 "last level" end-screen checks moved to Level 10. The full harness again lost Level 6's unseeded-RNG mixed-bot check, which locks Levels 7 to 10 and cascades, so the dawn levels' own checks (markers, curve, lone towers, console) were run directly with all levels unlocked and pass; levels 1 to 5 had no failures.
+
+**P3-V11 — Diorama look: color, toon lighting, cast shadows, glow, haze**
+*(on branch `graphics-pass-units-tiers`, user-requested: "a high-quality
+miniature diorama aesthetic", same on mobile and desktop)*. The user asked for
+sRGB output, ACES tone mapping, soft PCF shadow maps, lit materials and
+bloom or tilt-shift, and then ruled out quality tiers: phones and desktops get
+the same look. Real shadow maps and a post-processing pass stay excluded (they
+cost a lot on phones), so the same look is built from baked and in-shader
+techniques instead. three.js is still r128, which has no `SRGBColorSpace`;
+`renderer.outputEncoding = THREE.sRGBEncoding` does the job.
+1. **Color pipeline.** `js/color-pipeline.js` (loads right after three.js)
+wraps `THREE.Color` so every authored sRGB hex becomes linear on the way in and
+converts back on `getHex`/`getHSL`, with blends (`lerp`) done in sRGB so
+gradients keep the look the palette was tuned for. No palette or level file
+changed. `Renderer.init` sets sRGB output and ACES tone mapping (exposure 1.3;
+1.0 was too dark), raises light intensities and the toon ramp to linear
+equivalents (`lin()`), tone-maps the clear color the same way (`displayColor`)
+so the backdrop meets the fog, and every custom shader (water, particles,
+outline, puffs, cloud shadows) includes the tone mapping and encoding chunks.
+`?lin=0` restores the old look for comparison.
+2. **Toon lighting.** `js/toon-lighting.js` patches the shared
+`THREE.ShaderLib.toon` fragment shader once, so every toon material (including
+ones with their own `onBeforeCompile`) gets cool violet tint in the shaded ramp
+steps, a warm lift on sunlit steps and a faint top-light sheen on upward curved
+edges. Thresholds were calibrated from a debug color-coded view of the real
+light values (the first guess tinted the whole ground violet). `?toon=0` turns
+it off.
+3. **Cast shadows.** The baked decal system now draws a trailing teardrop
+(`castShadowTexture`) in cool violet along the sun's direction, longer and
+darker than the old round blobs; towers get a trailing shadow too and the
+Bastion (Level 1 and the dawn levels) a long one. Still merged decals, so no new
+draw calls. This is a baked look, not a per-pixel shadow map: shadows do not
+deform for animated units, and props do not shade each other's bodies.
+4. **Glow and haze.** Window and lantern halos are larger and softer (a cheap
+stand-in for bloom). The old desktop-only CSS blur strips became a plain
+top and bottom colored haze gradient on every device (no blur filter).
+5. **Frame-rate governor** (`boot.js`, `Renderer.setPixelScale`): if frames stay
+slow it steps resolution down to at most 0.6x and back up when fast, and never
+switches an effect off. Off under automation (`navigator.webdriver`) and with
+`?gov=0`.
+Also retuned: the curvy road ribbons' dirt brightness for the new pipeline.
+Level 1 title view: 119 calls and 170.7k triangles (budget 158 and 189k). Phone
+frame rate is still unmeasured: the real test is the user's phone.
+
+**P3-FIX2 — "Send next wave" sometimes needed a second tap** *(user-reported
+after finishing Level 3)*. Not reproducible in automated mouse and touch taps
+(48 of 48 sent), so the fix hardens the likely causes instead of guessing at
+one: the button's label and size changed every second during prep, a click is
+only delivered when press and release land on the same element, and a 3px
+press-down transform could move the pill out from under a press near its top
+edge. Now: the button never moves or resizes (fixed minimum size, the second
+line always reserves its height), the `:active` shift is gone, an invisible
+13px margin enlarges the tap target (hit-tested), the wave sends on pointer
+release as well as on click (`sendWave` is idempotent), and the wave goes
+before the sound unlock inside a try/catch so an audio error can never eat a
+tap. An open, unconfirmed guess: the button is disabled while enemies are
+still alive ("N coming"), so a tap during a wave does nothing by design; if
+players expect to call the next wave early, that is a design change (call
+early for a gold bonus), not a bug.
+
+**P3-V12 - Curving roads on Levels 1 to 8** *(on branch
+`claude/fervent-wright-jeojom`, user-requested: NEXT-STEPS item 7)*. Every
+level now sets `curvyRoads: true`, so the road is a smooth ribbon and enemies
+walk the curve. Screenshots of all eight levels were checked: bridges and
+crossings line up with the ribbon and no prop sits on the road.
+
+**Pace compensation (new engine flag `curveKeepsPace`).** Rounding corners
+shortens a road by 11% to 17%, so enemies spent less time in tower range and
+every level got harder (seeded bot runs: Level 2 from 7.2 lives to 4.9, Level 3
+lost 7 of 30, Levels 6 and 8 lost every run). Instead of retuning eight wave
+tables by hand, each route now has `pace = curved length / straight length`
+and enemies move at `speed * pace`. Time from spawn to gate is the same as on
+the straight road, so the tuned wave tables and boss margins stay valid.
+Levels 1 to 8 set the flag. Levels 9 and 10 do not (they were tuned on their
+curves). `tools/validate-levels.js` proves it: a grunt takes the same time on
+the curved and straight version of every route (within 1%).
+
+**Long legs.** Chaikin rounding cuts a bigger corner when the legs are long.
+Elderroot Ward (legs up to 11 cells) and Frostpine's Scree Path cut 1.12 and
+0.94 cells off their cells, past the 0.75 rule, so the road ribbon would have
+crossed build plots. Collinear waypoints on the long legs fix it with no change
+to the shape or the cells. Keep runs under about 5 cells on any new curvy level.
+New validator checks cover curve deviation, exact spawn and gate ends, and
+walking time for every curvy level (284 checks).
+
+**Balance (seeded bot runs, 30 to 60 per level, browser and vm runner agreed on
+the same seeds).** With pace compensation Levels 1, 2, 5, 7 and 8 match their
+straight-road results. Level 3 is a little easier than before (14 lives
+against 10), left as is. Level 4 lost about 5 of 30 runs at waves 10 and 11,
+so those two waves lost one or two units each (59 of 60 won, 5.6 lives, was
+5.8). Level 6 was already failing on straight roads on this branch (3 of 30
+won), which is why the full harness kept losing it and locking Levels 7 to 10.
+Waves 4, 9, 10, 11 and 12 were eased and the Drowned Swarm boss softened to
+hp 360 and speed 0.62: it leaked at about 53% hp in every run, even on straight
+roads, because Level 6 has the shortest roads and the boss spends too little
+time in range. Now 60 of 60 won, 9.4 lives, boss leaks 1 run in 30 (9 hp short).
+The single-tower-type stress test (5 types x 2 branches) tops out at 7 of 10
+clean waves on Level 2 and never wins a level alone, so no dominant strategy.
+Lesson that repeated: a boss that leaks at the same hp in every run is a
+damage ceiling, not bad luck. Measure its hp at the leak before touching waves.
+
+**Fixed along the way.** The first full harness pass with Level 6 beatable
+reached Levels 7 to 10 for the first time in a while and found three older
+issues: the world map reclaim animation could set a negative circle radius
+(the frame timestamp can precede `performance.now()` by a few ms, now clamped,
+a real console error); the safety-net check waited a fixed 2.3s but the net
+needs 1.5s of wall-clock plus slow software frames (measured 0.8 to 2.8s, now
+waits up to 15s); and the Level 1 spread check expected 6 path units after 9s,
+which a 0.86 pace makes 5.2 (now > 5).
+
+**Browser-free bot runner.** A seeded runner (the harness bot logic over
+the real `GameState` in a Node `vm`, about a second per 30 runs) replaces slow
+browser runs for tuning. Scratchpad only, not committed. It matched the
+browser on frostpine-camp and sunken-market over 30 identical seeds.
+
+**P3-V13 - Victory screens and the Level 10 finale** *(on branch
+`claude/fervent-wright-jeojom`, user-requested: "more exciting victory screens
+after each level, and especially after level 10")*. The win screen was a plain
+card with a title, three stars and a line of text. Every win now gets: a
+ribbon that follows the star rating (Flawless!, Well held!, Victory!); stars
+that land one at a time with a rising bell each; stat chips that count up
+(lives left, foes beaten, waves held); confetti cannons from both corners and
+a drizzle of paper; a warm glow behind the card; and a richer fanfare with a
+sparkle tail. A 3-star win adds three gold fireworks and two more cannon
+bursts, each with a boom.
+
+**The finale (the last level of the campaign, found from `LEVELS`, so it moves
+if a Level 11 is ever added).** The title becomes "The Hollow is healed!" with
+a "Dawn breaks!" ribbon, a shimmering gold logotype, a dawn-glow backdrop and a
+pulsing card. It shows a recap of all ten levels with their stars and a total
+(a perfect 30 gets its own line), and a long synthesized fanfare. Fireworks
+keep launching into the open sky on either side of the card until the screen
+closes, and every burst has its own whistle, boom and crackle, so sound and
+picture stay in step. A separate `sfx.finale()` replaces `sfx.win()` there.
+
+**How it is built.** New `js/celebrate.js` (`Celebrate`, loaded before
+`ui.js`) is one 2D canvas above the card with `pointer-events: none`, so taps
+still reach the buttons. It is visual only: it never touches `GameState`, has
+its own random stream (the balance tests seed `Math.random`), stops itself the
+moment `#end` loses `show`, is capped at about 340 particles, and does nothing
+under `prefers-reduced-motion` (the CSS entrance animations are also off).
+`showEnd` in `ui.js` restarts the entrance animation each time the screen
+opens, but star bells and firework sounds play only for a fresh win (a flag set
+by `gameWon`), not when the pause button reopens the screen. The `lit` class on
+the stars is still set immediately (the stagger is pure CSS delay), so the
+existing star-count checks hold. The card has `max-height` with scrolling as a
+safety net and a compact layout under 460px of height (the finale drops its
+flavor line and the badge stars there; measured 296px of 390 on a phone).
+
+**Caught while building it.** The first pass left the stars dark: a more
+specific selector (`#end.win #stars span`) overrode the lit color. The finale
+card was taller than the screen (733px on 720, 419px on 390), now 553 and 296.
+The first fireworks burst over the title and read as nothing; they now burst in
+the margins beside the card (anywhere in the upper part on narrow screens) and
+are bigger. This sandbox renders at 2 to 3 frames a second under software
+rendering and the loop caps each step at 50ms, so the show runs in slow motion
+here: judge timing on a real device. Eight new harness checks cover the
+ribbon, the counted stats, the non-finale title, a click-through canvas, the
+finale title and recap, ten badges, running fireworks and the card fitting.
+
+**P3-V14 - Player-rotatable view (four fixed views)** *(on branch
+`claude/fervent-wright-jeojom`, user-requested: "can the angle of the gameplay
+screen be rotated by the player", then "four fixed views")*. The camera was
+already built from two numbers (`CONFIG.cameraElevation` and `cameraYaw`), and
+picking, framing (`fitCamera`), health bars and `worldToScreen` all derive from
+the camera, so turning it was cheap. The view is now one of four 90 degree
+steps around the valley (`view.idx` 0 to 3, on top of the original 12 degree
+yaw). `Renderer.rotateView(+1 | -1)` eases to the next step over 0.55s of
+wall-clock time (so a slow frame cannot stall it, and it works while paused),
+re-placing the camera and re-fitting the frustum every frame while it turns.
+`+1` turns the valley clockwise as seen from above (checked: the Bastion moves
+from bottom right to bottom left). The step is saved in `localStorage` under
+`bb-view` (wrapped in try/catch) and restored on load. Default is the original
+view, so every level plays exactly as before until the player turns it.
+
+**Controls.** A clockwise button in the HUD row (aria-label, 44px), plus an
+anticlockwise one at 900px width and up; Q turns anticlockwise and E clockwise
+on a keyboard (only while a level is being played). On phones only the
+clockwise button shows: both of them pushed the HUD row 16px into the wave
+button at 844px wide. Taps still pick the right tile in every view (a harness
+check places a tower through a mouse click in a turned view). Not done:
+free-drag rotation (it would fight with tap-to-place on touch), a view per
+level, and an on-screen hint for the keys beyond the title card's key line.
+
+**Two things were baked to the old camera and had to change.** The soft
+lantern, brazier and fire halos (`glow(..., axis: 'cam')`) were built facing the
+camera at build time, so they would have skewed sideways in other views. They
+are now one dynamic mesh (`glowCam`) rebuilt from the camera's right and up
+vectors whenever the camera turns; window halos on walls (`axis: 'z' | 'x'`)
+are unchanged. The clouds were placed along the world's far and near edges,
+which become the left and right sides after a quarter turn (one drifted over the
+tower panel in the first test). They are now laid out in camera space, along the
+screen's horizontal and beyond the valley's far and near edges measured along
+the camera's forward direction, so they ride the same edges in every view.
+
+**Checked.** All ten levels at all four views (contact sheets, no console
+errors, tall trees and the Bastion hide some road from some sides, as expected
+of a 3D view). The sideways views (90 and 270 degrees) make a landscape map
+smaller, because the map is wider than it is tall; that is the cost of fixed
+quarter turns. Four turns return the camera to the starting position exactly.
+Nine new harness checks cover the button sizes, saving, direction, picking in a
+turned view, camera-facing glows, Q and E, a full circle and a tap in a turned
+view. Known and unchanged: at 667px wide the HUD row already overlapped the wave
+button before this change.
+
+**P3-V15 - Player zoom and pan** *(on branch `claude/fervent-wright-jeojom`,
+user-requested: "a zoom in / out for the camera view")*. The player can zoom the
+camera from 0.75x (a little more of the surroundings) to 2.5x (close enough to
+read the tower details), and drag to look around once zoomed in. It is layered on
+the camera director that already existed for the boss entrance and the title
+drift: `look.zoom` multiplies the director's zoom into `camera.zoom`, and
+`look.px/py` pan along the camera's own axes, so picking, health bars, the tip
+arrow and `worldToScreen` follow with no changes. Targets ease (wall-clock time,
+works while paused); a drag follows the finger at once. The pan is clamped so
+the view never leaves the original framing (`fit.hw/hh`, refreshed on every
+resize and turn), and zooming out past 1 allows no pan. Outline width is
+recomputed from the real camera zoom, including inside `fitCamera` (it used to
+reset to the unzoomed width on a resize while the director was zoomed).
+
+**Controls.** Mouse wheel and trackpad pinch (a wheel event with `ctrlKey`)
+zoom toward the pointer, so the tile under it stays put; two fingers pinch and
+pan together; dragging pans; the plus and minus keys step the zoom (1.25x), 0
+resets zoom and pan, arrow keys pan while zoomed. Minus and plus buttons sit in
+the HUD row from 1000px width up; phones use the pinch, since the row has no
+room (see P3-V14). `js/input.js` now tracks every pressed pointer: a press that
+moves less than 12px is still a tap, a drag past that is a pan and never
+selects a tile, and a second finger turns the gesture into a pinch for good
+(lifting one finger does not produce a stray tap). Zoom and pan only work while
+a level is being played, and are not saved between visits. Turning the view
+(P3-V14) keeps the zoom and eases the pan back to the center, since the pan
+belongs to the old angle.
+
+**Checked.** In a real page: the buttons clamp at 0.75x and 2.5x; the wheel
+keeps the cell under the cursor; a drag pans without selecting and stops at the
+clamp; a tap while zoomed picks the intended tile; turning keeps the zoom; a
+synthetic two-finger pinch zooms and selects nothing; screenshots at both ends.
+Twelve new harness checks cover these. Not done: saving the zoom, a zoom
+indicator, and a double-tap to reset (0 and zooming out do the job).
+
+**Found by the full run, not by zoom.** The full harness's random Level 10
+mixed-bot run lost once (20 lives, the boss wave leaked 5). The bots run in pure
+game logic, so zoom could not touch them. The seeded runner put Level 10 at 56
+of 60 wins (93%, 7.1 lives) with the Heartbloom leaking in 11 of 30 runs at the
+same 16% hp every time: a damage ceiling again (a leak costs 5 lives, the defense
+reaches wave 13 with about 7). The Heartbloom's base hp went from 200 to 150 (240
+at wave 13): 0 leaks in 40 runs, 80 of 80 won, 8.2 lives. A phone-size touch-tap
+check also failed once in that same run: leaving the title snaps the camera from
+its title zoom to 1 on the next rendered frame, and under software rendering that
+frame can be seconds away, so a tile measured before it and tapped after it was
+about 15px off. The first desktop and phone taps now wait for the camera to
+settle (a harness fix; a person cannot tap inside the first frame).
+
+**P3-V16 - Camera tilt** *(on branch `claude/fervent-wright-jeojom`,
+user-requested: "adjust the camera tilt")*. The tilt is the camera's elevation
+above the ground, fixed at 50 degrees (`CONFIG.cameraElevation`) until now. The
+player can set it from 30 degrees (the valley seen from the side, units large
+and dramatic) to 80 (nearly straight down, the whole layout at a glance). It
+follows the same pattern as the turn: an eased animation over 0.4s of wall-clock
+time, a drag follows at once, the value is saved under `bb-tilt` (try/catch, the
+default restores if storage is blocked) and the default view is exactly what it
+was, so nothing changes until the player tilts. Picking, framing and the
+camera-facing glows already derived from the camera, and the turn, the zoom and
+the pan all keep working at every tilt (a check turns the view while tilted).
+
+**Controls.** Buttons in the HUD row from 1180px width up (a triangle up for a
+higher camera, down for a lower one); `]` raises and `[` lowers by 6 degrees;
+a right-button drag (down looks more from above); a two-finger vertical swipe on
+touch (down looks more from above), the same gesture map apps use. The swipe
+only counts after 14px of travel, so a pinch's small vertical drift does not
+tilt. The 0 key now resets the zoom, the pan and the tilt together. Right-drag
+never selects a tile. Phones tilt by swipe (the HUD row has no room for
+buttons, see P3-V14). Not done: a tilt indicator, a tilt per level, and a hint
+for the gestures beyond the title card's key line (hidden on touch).
+
+**Two things were tied to the old angle.** The fog starts just past the
+valley's far edge, computed once for 50 degrees; at 30 it would have hazed the
+far rows and at 80 the far rim would never fade into the backdrop. It is now
+refreshed with every turn and tilt as the default distance plus the change in
+the far edge's depth, so the default view keeps its exact value (43.15 on
+Level 1) and a reset returns to it. The near clouds sit high, so at a low tilt
+they project up over the front rows of the valley; their distance now grows with
+the cotangent of the tilt (the same as before at 50).
+
+**Checked.** In a real page on four levels: limits at exactly 30 and 80, picking
+right at both ends, the saved value, a reset that restores the fog distance,
+both keys, right-drag, swipe, pinch drift ignored, no console errors, and
+screenshots at both ends on Levels 1 and 10 (nothing hidden that matters at 30,
+the keep and the brook still read). Twelve new harness checks cover the buttons,
+the step, both limits with picking, saving, the 0 key and its fog distance, the
+keys, right-drag, the drift and the swipe, and turning while tilted.
+
+**P3-V17 - Hide or show the camera buttons (Settings)** *(on branch
+`claude/fervent-wright-jeojom`, user-requested: "an option in the settings menu to
+display (or hide) the camera settings")*. Settings has a fourth row, "Camera
+buttons", with a switch like the others (role `switch`, `aria-checked`, a 44px
+target). It hides or shows the six camera buttons in the top bar (turn left and
+right, zoom out and in, tilt up and down) by toggling a `hide-camui` class on
+`body`; the buttons share one `cam-btn` class and one CSS rule. The choice is
+saved under `bb-camui` (`0` hidden, `1` shown, shown by default and if storage is
+blocked). Only the buttons go: the keys (Q, E, plus, minus, `[`, `]`, 0), the wheel,
+pinch, drag, right-drag and swipe all keep working, and the row says so. Hiding
+them also gives a phone's top bar back its room. Checked in a real page on
+desktop and an 844x390 phone (the card is 359px of 390 with four rows, no
+scrolling): the buttons hide and return, the saved choice survives a reload, and
+E still turns the view with the buttons hidden. Four new harness checks cover the
+default state and the 44px switch, hiding and saving, the keys with the buttons
+hidden, and showing them again.
+
+**P3-FIX3 - A finished level did not unlock the next one** *(user-reported:
+"I finished level 6 and hit Continue, level 7 still shows as locked")*. The
+user's screenshot of the world map showed Level 6 with no stars and no flag, so
+the win itself had not been recorded, and a "Return to The Sunken Market" battle
+at Prep behind it. I could not reproduce the failure: finishing Level 6, pressing
+Continue and marching to Level 7 worked on a clean page, with every saved camera
+setting, at several screen sizes, with the real published files (their sizes match
+the repo), and the progress code (`Progress.recordWin`) had not been touched by any
+of the recent camera, victory-screen or curved-road work. The cause on the
+player's device is therefore unconfirmed. Whatever it is, a finished level must
+never fail to open the next, so progress is now hard to lose:
+`js/progress.js` keeps three copies and merges them on every read (localStorage,
+a sessionStorage backup that survives a reload when localStorage refuses a write,
+and the page's own memory), and merging only ever adds (unlocked if any copy says
+so, highest stars and best lives); a level with stars always opens the next one;
+and `showEnd(true)` records the win again (`recordWin` only adds, so twice is
+harmless), which saves the win if the `gameWon` listener never ran. Eight
+validator checks cover a normal win, localStorage refusing writes (same page and
+after a reload), a stale read, a half-saved win, a worse replay, a corrupt save
+and recording twice. In a real page with `localStorage.setItem` throwing for the
+progress key, Level 7 still unlocks and starts after Continue.
+
+**Not fixed, to be honest about:** a win that was already lost in the player's
+saved data is not recovered, because nothing records it. They need to beat the
+level once more. What would still help is knowing the device and what the win
+screen showed.
+
+**P3-V18 - Save code** *(on branch `claude/fervent-wright-jeojom`,
+user-approved: "I like the save code idea")*. Progress lives in the browser,
+so a new device, a cleared browser or another browser starts from nothing. The
+player can now copy their campaign as text and paste it elsewhere. Settings has
+a "Save code" button that opens a panel (`#savecode`) with the player's code, a
+Copy button (clipboard API, with a select-and-`execCommand` fallback), a paste
+box and a Load button (Enter also loads), and a plain status line. The title
+link now reads "Settings and save code".
+
+**Format** (superseded by BB2 in P3-D2; BB1 codes still load). `BB1-` then, per level in `LEVELS` order, two characters: a state
+digit (0 locked, 1 open, 2 to 4 for one to three stars) and best lives in base
+36; then two check characters (a small polynomial hash mod 1296), all uppercase
+in groups of four. Ten levels give `BB1-xxxx-xxxx-xxxx-xxxx-xxxx-xx`. A changed
+single character always fails the check (31 is coprime to 1296); two swapped
+characters usually do but are not guaranteed to. `Progress.exportCode()` and
+`Progress.importCode(text)` live in `js/progress.js`. Import accepts lowercase,
+spaces and missing dashes, and returns `{ ok, changed }` or `{ ok: false,
+reason: 'empty' | 'format' | 'check' }`. **Loading only ever adds**, using the
+same `merge()` as every other copy, so an older code can never lower stars,
+best lives or unlocks. A code from a build with fewer levels fills what it has.
+The code is not secret or signed: anyone can write one that unlocks levels.
+That is fine for a single-player game and is stated here so nobody mistakes it
+for protection.
+
+**One real hazard handled.** A text box under a game that listens for keys on
+`window` would have turned typing into game actions (e and q turn the view, 0
+resets the camera, f changes speed, space or Enter sends a wave, + and - zoom).
+The key handler in `ui.js` and the arrow-key handler in `input.js` now ignore
+key presses whose target is an input, textarea or select (arrow keys on the
+settings sliders also work for the first time). Escape closes the Save code
+panel first, then Settings, through the same capture handler. On a 390px-tall
+phone the panel hides its intro text and measures 263px, no scrolling.
+
+**Checked.** 14 new validator checks (round trip, regenerates identically,
+lowercase and spaces, typo, missing character, empty and wrong-prefix input,
+garbage, a refused code changes nothing, an older code never lowers progress,
+levels in and out of range, length). 306 validator checks pass. In a real page
+on desktop and an 844x390 phone: copy, empty, junk, typo, typing the hotkey
+letters into the box (view and speed unchanged), load with Enter, load again
+("nothing new"), Escape order, no console errors. Harness checks cover the panel,
+the 44px controls, typing safety, the refusal messages, loading a code with
+nothing new and the Escape order; they deliberately do not load a more advanced
+code, since that would unlock later levels for the rest of the run.
+
+**Not built, offered:** "Resume a level" (remember the wave, gold, lives and
+towers at the start of the current wave and offer Resume on the map). The user
+did not ask for it after it was explained.
+
+**P3-V19 - 8x game speed** *(on branch `claude/fervent-wright-jeojom`,
+user-requested)*. The speed button and the F key now cycle 1x, 2x, 4x, 8x.
+`GameState.setSpeed` accepts 1, 2, 4 or 8 and treats anything else as 1. The
+button turns a hot pink with a stronger glow at 8x (`#speed-btn.fastest`). The
+loop in `js/boot.js` still steps in slices of at most 1/60 second, so 8x plays the
+same battle as 1x, only sooner (up to 24 steps a frame at the 0.05s frame cap).
+It now also stops stepping after about 30 ms in one frame, so a slow device runs
+a little under 8x instead of freezing the page. Measured: 24 steps cost about
+0.1 ms mid-wave on this machine, so the budget should never trigger on real
+hardware; the sandbox's low frame rate (software rendering) is what limits the
+rate here. Music tempo and effects stay at normal speed, so dense fights may
+sound busy at 8x. The harness speed checks now cover the 8x step, the cycle back to 1x and
+the valid-speed rule (8 is valid, 16 is not).
+
+**Heartbloom hp reverted to 200** *(user decision)*. The P3-V15 note above
+describes lowering it to 150 after the seeded runner showed it leaking in 11 of 30
+runs. The user chose to revert it. Expect the Level 10 mixed-bot run to lose
+occasionally again (about 56 of 60 won at hp 200 in that measurement). If it is ever
+tuned again, measure hp at the leak first.
+
+**P3-D1 - Difficulty tiers: Meadow and Bramble** *(on branch
+`claude/fervent-wright-jeojom`, user-requested: ENDLESS-MODE.md section 1)*.
+The player picks a tier on the world map, next to the Play button. Meadow is
+the game as tuned. Bramble is harder. Waves, maps, bosses and level files are
+unchanged.
+
+**Engine.** One table, `GameState.DIFFICULTY`. `loadLevel` reads gold and
+lives from it, `spawnEnemy` reads hp, speed and bounty (each enemy keeps its
+own `bounty`, so the kill code needed no change). `stars()` and the endpoint's
+damage states scale with the run's starting lives (`state.startLives`), so
+Bramble's star lines are 13 and 6 of 16. `GameState.setDifficulty(id)` picks
+the tier for the next load and, on a level still at the title phase, resets
+its gold and lives at once. Mid-battle it changes nothing. The run's tier is
+`state.difficulty`. Meadow is every multiplier at 1 and the level's own lives.
+
+**Meadow is exact.** 200 seeded mixed-bot runs (20 per level) on the engine
+before tiers (`git show 4939813:js/game-state.js`) and after matched on lives,
+gold and kills in every run. The validator now replays two seeds per level and
+compares them to those pinned numbers (`MEADOW_GOLDEN`). A deliberate change
+to a level's waves or economy will move them; regenerate them then.
+
+**Progress.** Still `v: 1`. Each level gains `bramble: { stars, bestLives }`;
+the old `stars` and `bestLives` stay as the Meadow record, so an old save is
+already valid and `defaults()` fills the missing field. Merging takes the best
+of each tier separately and only ever adds. A win on either tier unlocks the
+next level and counts as won for the map's pennant and reclaimed ground.
+`Progress.recordWin(id, stars, lives, tier)`, `starsFor(id, tier)` (Meadow by
+default), `isWon(id)`. The picked tier is saved as `bb-difficulty`
+(`Progress.tier()` and `setTier()`); boot applies it before loading a level.
+The save code carries both tiers since P3-D2 (BB2); BB1 codes still load.
+
+**UI.** Two radio buttons (Meadow, Bramble) beside Play, 52px tall (44px on
+short screens), arrow keys switch them. They show the battle's own tier and
+lock while returning to a battle in progress. Node star dots follow the
+picked tier. A level beaten on Bramble gets a ring of thorns around its node
+(a small badge read as a check mark or a star; the ring reads as thorns). The
+HUD lives pill gets a thorn-colored ring on Bramble, the win ribbon says
+"Bramble won!" and the finale recap counts the tier just played. New color
+`--thorn: #9a3f6e`. At 844x390 the card fits (1 to 389px) with no sideways
+scroll.
+
+**Tuning (seeded runs, `tools/bot-runner.js`, the P3-V12 runner now
+committed).** The starting numbers (hp 1.25, speed 1.1, gold 0.85, 15 lives,
+bounty 0.9) lost all 200 runs, most by wave 5 to 7. Alone, each lever (10
+seeds per level): hp 1.25 won 32 of 100, hp 1.1 63, lives 15 74, speed 1.1 81,
+bounty 0.9 88, gold 0.85 94. Combined they compound: hp 1.05, speed 1.05, gold
+0.9, 15 lives and bounty 0.9 won 11 of 100. Final numbers: **hp 1.05, speed 1,
+gold 1, 16 lives, bounty 0.95**, 192 of 300 wins (64%). Per level, 30 seeds:
+Shadow Hollow 29, Millbrook 30, Cairnwatch 23, Splintered Vale 6, Elderroot 28,
+Sunken Market 24, Amber Terraces 5, Frostpine 10, Flanked Keep 25, Keep Between 12.
+
+**Why the spread, measured before touching anything.** On Amber Terraces,
+Frostpine Camp and Splintered Vale the bot already leaks a fixed enemy type in
+every Meadow run: the Matriarch at 243 to 517 of 960 hp (20 of 20 runs), the
+Rime Swarm at 125 to 219 of 992 (20 of 20), and 5 bats on Splintered's wave 5
+(20 of 20). That is the bot's anti-air ceiling, the AGENTS.md P3-M6/M7
+pattern, and it leaves 3.5 to 6 lives of Meadow margin. Bramble removes that
+margin; on Bramble the Matriarch leaks at 306 to 550 of 1008 and the Rime Swarm
+at 239 to 347 of 1042. No uniform setting tried lifted Amber above 2 of 10
+without making Millbrook and Shadow Hollow trivial. Speed and gold were left
+at 1 because they hurt exactly those levels most. No wave, boss or level
+economy was changed. Per-level trims inside the table, or a bot that builds
+anti-air the way a person would, are the two ways to even the spread; both are
+the user's call.
+
+**Checked.** 342 validator checks, including 13 tier checks, 13 progress
+checks and 10 Meadow golden runs. Harness: 12 new browser checks at 844x390 by
+touch (picker size and fit, defaults, thorn ring, old save, Bramble applied
+and remembered, HUD mark, picker locked mid-battle, Bramble win stored apart,
+win ribbon). Full `tools/playtest.js`: 739 of 739 passed, every level won
+by the mixed bot on Meadow, no console errors or warnings.
+
+**P3-D2 - Save code BB2: Bramble stars travel too** *(on branch
+`claude/fervent-wright-jeojom`, user-approved: "yes, build the BB2 save
+code")*. The BB1 code (P3-V18) carried Meadow progress only. `exportCode()` now
+writes `BB2-`, then three base-36 characters per level in `LEVELS` order, then
+the same two check characters (hashed over `BB2` plus the body):
+1. the level's Meadow state and its Bramble stars in one character,
+   `meadow * 4 + bramble`, where meadow is 0 locked, 1 open, 2 to 4 for one to
+   three Meadow stars and bramble is 0 to 3 Bramble stars (so `0` to `J`);
+2. Meadow best lives; 3. Bramble best lives (0 when it has none).
+
+Ten levels give 32 characters, `BB2-` and eight groups of four (43 characters
+with the dashes). `importCode()` reads both versions: a BB1 code decodes
+exactly as before and never touches Bramble stars; a BB1 body relabeled `BB2-`
+(or the other way) fails the check, since the prefix is hashed. A code whose
+version is newer than this build (`BB3-` and up) is refused with its own
+reason, `newer`, and message ("That code comes from a newer version of the
+game"). A Bramble star in a code unlocks that level even if its Meadow state
+says locked. `changed` now also counts Bramble stars gained. Loading still only
+ever adds, through the same `merge()`. A single mistyped character is always
+caught (checked exhaustively: every one of 1,120 single-character changes to a
+real code is refused).
+
+**One layout fix.** The code grew from 31 to 43 characters and the one-line
+field showed only about 350 of its 481px. `#savecode-out` is now a read-only
+two-line `textarea` (`.sc-out`) that wraps at a dash, so the whole code shows;
+its value is still exactly the code. The panel is 286px tall on an 844x390
+phone (was 263).
+
+**Checked.** 16 new validator checks (358 in all): the format written out
+independently of `progress.js` and compared character for character, a round
+trip of both tiers, regenerating identically, a Bramble-only win, a real BB1
+code (Meadow stars in, Bramble stars untouched, BB2 offered after), relabeling,
+a weaker code never lowering either tier, a Bramble-only gain counted, fields
+out of range with a valid check, fewer and more levels, stray characters, every
+single-character typo, the newer-version reason. Harness: the BB2 prefix, the
+whole code showing without scrolling, the newer-version message, a BB1 code
+loading in a real page, and the Bramble win carried in the code.
+
+**Graphics roadmap**: see `GRAPHICS-ROADMAP.md` for the approved list of
+further graphics work, its priority order, the performance budget and the
+current test status. Read it before starting any graphics task. Its numbered list is the one the
+user was given in chat and is authoritative.
+
+**Endless mode, difficulty tiers and daily run**: tiers built (P3-D1), the rest designed, not built. See `ENDLESS-MODE.md` for the plan, build order, save-format notes and itch.io and Steam hosting notes. Read it before starting any of that work.
+
+**What is left to do**: see `NEXT-STEPS.md` for the current open items in priority order and the working notes from the last long session. Read it at the start of a new chat.

@@ -179,6 +179,8 @@ const LEVEL_3 = (() => {
       cells: [[17, 5], [18, 5], [19, 5], [17, 6], [18, 6], [19, 6], [17, 7], [18, 7], [19, 7]], gateCell: [18, 7],
     },
     cobbleTailCells: 4,
+    curvyRoads: true,   // the road is a smooth ribbon and enemies follow the curve
+    curveKeepsPace: true,   // shorter road, proportionally slower walkers: same time spawn to gate as the straight road
     theme: { center: [1, 6], radiusOut: { x: 7, z: 7.5 }, radiusIn: 1.25, falloffWidth: 0.5, motes: { embers: 30, fireflies: 14 },
       groundMeadow: 0x84ad52, groundMeadowDark: 0x6c9642, ambient: 0.37 },
     spawnBlockedText: "That's the Baron's camp. Nothing of ours stands there.",

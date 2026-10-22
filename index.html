@@ -16,7 +16,9 @@
     --royal: #2f5d9e;
     --royal-light: #7d9fdc;
     --baron-red: #d24a3c;
-    --btn: #263354;
+    --baron: #221d24;
+    --ember: #ff8a3d;
+    --slate: #5b6170;
     --panel: rgba(18, 22, 38, 0.86);
     --serif: "Palatino Linotype", "Book Antiqua", Palatino, "URW Palladio L", Georgia, serif;
     /* world-map art, all straight from PALETTE in js/palette-config.js */
@@ -26,8 +28,6 @@
     --path-edge: #a6875a;
     --stone: #a8a397;
     --stone-dark: #7c786e;
-    --slate: #5b6170;
-    --ember: #ff8a3d;
     --water: #4fa3c9;
     --foam: #d8f3fb;
     --straw: #d8b04e;
@@ -38,7 +38,7 @@
     --hollow-wood: #3b3330;
     --spore: #d9632a;
     --canvas: #e9dcc0;
-    --baron: #221d24;
+    --thorn: #9a3f6e;
   }
   * { box-sizing: border-box; }
   html, body {
@@ -74,8 +74,18 @@
   .iconbtn { pointer-events: auto; min-width: 44px; padding: 0 10px; justify-content: center; color: var(--cream); border-color: var(--cream); font: inherit; cursor: pointer; }
   .iconbtn:active { transform: translateY(2px); }
   .iconbtn.muted { opacity: 0.6; }
+  /* phones: one turn button (clockwise) so the HUD row stays clear of the wave button; Q and E still turn both ways */
+  @media (max-width: 899px) { #rot-left-btn { display: none; } }
+  /* zoom buttons only where the HUD row has room; phones pinch, desktops scroll or use + and - */
+  @media (max-width: 999px) { #zoom-in-btn, #zoom-out-btn { display: none; } }
+  /* the tilt buttons need the most room; everywhere else a right-drag or two-finger swipe tilts, and [ and ] */
+  @media (max-width: 1179px) { #tilt-up-btn, #tilt-down-btn { display: none; } }
+  /* Settings can hide the camera buttons; the keys and gestures keep working */
+  body.hide-camui .cam-btn { display: none; }
   #speed-btn { font-weight: 900; font-size: 17px; }
   #speed-btn.fast { color: var(--gold); border-color: var(--gold); }
+  #speed-btn.faster { color: #ffb0c8; border-color: #ff8fb3; box-shadow: 0 3px 0 rgba(0, 0, 0, 0.45), 0 0 10px rgba(255, 143, 179, 0.45); }
+  #speed-btn.fastest { color: #fff; border-color: #ff5f8f; background: linear-gradient(180deg, #d94a7a, #a8284f); box-shadow: 0 3px 0 rgba(0, 0, 0, 0.45), 0 0 14px rgba(255, 95, 143, 0.7); }
   .screen .row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
   .screen button.secondary { background: var(--panel); color: var(--cream); border-color: var(--cream); box-shadow: 0 5px 0 rgba(0,0,0,0.5); }
   .screen .keys { margin: 14px 0 0; font-size: 13px; opacity: 0.6; }
@@ -94,13 +104,17 @@
   #wave-btn {
     position: absolute; top: max(10px, env(safe-area-inset-top));
     right: max(10px, env(safe-area-inset-right));
-    pointer-events: auto; min-height: 48px; padding: 0 20px;
+    pointer-events: auto; min-height: 56px; min-width: 190px; padding: 0 20px;
     background: var(--gold); color: var(--ink); border: 3px solid var(--ink);
     border-radius: 24px; font: inherit; font-size: 18px; font-weight: 800;
     cursor: pointer; box-shadow: 0 4px 0 var(--ink);
-    transition: transform 0.08s ease, box-shadow 0.08s ease;
+    transition: box-shadow 0.08s ease;
   }
-  #wave-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
+  /* The tap target reaches 10px past the visible pill on every side, and the
+     button never moves or changes size under the finger (its label changes every
+     second during prep), so a press near an edge still counts. */
+  #wave-btn::before { content: ""; position: absolute; inset: -13px; }
+  #wave-btn:active { box-shadow: 0 1px 0 var(--ink); }
   #wave-btn:disabled {
     background: var(--panel); color: #bfe6ff; border-color: #bfe6ff;
     box-shadow: 0 3px 0 rgba(0,0,0,0.35); cursor: default; transform: none;
@@ -114,7 +128,7 @@
     box-shadow: 0 3px 0 rgba(0,0,0,0.35);
   }
   #panel.show { opacity: 1; transform: translate(0, 0); pointer-events: auto; visibility: visible; transition-delay: 0s; }
-  .panel-title { font-family: var(--serif); font-size: 16px; font-weight: 800; color: var(--gold); margin: 0 4px 8px; letter-spacing: 0.4px; }
+  .panel-title { font-size: 15px; font-weight: 800; color: var(--gold); margin: 0 4px 8px; letter-spacing: 0.4px; }
   .panel-title .hint { font-weight: 600; color: var(--cream); opacity: 0.7; font-size: 12px; margin-left: 6px; letter-spacing: 0; }
   .build-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
   .build-grid .build-btn:nth-child(5) { grid-column: 1 / -1; }
@@ -124,28 +138,28 @@
   .actions { display: flex; gap: 8px; }
   .act-btn {
     flex: 1; min-height: 48px; padding: 0 12px; display: flex; align-items: center; justify-content: center; gap: 8px;
-    background: var(--btn); color: var(--cream); border: 2px solid var(--royal-light); border-radius: 12px;
+    background: #2f4a33; color: var(--cream); border: 2px solid var(--moss); border-radius: 12px;
     font: inherit; font-size: 16px; font-weight: 800; cursor: pointer; transition: transform 0.08s ease;
   }
   .act-btn:active { transform: scale(0.96); }
-  .act-btn:disabled { opacity: 0.55; cursor: default; border-color: #6a6f7e; }
+  .act-btn:disabled { opacity: 0.55; cursor: default; border-color: #6d6e66; }
   .act-btn.sell { border-color: #b08a52; flex: 0.8; }
   .branch-label { font-size: 13px; font-weight: 700; color: var(--gold); margin: 0 4px 6px; }
   .branch-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px; }
   .branch-btn {
     display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-height: 64px; padding: 6px 10px;
-    background: var(--btn); color: var(--cream); border: 2px solid var(--magic); border-radius: 12px;
+    background: #2f4a33; color: var(--cream); border: 2px solid var(--magic); border-radius: 12px;
     font: inherit; text-align: left; cursor: pointer; transition: transform 0.08s ease, background 0.1s ease;
   }
   .branch-btn:active { transform: scale(0.97); }
   .branch-btn:disabled { opacity: 0.55; cursor: default; border-color: #6d6e66; }
-  .branch-btn.armed { border-color: var(--gold); background: #33416b; box-shadow: 0 0 0 2px var(--gold); animation: armed 0.9s ease-in-out infinite; }
+  .branch-btn.armed { border-color: var(--gold); background: #3a5a3f; box-shadow: 0 0 0 2px var(--gold); animation: armed 0.9s ease-in-out infinite; }
   .branch-btn.armed .build-blurb { color: var(--gold); font-weight: 800; opacity: 1; }
   .branch-head { display: flex; align-items: center; gap: 6px; }
   .branch-head .build-icon { font-size: 20px; }
   .branch-btn .build-name { font-size: 14px; line-height: 1.15; }
   .branch-btn .build-cost { font-size: 15px; }
-  @keyframes armed { 0%, 100% { box-shadow: 0 0 0 2px var(--gold); } 50% { box-shadow: 0 0 0 4px rgba(232, 184, 74, 0.5); } }
+  @keyframes armed { 0%, 100% { box-shadow: 0 0 0 2px var(--gold); } 50% { box-shadow: 0 0 0 4px rgba(242, 193, 78, 0.5); } }
   @media (max-height: 520px) {
     #panel { max-width: 62vw; width: auto; padding: 8px 10px; }
     #toast { left: auto; right: max(10px, env(safe-area-inset-right)); bottom: max(10px, env(safe-area-inset-bottom)); transform: translate(0, 10px); max-width: 36vw; white-space: normal; text-align: center; font-size: 15px; }
@@ -170,11 +184,11 @@
   .panel-blurb { font-size: 15px; margin: 0 4px 2px; opacity: 0.9; }
   .build-btn {
     display: flex; align-items: center; gap: 12px; width: 100%; min-height: 56px;
-    padding: 6px 12px; background: var(--btn); color: var(--cream);
-    border: 2px solid var(--royal-light); border-radius: 12px; font: inherit; text-align: left;
+    padding: 6px 12px; background: #2f4a33; color: var(--cream);
+    border: 2px solid var(--moss); border-radius: 12px; font: inherit; text-align: left;
     cursor: pointer; transition: transform 0.08s ease, background 0.1s ease;
   }
-  .build-btn:active { transform: scale(0.97); background: #33416b; }
+  .build-btn:active { transform: scale(0.97); background: #3a5a3f; }
   .build-btn:disabled { opacity: 0.55; cursor: default; border-color: #6d6e66; }
   .build-icon { font-size: 26px; line-height: 1; }
   .build-text { display: flex; flex-direction: column; flex: 1; }
@@ -197,7 +211,7 @@
   #debug.show { display: block; }
   .screen {
     position: fixed; inset: 0; display: none; z-index: 15; padding: 24px;
-    background: rgba(14, 16, 26, 0.68); align-items: center; justify-content: center; text-align: center;
+    background: rgba(27, 20, 16, 0.72); align-items: center; justify-content: center; text-align: center;
   }
   .screen.show { display: flex; }
   .screen .card {
@@ -206,10 +220,9 @@
     box-shadow: 0 6px 0 rgba(0,0,0,0.4);
   }
   .screen .card.wide { max-width: 920px; }
-  .screen .eyebrow { font-size: 14px; letter-spacing: 2px; text-transform: uppercase; color: var(--royal-light); font-weight: 700; }
-  .screen h1 { margin: 6px 0 12px; font-family: var(--serif); font-size: clamp(34px, 6vw, 54px); color: var(--gold); line-height: 1.05; letter-spacing: 0.5px; text-shadow: 0 3px 0 rgba(0,0,0,0.45); }
-  .screen h1 .amp { color: var(--cream); font-weight: 400; font-style: italic; }
-  .screen .crest { font-size: 34px; line-height: 1; margin-bottom: 2px; color: var(--gold); text-shadow: 0 2px 0 var(--ink); }
+  .screen .eyebrow { font-size: 14px; letter-spacing: 2px; text-transform: uppercase; color: var(--moss); font-weight: 700; }
+  .screen h1 { margin: 6px 0 12px; font-size: clamp(34px, 6vw, 52px); font-family: var(--serif); color: var(--gold); line-height: 1.05; }
+  .screen h1 .amp { color: var(--cream); font-weight: 400; }
   .screen .stakes { margin: 0 auto 18px; max-width: 420px; font-size: 18px; line-height: 1.45; }
   .howto { list-style: none; margin: 0 auto 22px; padding: 0; max-width: 400px; text-align: left; font-size: 16px; line-height: 1.4; }
   .howto li { display: flex; gap: 10px; align-items: flex-start; margin: 8px 0; }
@@ -231,13 +244,14 @@
     #worldmap h1 { font-size: 30px; }
   }
   #wave-btn .sub { display: block; font-size: 12px; font-weight: 700; opacity: 0.8; line-height: 1.1; }
-  #wave-btn .sub:empty { display: none; }
+  #wave-btn .sub:empty { visibility: hidden; }
+  #wave-btn .sub:empty::before { content: "\00a0"; }
   #boss-bar {
     position: absolute; top: max(64px, calc(env(safe-area-inset-top) + 54px)); left: 50%; transform: translateX(-50%);
     width: min(420px, 46vw); display: none; text-align: center;
   }
   #boss-bar.show { display: block; }
-  .boss-name { font-family: var(--serif); font-size: 14px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; color: var(--baron-red); text-shadow: 0 2px 0 var(--ink); }
+  .boss-name { font-size: 13px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; font-family: var(--serif); color: var(--baron-red); text-shadow: 0 2px 0 var(--ink); }
   .boss-track { height: 12px; border: 2px solid var(--ink); border-radius: 8px; background: rgba(27,20,16,0.7); overflow: hidden; }
   .boss-fill { height: 100%; width: 100%; background: linear-gradient(90deg, #7a1f1f, var(--baron-red)); transition: width 0.15s ease; }
   #wave-banner {
@@ -262,7 +276,7 @@
   #stars span.lit { color: var(--gold); text-shadow: 0 3px 0 var(--ink); animation: starpop 0.5s cubic-bezier(0.3, 1.6, 0.5, 1) forwards; opacity: 1; }
   #stars span.lit:nth-child(2) { animation-delay: 0.25s; }
   #stars span.lit:nth-child(3) { animation-delay: 0.5s; }
-  @keyframes starpop { 0% { transform: scale(0.2) rotate(-30deg); } 100% { transform: scale(1) rotate(0); } }
+  @keyframes starpop { 0% { transform: scale(0.2) rotate(-30deg); opacity: 0; } 100% { transform: scale(1) rotate(0); opacity: 1; } }
   #tip {
     position: absolute; display: none; pointer-events: none; transform: translate(-50%, 0);
     align-items: center; flex-direction: column; gap: 2px;
@@ -293,7 +307,7 @@
   }
   #rotate {
     position: fixed; inset: 0; display: none; z-index: 20;
-    background: #34452e; color: var(--cream);
+    background: #2f4a33; color: var(--cream);
     align-items: center; justify-content: center; text-align: center; padding: 24px;
   }
   #rotate.show { display: flex; }
@@ -316,7 +330,7 @@
   }
   #load-error {
     position: fixed; inset: 0; display: none; z-index: 30; padding: 24px;
-    background: #34452e; align-items: center; justify-content: center; text-align: center;
+    background: #2f4a33; align-items: center; justify-content: center; text-align: center;
   }
   #load-error.show { display: flex; }
   #load-error .card { max-width: 420px; font-size: 17px; line-height: 1.45; }
@@ -338,17 +352,18 @@
   .wm-blight { fill: url(#wm-blight-grad); }
   .wm-crack { fill: none; stroke: var(--spore); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; animation: wm-pulse 3.2s ease-in-out infinite; }
   .wm-deadtree { stroke: var(--stone-dark); stroke-width: 2.5; stroke-linecap: round; fill: none; }
-  .wm-heart-stump { fill: var(--baron); stroke: var(--ink); stroke-width: 2; stroke-linejoin: round; }
-  .wm-baron-flag { fill: var(--baron-red); stroke: var(--ink); stroke-width: 1.4; stroke-linejoin: round; }
-  .wm-baron-gate { fill: var(--ember); opacity: 0.85; }
-  .wm-field.alt { fill: var(--meadow-light); }
+  .wm-heart-stump { fill: var(--baron); stroke: var(--ink); stroke-width: 2; }
   .wm-heart-glow { fill: var(--ember); animation: wm-pulse 2.2s ease-in-out infinite; }
-  .wm-heart-label { fill: var(--cream); font-family: var(--serif); font-size: 13px; font-style: italic; opacity: 0.9; }
+  .wm-heart-label { fill: var(--cream); font-size: 12px; font-style: italic; opacity: 0.85; }
   .wm-seg { fill: none; stroke-linecap: round; }
   .wm-seg-edge { stroke: var(--path-edge); stroke-width: 11; }
   .wm-seg.claimed { stroke: var(--path); stroke-width: 7; }
   .wm-seg.open { stroke: var(--gold); stroke-width: 4; stroke-dasharray: 2 11; animation: wm-march 1.1s linear infinite; }
   .wm-seg.locked { stroke: var(--bark); stroke-width: 4; stroke-dasharray: 2 11; opacity: 0.55; }
+  .wm-bridge-shadow { fill: var(--ink); opacity: 0.32; }
+  .wm-bridge-wood { fill: var(--bark); stroke: var(--ink); stroke-width: 1.6; }
+  .wm-bridge-plank { fill: none; stroke: var(--ink); stroke-width: 1; opacity: 0.45; }
+  .wm-bridge-rail { fill: none; stroke: var(--ink); stroke-width: 2.4; stroke-linecap: round; }
   .wm-glyph { pointer-events: none; }
   .wm-glyph .st { fill: var(--stone); stroke: var(--ink); stroke-width: 1.4; }
   .wm-glyph .rf { fill: var(--cap-red); stroke: var(--ink); stroke-width: 1.4; }
@@ -356,12 +371,8 @@
   .wm-glyph .wd { fill: none; stroke: var(--bark); stroke-width: 2; }
   .wm-glyph .wn { fill: var(--gold); }
   .wm-glyph .tn { fill: var(--canvas); stroke: var(--ink); stroke-width: 1.4; }
-  .wm-glyph .rs { fill: var(--slate); stroke: var(--ink); stroke-width: 1.4; }
-  .wm-glyph .ry { fill: var(--royal); stroke: var(--ink); stroke-width: 1.4; }
-  .wm-glyph .fire { fill: var(--ember); }
-  .wm-glyph .pl { fill: var(--cream); stroke: var(--ink); stroke-width: 1.4; }
   .wm-pennant-pole { stroke: var(--bark); stroke-width: 2; }
-  .wm-pennant { fill: var(--royal-light); stroke: var(--ink); stroke-width: 1; animation: wm-wave 1.6s ease-in-out infinite; transform-box: fill-box; transform-origin: left center; }
+  .wm-pennant { fill: var(--gold); stroke: var(--ink); stroke-width: 1; animation: wm-wave 1.6s ease-in-out infinite; transform-box: fill-box; transform-origin: left center; }
   .wm-next-ring { fill: none; stroke: var(--gold); stroke-width: 3; transform-box: fill-box; transform-origin: center; animation: wm-ping 1.6s ease-out infinite; pointer-events: none; }
   .wm-puff { fill: var(--gold); transform-box: fill-box; transform-origin: center; animation: wm-puff 1s ease-out forwards; pointer-events: none; }
   @keyframes wm-flow { to { stroke-dashoffset: -44; } }
@@ -375,19 +386,346 @@
   }
   .wm-node { cursor: pointer; }
   .wm-node .wm-node-hit { fill: transparent; }
-  .wm-node .wm-node-badge { fill: var(--panel); stroke: var(--royal-light); stroke-width: 3; transition: stroke 0.15s ease, fill 0.15s ease; }
-  .wm-node.selected .wm-node-badge { stroke: var(--gold); fill: #33416b; }
+  .wm-node .wm-node-badge { fill: var(--panel); stroke: var(--moss); stroke-width: 3; transition: stroke 0.15s ease, fill 0.15s ease; }
+  .wm-node.selected .wm-node-badge { stroke: var(--gold); fill: #3a5a3f; }
   .wm-node .wm-node-label, .wm-node .wm-lock-icon { fill: var(--cream); font-size: 18px; font-weight: 800; font-family: inherit; pointer-events: none; }
   .wm-node .wm-star { fill: #4a3f36; stroke: var(--ink); stroke-width: 1; }
   .wm-node .wm-star.lit { fill: var(--gold); }
   .wm-node.locked { opacity: 0.45; cursor: default; }
   .wm-node.locked .wm-node-badge { stroke: #6d6e66; }
   #wm-blurb { min-height: 44px; }
-  #wm-blurb .wm-name { display: block; color: var(--gold); font-weight: 800; font-family: var(--serif); font-size: 20px; }
+  #wm-blurb .wm-name { display: block; color: var(--gold); font-weight: 800; }
+  /* difficulty tier picker, next to the Play button */
+  #wm-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px 14px; }
+  #wm-tier { display: inline-flex; gap: 6px; padding: 4px; border-radius: 30px; background: rgba(0, 0, 0, 0.3); }
+  .screen #wm-tier .tier-btn {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+    min-height: 52px; min-width: 104px; padding: 2px 14px; border-radius: 24px; border: 2px solid rgba(246, 236, 212, 0.35);
+    background: linear-gradient(180deg, var(--wood-hi), var(--wood-lo)); color: var(--cream);
+    font-size: 16px; line-height: 1.1; box-shadow: none;
+  }
+  .screen #wm-tier .tier-btn:active { transform: translateY(2px); }
+  .tier-btn .tier-sub { font-size: 11px; font-weight: 700; opacity: 0.8; }
+  .screen #wm-tier .tier-btn[aria-checked="true"] { background: var(--gold); color: var(--ink); border-color: var(--ink); box-shadow: 0 3px 0 var(--ink); }
+  .screen #wm-tier .tier-btn.bramble[aria-checked="true"] { background: var(--thorn); color: var(--cream); }
+  .screen #wm-tier .tier-btn:disabled { opacity: 0.5; cursor: default; transform: none; }
+  .tier-btn.bramble .tier-name::before { content: "\2766\00a0"; }
+  /* a level beaten on Bramble: a thorn mark on its node */
+  .wm-thorn circle { fill: none; stroke: var(--thorn); stroke-width: 4; }
+  .wm-thorn path { fill: var(--thorn); stroke: var(--ink); stroke-width: 1.2; stroke-linejoin: round; }
+  .wm-thorn { pointer-events: none; }
+  .pill.lives.bramble { border-color: var(--thorn); box-shadow: 0 0 0 2px var(--thorn); }
+  @media (max-height: 460px) {
+    .screen #wm-tier .tier-btn { min-height: 44px; min-width: 92px; padding: 0 10px; font-size: 15px; }
+    .tier-btn .tier-sub { font-size: 10px; }
+  }
+
+  /* ---- painted UI pass: carved wood panels, gold trim, glossy buttons ----
+     Overrides only paint (backgrounds, shadows, text-shadow). No sizes or
+     layout change, so touch targets and the phone layout are untouched. */
+  :root {
+    --wood-hi: #4a3323; --wood-lo: #2a1d14; --gold-hi: #ffe08a; --gold-lo: #d49a2a;
+    --moss-hi: #46704a; --moss-lo: #2a4530;
+    --trim: inset 0 0 0 2px rgba(18, 12, 8, 0.9), inset 0 3px 0 2px rgba(255, 224, 150, 0.16);
+  }
+  .pill, #toast, #panel {
+    background: linear-gradient(180deg, rgba(74, 51, 35, 0.95), rgba(42, 29, 20, 0.95));
+    box-shadow: 0 3px 0 rgba(0, 0, 0, 0.5), var(--trim);
+  }
+  .pill.gold { text-shadow: 0 1px 0 #1b1410; }
+  #panel, .screen .card {
+    background:
+      radial-gradient(circle at 12px 12px, var(--gold-hi) 0 2px, #8a6420 3px 4px, transparent 5px),
+      radial-gradient(circle at calc(100% - 12px) 12px, var(--gold-hi) 0 2px, #8a6420 3px 4px, transparent 5px),
+      radial-gradient(circle at 12px calc(100% - 12px), var(--gold-hi) 0 2px, #8a6420 3px 4px, transparent 5px),
+      radial-gradient(circle at calc(100% - 12px) calc(100% - 12px), var(--gold-hi) 0 2px, #8a6420 3px 4px, transparent 5px),
+      linear-gradient(180deg, rgba(74, 51, 35, 0.96), rgba(38, 26, 18, 0.97));
+  }
+  .screen .card { box-shadow: 0 8px 0 rgba(0, 0, 0, 0.45), var(--trim), 0 0 60px rgba(242, 193, 78, 0.12); }
+  .screen h1 { text-shadow: 0 2px 0 #8a6420, 0 5px 0 #1b1410, 0 10px 18px rgba(0, 0, 0, 0.5); }
+  .screen h1 .amp { text-shadow: 0 2px 0 #7a6b4a, 0 5px 0 #1b1410, 0 10px 18px rgba(0, 0, 0, 0.5); }
+  .screen .eyebrow { text-shadow: 0 1px 0 #1b1410; }
+  #wave-btn, .screen button {
+    background: linear-gradient(180deg, var(--gold-hi), var(--gold) 55%, var(--gold-lo));
+    box-shadow: 0 4px 0 var(--ink), inset 0 2px 0 rgba(255, 255, 255, 0.55);
+  }
+  .screen button { box-shadow: 0 5px 0 var(--ink), inset 0 2px 0 rgba(255, 255, 255, 0.55); }
+  #wave-btn:active { box-shadow: 0 1px 0 var(--ink), inset 0 2px 0 rgba(255, 255, 255, 0.4); }
+  .screen button:active { box-shadow: 0 1px 0 var(--ink), inset 0 2px 0 rgba(255, 255, 255, 0.4); }
+  #wave-btn:disabled { background: linear-gradient(180deg, rgba(74, 51, 35, 0.95), rgba(42, 29, 20, 0.95)); box-shadow: 0 3px 0 rgba(0, 0, 0, 0.5), var(--trim); }
+  .screen button.secondary { background: linear-gradient(180deg, var(--wood-hi), var(--wood-lo)); box-shadow: 0 5px 0 rgba(0, 0, 0, 0.55), inset 0 2px 0 rgba(255, 224, 150, 0.18); }
+  #wave-btn:not(:disabled) { animation: ready-glow 1.8s ease-in-out infinite; }
+  @keyframes ready-glow {
+    0%, 100% { filter: none; }
+    50% { filter: drop-shadow(0 0 10px rgba(255, 224, 138, 0.75)); }
+  }
+  .build-btn, .act-btn, .branch-btn {
+    background: linear-gradient(180deg, var(--moss-hi), var(--moss-lo));
+    box-shadow: 0 2px 0 rgba(0, 0, 0, 0.45), inset 0 2px 0 rgba(255, 255, 255, 0.14);
+  }
+  .build-btn:active, .act-btn:active, .branch-btn:active { box-shadow: 0 0 0 rgba(0, 0, 0, 0.45), inset 0 2px 0 rgba(255, 255, 255, 0.08); }
+  .build-btn.previewing { background: linear-gradient(180deg, #57835a, #33553a); }
+  .branch-btn.armed { background: linear-gradient(180deg, #5f8a5b, #3a5a3f); }
+  .build-btn:disabled, .act-btn:disabled, .branch-btn:disabled { filter: saturate(0.5) brightness(0.85); }
+  .build-name, .panel-title { text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6); }
+  .build-icon { filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.4)); }
+  @media (prefers-reduced-motion: reduce) { #wave-btn:not(:disabled) { animation: none; } }
+
+  /* ---- first-impression art: title crest, sun rays, clouds, fireflies ---- */
+  .crest { width: 56px; height: 63px; display: block; margin: -6px auto 4px; filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.5)); animation: crest-bob 4s ease-in-out infinite; }
+  @keyframes crest-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+  #title .card { position: relative; z-index: 1; }
+  .t-rays, .t-clouds, .t-flies { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+  .t-rays {
+    background:
+      linear-gradient(115deg, rgba(255, 214, 130, 0.16), transparent 50%),
+      radial-gradient(ellipse at 12% -10%, rgba(255, 232, 170, 0.22), transparent 55%);
+    animation: rays 9s ease-in-out infinite; mix-blend-mode: screen;
+  }
+  @keyframes rays { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+  .t-clouds i { position: absolute; left: -320px; width: 300px; height: 80px; border-radius: 50%; background: radial-gradient(ellipse at center, rgba(255, 246, 220, 0.22), transparent 70%); animation: cloud-drift 80s linear infinite; }
+  .t-clouds i:nth-child(1) { top: 9%; }
+  .t-clouds i:nth-child(2) { top: 62%; width: 380px; animation-duration: 110s; animation-delay: -40s; }
+  .t-clouds i:nth-child(3) { top: 33%; width: 240px; animation-duration: 95s; animation-delay: -70s; opacity: 0.7; }
+  @keyframes cloud-drift { to { transform: translateX(calc(100vw + 700px)); } }
+  .t-flies i { position: absolute; width: 5px; height: 5px; border-radius: 50%; background: #ffe9a0; box-shadow: 0 0 10px 3px rgba(255, 224, 138, 0.7); animation: fly-float var(--dur) ease-in-out infinite, fly-twinkle var(--tw) ease-in-out infinite; animation-delay: var(--dl), var(--dl); }
+  @keyframes fly-float { 0%, 100% { transform: translate(0, 0); } 33% { transform: translate(28px, -22px); } 66% { transform: translate(-20px, -38px); } }
+  @keyframes fly-twinkle { 0%, 100% { opacity: 0.15; } 50% { opacity: 1; } }
+
+  /* ---- boss entrance: dark edges and a ribbon banner ---- */
+  #boss-vig { position: absolute; inset: 0; pointer-events: none; opacity: 0; background: radial-gradient(ellipse at center, transparent 45%, rgba(46, 12, 66, 0.72) 100%); }
+  #boss-vig.go { animation: boss-vig 3.2s ease-out; }
+  @keyframes boss-vig { 0% { opacity: 0; } 12% { opacity: 1; } 70% { opacity: 0.85; } 100% { opacity: 0; } }
+  #boss-intro { position: absolute; left: 50%; top: 24%; transform: translate(-50%, 0); pointer-events: none; opacity: 0; text-align: center; padding: 12px 64px 14px;
+    background: linear-gradient(180deg, #4b2a63, #2a1638); border-top: 3px solid var(--gold); border-bottom: 3px solid var(--gold);
+    clip-path: polygon(0 0, 100% 0, calc(100% - 26px) 50%, 100% 100%, 0 100%, 26px 50%); box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5); }
+  #boss-intro.go { animation: boss-intro 3.2s cubic-bezier(0.2, 0.8, 0.2, 1); }
+  .bi-kicker { font-size: 13px; letter-spacing: 4px; text-transform: uppercase; color: #e6b8ff; font-weight: 800; }
+  .bi-name { font-size: clamp(26px, 5vw, 44px); font-weight: 900; color: var(--gold); text-shadow: 0 2px 0 #7a5316, 0 4px 0 #1b1410; white-space: nowrap; }
+  @keyframes boss-intro {
+    0% { opacity: 0; transform: translate(-50%, -14px) scale(0.86); letter-spacing: 0.4em; }
+    14% { opacity: 1; transform: translate(-50%, 0) scale(1.04); }
+    22% { transform: translate(-50%, 0) scale(1); }
+    78% { opacity: 1; }
+    100% { opacity: 0; transform: translate(-50%, 8px) scale(1); }
+  }
+
+  /* ---- world map extras ---- */
+  .wm-cloudshadows ellipse { fill: #0a1420; opacity: 0.14; }
+  .wm-cloudshadows { animation: wm-clouds 70s linear infinite; }
+  @keyframes wm-clouds { to { transform: translateX(1500px); } }
+  .wm-ripples path { fill: none; stroke: rgba(191, 230, 255, 0.4); stroke-width: 2; stroke-linecap: round; animation: wm-ripple 4s ease-in-out infinite; }
+  .wm-ripples path:nth-child(2) { animation-delay: -1s; } .wm-ripples path:nth-child(3) { animation-delay: -2s; } .wm-ripples path:nth-child(4) { animation-delay: -3s; }
+  @keyframes wm-ripple { 0%, 100% { opacity: 0.2; transform: translateX(0); } 50% { opacity: 0.9; transform: translateX(4px); } }
+  .wm-compass circle { fill: rgba(27, 20, 16, 0.6); stroke: var(--gold); stroke-width: 2; }
+  .wm-compass-n { fill: #d94f3a; stroke: #1b1410; stroke-width: 1; } .wm-compass-e { fill: var(--cream); opacity: 0.55; }
+  .wm-compass text { fill: var(--gold); font: 800 11px "Trebuchet MS", sans-serif; }
+  #wm-svg { filter: drop-shadow(0 4px 0 rgba(0, 0, 0, 0.35)); }
+
+  /* ---- miniature haze: the far and near edges of the board melt into soft
+     colored mist, the way a tilt-shift photo of a model falls out of focus.
+     A plain gradient (no blur filter), so it costs the same on every device. ---- */
+  #tiltshift { display: block; position: fixed; inset: 0; pointer-events: none; }
+  #tiltshift::before, #tiltshift::after { content: ""; position: absolute; left: 0; right: 0; }
+  #tiltshift::before { top: 0; height: 15vh; background: linear-gradient(rgba(70, 52, 110, 0.38), rgba(70, 52, 110, 0.14) 45%, transparent); }
+  #tiltshift::after { bottom: 0; height: 15vh; background: linear-gradient(transparent, rgba(255, 214, 160, 0.10) 55%, rgba(70, 52, 110, 0.30)); }
+  @media (prefers-reduced-motion: reduce) {
+    .crest, .t-rays, .t-clouds i, .t-flies i, .wm-cloudshadows, .wm-ripples path { animation: none; }
+    #boss-intro.go, #boss-vig.go { animation-duration: 0.01s; }
+  }
+
+  /* ---- painted title: illustrated backdrop, parallax layers, gold logotype ---- */
+  #title { background: none; overflow: hidden; }
+  #t-scene { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
+  #t-scene .tl { will-change: transform; }
+  .t-vignette { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at center, transparent 48%, rgba(12, 8, 18, 0.55) 100%); }
+  @keyframes ts-drift { from { transform: translateX(-420px); } to { transform: translateX(1950px); } }
+  .ts-cloud.c1 { animation: ts-drift 150s linear infinite; }
+  .ts-cloud.c2 { animation: ts-drift 210s linear infinite; animation-delay: -90s; }
+  .ts-cloud.c3 { animation: ts-drift 180s linear infinite; animation-delay: -40s; }
+  .ts-rays { transform-origin: 1120px 560px; animation: ts-rays 14s ease-in-out infinite; }
+  @keyframes ts-rays { 0%, 100% { opacity: 0.6; transform: rotate(-2deg); } 50% { opacity: 1; transform: rotate(2deg); } }
+  #title .card { background-color: rgba(34, 23, 16, 0.9); }
+  #title h1 {
+    position: relative; display: inline-block; margin: 8px 0 14px; padding: 0 6px;
+    background: linear-gradient(180deg, #fff0b0 0%, #f2c14e 52%, #c98a1d 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    -webkit-text-stroke: 2px #1b1410; paint-order: stroke fill; text-shadow: none;
+    filter: drop-shadow(0 3px 0 #7a5316) drop-shadow(0 6px 0 #1b1410) drop-shadow(0 12px 14px rgba(0, 0, 0, 0.55));
+    letter-spacing: 1px; white-space: nowrap; font-size: clamp(28px, 4.2vw, 44px);
+  }
+  #title .card { max-width: 560px; }
+  #title h1 .amp { -webkit-text-fill-color: #f6ecd4; text-shadow: none; font-style: italic; }
+  #title h1::before, #title h1::after {
+    content: ""; position: absolute; top: 50%; width: 56px; height: 34px; margin-top: -17px;
+    background: no-repeat center / contain url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 56 34'><path d='M2 17 C14 17 20 8 30 6 C28 14 24 18 18 20 C26 20 32 24 38 30 C28 30 20 26 14 20 C10 18 6 18 2 17 Z' fill='%236fae4a' stroke='%231b1410' stroke-width='2' stroke-linejoin='round'/><circle cx='44' cy='17' r='5' fill='%23f2c14e' stroke='%231b1410' stroke-width='2'/></svg>");
+  }
+  #title h1::before { left: -58px; }
+  #title h1::after { right: -58px; transform: scaleX(-1); }
+  #title .eyebrow {
+    display: inline-block; padding: 5px 30px 6px; margin: 0 0 2px; color: #eaf5d2; text-shadow: 0 1px 0 #1b1410;
+    background: linear-gradient(180deg, #3c6a3f, #24422a);
+    clip-path: polygon(0 0, 100% 0, calc(100% - 14px) 50%, 100% 100%, 0 100%, 14px 50%);
+    box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.18);
+  }
+  @media (max-width: 640px) { #title h1::before, #title h1::after { display: none; } }
+  @media (max-height: 460px) { .crest { display: none; } #title .card { padding-top: 16px; } }
+
+  /* ---- painted world map: sea, gold frame, corner ornaments, a gentle tilt ---- */
+  .wm-sea { fill: url(#wm-sea-grad); }
+  .wm-frame { fill: none; stroke: var(--gold); stroke-width: 3; }
+  .wm-corners path, .wm-corners circle { fill: none; stroke: var(--gold); stroke-width: 3; stroke-linecap: round; }
+  .wm-corners circle { fill: var(--gold); stroke: #1b1410; stroke-width: 1.5; }
+  .wm-swell path { fill: none; stroke: rgba(191, 230, 255, 0.28); stroke-width: 2.4; stroke-linecap: round; animation: wm-ripple 5s ease-in-out infinite; }
+  .wm-swell path:nth-child(2) { animation-delay: -1.5s; } .wm-swell path:nth-child(3) { animation-delay: -3s; } .wm-swell path:nth-child(4) { animation-delay: -4s; }
+  #worldmap .card.wide { transition: transform 0.25s ease-out; transform: perspective(1400px) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg)); }
+  @media (prefers-reduced-motion: reduce) { .ts-cloud, .ts-rays, .wm-swell path { animation: none; } #worldmap .card.wide { transform: none; } }
+
+  /* ---- settings screen: switches and volume sliders ---- */
+  .title-links { margin-top: 10px; }
+  .linkbtn { min-height: 44px; padding: 0 16px; background: none; border: 0; color: var(--cream); opacity: 0.85; font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; text-decoration: underline; text-underline-offset: 4px; }
+  .linkbtn:hover, .linkbtn:focus-visible { opacity: 1; color: var(--gold); }
+  #settings { z-index: 20; background: rgba(10, 7, 5, 0.9); }
+  #settings .card { max-width: 480px; text-align: left; background-color: #2a1d14; }
+  #settings h1 { text-align: center; }
+  #settings .eyebrow { text-align: center; }
+  .set-rows { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 18px; }
+  .set-row { display: grid; grid-template-columns: 1fr auto; align-items: center; column-gap: 14px; padding: 10px 4px; border-bottom: 1px solid rgba(246, 236, 212, 0.14); }
+  .set-row:last-child { border-bottom: 0; }
+  .set-label { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .set-name { font-size: 18px; font-weight: 800; color: var(--cream); }
+  .set-sub { font-size: 13px; opacity: 0.7; }
+  .switch { position: relative; width: 72px; height: 44px; padding: 0; background: #3a2a1e; border: 3px solid #1b1410; border-radius: 22px; cursor: pointer; box-shadow: inset 0 2px 0 rgba(0, 0, 0, 0.4); transition: background 0.15s ease; }
+  .switch .knob { position: absolute; top: 3px; left: 3px; width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(180deg, #ffe9a0, #d9a12f); border: 2px solid #1b1410; transition: transform 0.15s ease; }
+  .switch[aria-checked="true"] { background: #3c6a3f; }
+  .switch[aria-checked="true"] .knob { transform: translateX(28px); }
+  .switch:focus-visible, .slider:focus-visible, .screen button:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+  .slider { grid-column: 1 / -1; width: 100%; height: 44px; margin: 4px 0 0; accent-color: var(--gold); cursor: pointer; }
+  .slider:disabled { opacity: 0.4; cursor: default; }
+  .set-foot { display: flex; justify-content: center; flex-wrap: wrap; gap: 12px; }
+  .set-foot button { margin: 0; min-height: 44px; }
+
+  /* ---- save code screen ---- */
+  #savecode { z-index: 21; background: rgba(10, 7, 5, 0.92); }
+  #savecode .card { max-width: 520px; text-align: left; background-color: #2a1d14; max-height: calc(100vh - 16px); overflow-y: auto; overscroll-behavior: contain; }
+  #savecode h1, #savecode .eyebrow { text-align: center; }
+  .sc-help { margin: 0 0 12px; font-size: 15px; opacity: 0.85; line-height: 1.4; }
+  .sc-label { display: block; margin: 10px 0 4px; font-size: 14px; font-weight: 800; color: var(--gold); }
+  .sc-line { display: flex; gap: 10px; align-items: stretch; }
+  .sc-field { flex: 1; min-width: 0; min-height: 44px; padding: 0 12px; font: 700 16px/1 ui-monospace, Menlo, Consolas, monospace; letter-spacing: 1px; color: var(--cream); background: #1b1410; border: 3px solid #1b1410; border-radius: 10px; box-shadow: inset 0 2px 0 rgba(0, 0, 0, 0.5); outline: 1px solid rgba(246, 236, 212, 0.25); }
+  .sc-field:focus { outline: 3px solid var(--gold); }
+  /* the code itself: two wrapped lines, so all of it shows (a BB2 code is 43 characters) */
+  .sc-out { display: block; resize: none; overflow: hidden; padding: 7px 12px; line-height: 1.45; letter-spacing: 1px; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .sc-line button { margin: 0; min-height: 44px; min-width: 84px; padding-left: 16px; padding-right: 16px; }
+  .sc-msg { min-height: 22px; margin: 10px 0 6px; font-size: 15px; font-weight: 700; text-align: center; }
+  .sc-msg.ok { color: #9fe08a; } .sc-msg.bad { color: #ff9a8a; }
+  #savecode .card > button#savecode-done { display: block; margin: 6px auto 0; min-height: 44px; }
+  @media (max-height: 460px) {
+    #savecode .card { padding: 12px 20px; }
+    #savecode h1 { margin: 2px 0 4px; font-size: 24px; }
+    #savecode .eyebrow, .sc-help { display: none; }
+    .sc-label { margin: 4px 0 2px; }
+    .sc-msg { min-height: 18px; margin: 4px 0 2px; }
+  }
+  @media (max-height: 460px) {
+    #settings .card { padding: 14px 20px 14px; }
+    #settings h1 { margin: 2px 0 6px; font-size: 26px; }
+    .set-rows { margin-bottom: 8px; gap: 0; }
+    .set-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr) auto; padding: 4px 4px; }
+    .set-label { grid-column: 1; }
+    .switch { grid-column: 3; grid-row: 1; }
+    .slider { grid-column: 2; grid-row: 1; height: 44px; margin: 0; }
+    .set-sub { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) { .switch, .switch .knob { transition: none; } }
+
+  /* ---- victory screens: ribbon, staggered stars, stats, confetti, the finale ---- */
+  #celebrate { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 2; }
+  #end .card { position: relative; z-index: 1; max-height: calc(100vh - 16px); overflow-y: auto; overscroll-behavior: contain; }
+  #end.win { background: radial-gradient(ellipse at 50% 38%, rgba(242, 193, 78, 0.2), rgba(27, 20, 16, 0.74) 68%); }
+  #end.win .card { animation: endpop 0.6s cubic-bezier(0.3, 1.45, 0.5, 1) both; box-shadow: 0 8px 0 rgba(0, 0, 0, 0.45), var(--trim), 0 0 90px rgba(242, 193, 78, 0.35); }
+  @keyframes endpop { 0% { transform: translateY(28px) scale(0.84); opacity: 0; } 100% { transform: none; opacity: 1; } }
+  #end-ribbon { display: none; align-items: center; gap: 10px; padding: 5px 20px 6px; margin: 0 0 4px; border: 3px solid var(--ink); border-radius: 12px;
+    background: linear-gradient(180deg, #ffe08a, var(--gold) 55%, #d89a2a); color: var(--ink); font-size: 20px; font-weight: 900; letter-spacing: 3px; text-transform: uppercase;
+    box-shadow: 0 4px 0 var(--ink), inset 0 2px 0 rgba(255, 255, 255, 0.6); transform: rotate(-1.5deg); }
+  #end.win #end-ribbon { display: inline-flex; animation: ribbonin 0.7s 0.2s cubic-bezier(0.3, 1.6, 0.5, 1) both; }
+  #end-ribbon .rb-star { font-size: 16px; color: #8a6420; }
+  @keyframes ribbonin { 0% { transform: scale(0.2) rotate(-14deg); opacity: 0; } 100% { transform: rotate(-1.5deg); opacity: 1; } }
+  #end.win #stars { gap: 12px; font-size: clamp(50px, 9vw, 68px); margin: 4px 0 12px; }
+  #end.win #stars span { color: #54483d; transform: scale(0.8); opacity: 0.55; text-shadow: 0 3px 0 var(--ink); }
+  #end.win #stars span.lit { color: var(--gold); opacity: 0; animation: starpop 0.55s cubic-bezier(0.3, 1.9, 0.5, 1) both; text-shadow: 0 3px 0 var(--ink), 0 0 26px rgba(242, 193, 78, 0.9); }
+  #end.win #stars span.lit:nth-child(1) { animation-delay: 0.75s; }
+  #end.win #stars span.lit:nth-child(2) { animation-delay: 1.2s; }
+  #end.win #stars span.lit:nth-child(3) { animation-delay: 1.65s; }
+  #end-stats { display: none; justify-content: center; gap: 10px; margin: 0 0 14px; flex-wrap: wrap; }
+  #end.win #end-stats { display: flex; animation: statsin 0.5s 0.5s ease-out both; }
+  @keyframes statsin { 0% { transform: translateY(10px); opacity: 0; } 100% { transform: none; opacity: 1; } }
+  .stat { min-width: 96px; padding: 8px 12px 7px; border: 2px solid rgba(242, 193, 78, 0.55); border-radius: 12px; background: rgba(0, 0, 0, 0.3); }
+  .stat b { display: block; font-size: 28px; line-height: 1.1; color: var(--gold); font-variant-numeric: tabular-nums; text-shadow: 0 2px 0 var(--ink); }
+  .stat span { font-size: 11px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; opacity: 0.8; }
+  /* the Level 10 finale */
+  #finale { display: none; margin: 0 0 12px; }
+  #end.finale #finale { display: block; animation: statsin 0.6s 1.9s ease-out both; }
+  #end.finale #stars { font-size: clamp(40px, 7vw, 52px); margin: 0 0 8px; }
+  #end.finale .stat { padding: 5px 10px 4px; }
+  #end.finale .stat b { font-size: 24px; }
+  #end.finale #end-stats { margin-bottom: 10px; }
+  #end.finale .stakes { font-size: 16px; margin-bottom: 12px; }
+  #finale-line { margin: 0 auto 8px; max-width: 520px; font-size: 16px; line-height: 1.45; font-style: italic; color: var(--cream); }
+  #finale-badges { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin-bottom: 8px; }
+  .fb { width: 48px; padding: 4px 0 3px; border: 2px solid rgba(242, 193, 78, 0.5); border-radius: 10px; background: rgba(0, 0, 0, 0.3); }
+  .fb b { display: block; font-size: 14px; line-height: 1.2; color: var(--cream); }
+  .fb i { display: block; font-style: normal; font-size: 12px; line-height: 1.1; letter-spacing: 1px; color: #54483d; }
+  .fb i .on { color: var(--gold); text-shadow: 0 0 6px rgba(242, 193, 78, 0.8); }
+  #finale-total { margin: 0; font-size: 15px; font-weight: 800; letter-spacing: 0.5px; color: var(--gold); }
+  #end.finale { background: radial-gradient(ellipse at 50% 24%, rgba(255, 226, 150, 0.4), rgba(120, 60, 140, 0.34) 38%, rgba(27, 20, 16, 0.84) 76%); }
+  #end.finale .card { max-width: 700px; padding-top: 20px; padding-bottom: 20px; border-width: 4px; animation: endpop 0.9s cubic-bezier(0.25, 1.3, 0.5, 1) both, finaleglow 3.2s 1s ease-in-out infinite; }
+  @keyframes finaleglow { 0%, 100% { box-shadow: 0 8px 0 rgba(0, 0, 0, 0.45), var(--trim), 0 0 70px rgba(242, 193, 78, 0.35); } 50% { box-shadow: 0 8px 0 rgba(0, 0, 0, 0.45), var(--trim), 0 0 130px rgba(255, 214, 120, 0.7); } }
+  #end.finale h1 { font-size: clamp(30px, 5.2vw, 48px); margin: 2px 0 6px; white-space: nowrap; background: linear-gradient(100deg, #ffd25a 0%, #fff6d0 38%, #ffd25a 52%, #f2a93a 100%); background-size: 220% 100%;
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; text-shadow: none;
+    filter: drop-shadow(0 3px 0 #1b1410) drop-shadow(0 8px 14px rgba(0, 0, 0, 0.5)); animation: shine 3.4s linear infinite; }
+  @keyframes shine { 0% { background-position: 120% 0; } 100% { background-position: -100% 0; } }
+  #end.finale #end-ribbon { background: linear-gradient(180deg, #ffd0ee, #e68bd2 55%, #b95fb0); }
+  @media (max-height: 460px) {
+    #end.win .card { padding-top: 10px; }
+    #end-ribbon { font-size: 15px; padding: 2px 14px 3px; letter-spacing: 2px; }
+    #end.win #stars { font-size: 38px; margin: 0 0 6px; }
+    #end-stats { gap: 6px; margin-bottom: 8px; }
+    .stat { min-width: 80px; padding: 4px 8px 3px; }
+    .stat b { font-size: 20px; }
+    #finale { margin-bottom: 6px; }
+    #finale-line { font-size: 14px; margin-bottom: 6px; }
+    .fb { width: 38px; padding: 2px 0; }
+    .fb b { font-size: 12px; }
+    #finale-total { font-size: 13px; }
+    #end.finale h1 { font-size: 26px; white-space: normal; }
+    #end.finale .card { padding-top: 8px; padding-bottom: 8px; }
+    #end.finale #stars { font-size: 30px; margin: 0 0 4px; }
+    #end.finale .stakes { display: none; }
+    #finale-line { display: none; }
+    .fb i { display: none; }
+    .fb { width: 30px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #end.win .card, #end.finale .card, #end-ribbon, #end-stats, #finale, #end.finale h1 { animation: none !important; }
+    #end.win #stars span.lit { animation: none !important; opacity: 1; }
+  }
+  /* Knights & Knaves additions */
+  .wm-baron-flag { fill: var(--baron-red); stroke: var(--ink); stroke-width: 1.4; stroke-linejoin: round; }
+  .wm-baron-gate { fill: var(--ember); opacity: 0.85; }
+  .wm-field.alt { fill: var(--meadow-light); }
+  .wm-glyph .rs { fill: var(--slate); stroke: var(--ink); stroke-width: 1.4; }
+  .wm-glyph .ry { fill: var(--royal); stroke: var(--ink); stroke-width: 1.4; }
+  .wm-glyph .fire { fill: var(--ember); }
+  .wm-glyph .pl { fill: var(--cream); stroke: var(--ink); stroke-width: 1.4; }
+  .wm-heart-label { font-family: var(--serif); }
+  #wm-blurb .wm-name { font-family: var(--serif); }
+  .panel-title { font-family: var(--serif); }
 </style>
 </head>
 <body>
 <canvas id="game" aria-label="Knights and Knaves game view"></canvas>
+<div id="tiltshift" aria-hidden="true"></div>
 <div id="vignette" aria-hidden="true"></div>
 
 <div id="ui">
@@ -396,8 +734,15 @@
     <div class="pill lives"><span class="icon">&#9829;</span><span id="hud-lives">0</span></div>
     <div class="pill wave"><span class="icon">&#9873;</span><span id="hud-wave">Wave</span></div>
     <button id="mute-btn" class="pill iconbtn" type="button" aria-label="Sound on" title="Sound"><span class="icon">&#128266;</span></button>
+    <button id="settings-btn" class="pill iconbtn" type="button" aria-label="Settings" title="Settings"><span class="icon">&#9881;</span></button>
     <button id="speed-btn" class="pill iconbtn" type="button" aria-label="Game speed" title="Speed">1&times;</button>
     <button id="pause-btn" class="pill iconbtn" type="button" aria-label="Pause" title="Pause"><span class="icon">&#10074;&#10074;</span></button>
+    <button id="rot-left-btn" class="pill iconbtn cam-btn" type="button" aria-label="Turn the view anticlockwise (Q)" title="Turn the view (Q)"><span class="icon">&#8634;</span></button>
+    <button id="rot-right-btn" class="pill iconbtn cam-btn" type="button" aria-label="Turn the view clockwise (E)" title="Turn the view (E)"><span class="icon">&#8635;</span></button>
+    <button id="zoom-out-btn" class="pill iconbtn cam-btn" type="button" aria-label="Zoom out (minus key)" title="Zoom out (-)"><span class="icon">&#8722;</span></button>
+    <button id="zoom-in-btn" class="pill iconbtn cam-btn" type="button" aria-label="Zoom in (plus key)" title="Zoom in (+)"><span class="icon">+</span></button>
+    <button id="tilt-up-btn" class="pill iconbtn cam-btn" type="button" aria-label="Raise the camera, looking more from above (] key)" title="Camera higher (])"><span class="icon">&#9650;</span></button>
+    <button id="tilt-down-btn" class="pill iconbtn cam-btn" type="button" aria-label="Lower the camera, looking more from the side ([ key)" title="Camera lower ([)"><span class="icon">&#9660;</span></button>
   </div>
   <button id="wave-btn" type="button"><span id="wave-btn-main">Send the first wave</span><span id="wave-btn-sub" class="sub"></span></button>
   <div id="boss-bar"><div id="boss-name" class="boss-name">The Siege Ram</div><div class="boss-track"><div class="boss-fill"></div></div></div>
@@ -407,12 +752,23 @@
   <div id="floaters"></div>
   <div id="toast"></div>
   <div id="flash"></div>
+  <div id="boss-vig"></div>
+  <div id="boss-intro" aria-live="polite"><div class="bi-kicker">A boss approaches</div><div class="bi-name" id="boss-intro-name"></div></div>
   <div id="debug"></div>
 </div>
 
 <div id="title" class="screen">
+  <svg id="t-scene" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true"></svg>
+  <div class="t-vignette"></div>
+  <div class="t-rays"></div><div class="t-clouds"><i></i><i></i><i></i></div><div class="t-flies" id="t-flies"></div>
   <div class="card">
-    <div class="crest" aria-hidden="true">&#9876;</div>
+    <svg class="crest" viewBox="0 0 64 72" aria-hidden="true">
+      <path d="M32 3 L58 12 V36 C58 52 46 63 32 69 C18 63 6 52 6 36 V12 Z" fill="#2f5d9e" stroke="#e8b84a" stroke-width="3"></path>
+      <path d="M32 9 L52 16 V36 C52 48 43 57 32 62 C21 57 12 48 12 36 V16 Z" fill="#244a80"></path>
+      <path d="M18 52 L44 20 M46 52 L20 20" stroke="#dfe3ea" stroke-width="4" stroke-linecap="round"></path>
+      <path d="M15 49 L21 55 M49 49 L43 55" stroke="#e8b84a" stroke-width="4" stroke-linecap="round"></path>
+      <path d="M24 16 L28 22 L32 14 L36 22 L40 16 L40 25 H24 Z" fill="#e8b84a" stroke="#1b1410" stroke-width="1.4" stroke-linejoin="round"></path>
+    </svg>
     <div class="eyebrow">A medieval tower defense</div>
     <h1>Knights <span class="amp">&amp;</span> Knaves</h1>
     <p class="stakes">The Black Baron's knaves are loose upon the realm. Raise your towers, hold the King's road and send the rascals packing.</p>
@@ -422,6 +778,7 @@
       <li><span class="ico">&#9873;</span>Send the next wave when you're ready and hold the line.</li>
     </ul>
     <button id="start-btn" type="button">Raise the Banners</button>
+    <div class="title-links"><button id="title-settings-btn" class="linkbtn" type="button">&#9881; Settings and save code</button></div>
   </div>
 </div>
 
@@ -431,12 +788,13 @@
     <h1>Choose your battle</h1>
     <svg id="wm-svg" viewBox="0 0 800 320" role="img" aria-label="Map of the Kingdom of Aldermere and its battle sites">
       <defs>
+        <linearGradient id="wm-sea-grad" x1="0" y1="0" x2="0.4" y2="1"><stop offset="0" stop-color="#1f4a63"/><stop offset="0.55" stop-color="#2a6580"/><stop offset="1" stop-color="#1b3f56"/></linearGradient>
         <radialGradient id="wm-soft">
           <stop offset="0" stop-color="#000" stop-opacity="1"></stop>
           <stop offset="0.6" stop-color="#000" stop-opacity="1"></stop>
           <stop offset="1" stop-color="#000" stop-opacity="0"></stop>
         </radialGradient>
-        <linearGradient id="wm-blight-grad" x1="0" y1="0" x2="1" y2="0.4">
+        <linearGradient id="wm-blight-grad" x1="0" y1="0" x2="1" y2="0.6">
           <stop offset="0" stop-color="#2a2226" stop-opacity="0.95"></stop>
           <stop offset="0.65" stop-color="#4a3c38" stop-opacity="0.84"></stop>
           <stop offset="1" stop-color="#5e564d" stop-opacity="0.62"></stop>
@@ -447,6 +805,11 @@
           <g id="wm-cuts"></g>
         </mask>
       </defs>
+      <!-- painted sea and a gold frame -->
+      <rect class="wm-sea" x="-8" y="-8" width="816" height="336" rx="18"></rect>
+      <g class="wm-swell"><path d="M 20 150 q 20 -8 40 0 t 40 0 t 40 0"></path><path d="M 700 250 q 20 -8 40 0 t 40 0"></path><path d="M 300 314 q 20 -8 40 0 t 40 0 t 40 0"></path><path d="M 610 8 q 20 -8 40 0 t 40 0"></path></g>
+      <rect class="wm-frame" x="-8" y="-8" width="816" height="336" rx="18"></rect>
+      <g class="wm-corners"><path d="M -8 26 V 10 a 18 18 0 0 1 18 -18 H 26"></path><path d="M 808 26 V 10 a 18 18 0 0 0 -18 -18 H 774"></path><path d="M -8 294 V 310 a 18 18 0 0 0 18 18 H 26"></path><path d="M 808 294 V 310 a 18 18 0 0 1 -18 18 H 774"></path><circle cx="-8" cy="-8" r="5"></circle><circle cx="808" cy="-8" r="5"></circle><circle cx="-8" cy="328" r="5"></circle><circle cx="808" cy="328" r="5"></circle></g>
       <!-- the realm: the King's castle in the east, the Baron's hold of Blackmoor in the far west -->
       <path class="wm-coast" d="M 60 40 C 150 10, 300 22, 420 18 C 540 14, 660 30, 740 52 C 790 70, 786 140, 772 200 C 760 260, 730 300, 640 304 C 520 310, 380 300, 260 304 C 150 308, 60 296, 34 250 C 12 200, 20 120, 30 80 C 36 58, 44 46, 60 40 Z"></path>
       <path class="wm-land" d="M 60 40 C 150 10, 300 22, 420 18 C 540 14, 660 30, 740 52 C 790 70, 786 140, 772 200 C 760 260, 730 300, 640 304 C 520 310, 380 300, 260 304 C 150 308, 60 296, 34 250 C 12 200, 20 120, 30 80 C 36 58, 44 46, 60 40 Z"></path>
@@ -484,11 +847,20 @@
         <rect class="wm-baron-gate" x="-4" y="4" width="6" height="8"></rect>
         <text class="wm-heart-label" x="26" y="-8">Blackmoor, the Baron's hold</text>
       </g>
+      <g class="wm-cloudshadows" clip-path="url(#wm-land-clip)"><ellipse cx="-120" cy="90" rx="110" ry="46"></ellipse><ellipse cx="-380" cy="220" rx="150" ry="52"></ellipse><ellipse cx="-620" cy="150" rx="90" ry="38"></ellipse></g>
+      <g class="wm-ripples"><path d="M 8 24 q 8 -5 16 0 t 16 0"></path><path d="M 762 20 q 8 -5 16 0 t 16 0"></path><path d="M 6 300 q 8 -5 16 0 t 16 0"></path><path d="M 690 314 q 8 -5 16 0 t 16 0"></path></g>
+      <g class="wm-compass" transform="translate(772 292)"><circle r="17"></circle><path class="wm-compass-n" d="M 0 -14 L 4 0 L 0 14 L -4 0 Z"></path><path class="wm-compass-e" d="M -14 0 L 0 4 L 14 0 L 0 -4 Z"></path><text y="-21" text-anchor="middle">N</text></g>
       <g id="wm-roads"></g>
       <g id="wm-fx"></g>
     </svg>
     <p id="wm-blurb" class="stakes">Pick a battle on the map.</p>
-    <button id="wm-play-btn" type="button" disabled>Choose a battle</button>
+    <div id="wm-actions">
+      <div id="wm-tier" role="radiogroup" aria-label="Difficulty">
+        <button type="button" class="tier-btn" role="radio" data-tier="meadow" aria-checked="true"><span class="tier-name">Squire</span><span class="tier-sub">The usual fight</span></button>
+        <button type="button" class="tier-btn bramble" role="radio" data-tier="bramble" aria-checked="false"><span class="tier-name">Knight</span><span class="tier-sub">Tougher, 16 lives</span></button>
+      </div>
+      <button id="wm-play-btn" type="button" disabled>Choose a battle</button>
+    </div>
   </div>
 </div>
 
@@ -501,20 +873,85 @@
       <button id="resume-btn" type="button">Back to the walls</button>
       <button id="pause-restart-btn" type="button" class="secondary">Start over</button>
       <button id="pause-map-btn" type="button" class="secondary">World map</button>
+      <button id="pause-settings-btn" type="button" class="secondary">Settings</button>
     </div>
-    <p class="keys">Desktop: P or Esc pauses. Space sends the next wave.</p>
+    <p class="keys">Desktop: P or Esc pauses. Space sends the next wave. Q and E turn the view. Scroll or pinch to zoom, drag to look around. [ and ] tilt the camera.</p>
   </div>
 </div>
 
 <div id="end" class="screen">
+  <canvas id="celebrate" aria-hidden="true"></canvas>
   <div class="card">
+    <div id="end-ribbon" aria-hidden="true"><span class="rb-star">&#9733;</span><span id="end-ribbon-text">Victory!</span><span class="rb-star">&#9733;</span></div>
     <h1 id="end-title">The manor holds!</h1>
     <div id="stars"><span>&#9733;</span><span>&#9733;</span><span>&#9733;</span></div>
+    <div id="end-stats">
+      <div class="stat"><b id="stat-lives">0</b><span>Lives left</span></div>
+      <div class="stat"><b id="stat-kills">0</b><span>Foes beaten</span></div>
+      <div class="stat"><b id="stat-waves">0</b><span>Waves held</span></div>
+    </div>
+    <div id="finale">
+      <p id="finale-line"></p>
+      <div id="finale-badges"></div>
+      <p id="finale-total"></p>
+    </div>
     <p id="end-text" class="stakes"></p>
     <div class="row">
       <button id="restart-btn" type="button">Play again</button>
       <button id="end-map-btn" type="button" class="secondary">Choose another battle</button>
     </div>
+  </div>
+</div>
+
+
+<div id="settings" class="screen" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+  <div class="card">
+    <div class="eyebrow">Your realm, your volume</div>
+    <h1 id="settings-title">Settings</h1>
+    <div class="set-rows">
+      <div class="set-row">
+        <div class="set-label"><span class="set-name">All sound</span><span class="set-sub">A quick mute for everything</span></div>
+        <button id="set-master" class="switch" type="button" role="switch" aria-checked="true" aria-label="All sound"><span class="knob"></span></button>
+      </div>
+      <div class="set-row">
+        <div class="set-label"><span class="set-name">Sound effects</span><span class="set-sub">Shots, hits, horns and chimes</span></div>
+        <button id="set-sfx" class="switch" type="button" role="switch" aria-checked="true" aria-label="Sound effects"><span class="knob"></span></button>
+        <input id="set-sfx-vol" class="slider" type="range" min="0" max="100" step="5" aria-label="Sound effects volume">
+      </div>
+      <div class="set-row">
+        <div class="set-label"><span class="set-name">Music</span><span class="set-sub">The score that follows the battle</span></div>
+        <button id="set-music" class="switch" type="button" role="switch" aria-checked="true" aria-label="Music"><span class="knob"></span></button>
+        <input id="set-music-vol" class="slider" type="range" min="0" max="100" step="5" aria-label="Music volume">
+      </div>
+      <div class="set-row">
+        <div class="set-label"><span class="set-name">Camera buttons</span><span class="set-sub">Turn, zoom and tilt in the top bar. Keys and gestures always work</span></div>
+        <button id="set-camui" class="switch" type="button" role="switch" aria-checked="true" aria-label="Camera buttons"><span class="knob"></span></button>
+      </div>
+    </div>
+    <div class="set-foot">
+      <button id="savecode-btn" class="secondary" type="button">Save code</button>
+      <button id="settings-done" type="button">Done</button>
+    </div>
+  </div>
+</div>
+
+<div id="savecode" class="screen" role="dialog" aria-modal="true" aria-labelledby="savecode-title">
+  <div class="card">
+    <div class="eyebrow">Take your campaign with you</div>
+    <h1 id="savecode-title">Save code</h1>
+    <p class="sc-help">Your stars on Squire and Knight and your unlocked levels as a short code. Copy it somewhere safe. Paste it on another device or browser to carry on.</p>
+    <label class="sc-label" for="savecode-out">Your code</label>
+    <div class="sc-line">
+      <textarea id="savecode-out" class="sc-field sc-out" rows="2" readonly spellcheck="false" autocomplete="off" aria-label="Your save code"></textarea>
+      <button id="savecode-copy" type="button">Copy</button>
+    </div>
+    <label class="sc-label" for="savecode-in">Have a code? Paste it here</label>
+    <div class="sc-line">
+      <input id="savecode-in" class="sc-field" type="text" spellcheck="false" autocomplete="off" autocapitalize="characters" placeholder="KK1-...." aria-label="Paste a save code">
+      <button id="savecode-load" type="button">Load</button>
+    </div>
+    <div id="savecode-msg" class="sc-msg" role="status" aria-live="polite"></div>
+    <button id="savecode-done" type="button">Done</button>
   </div>
 </div>
 
@@ -534,6 +971,8 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="js/color-pipeline.js"></script>
+<script src="js/toon-lighting.js"></script>
 <script src="js/palette-config.js"></script>
 <script src="js/level-common.js"></script>
 <script src="js/level1-hollybrook.js"></script>
@@ -546,6 +985,8 @@
 <script src="js/renderer-fx.js"></script>
 <script src="js/renderer.js"></script>
 <script src="js/input.js"></script>
+<script src="js/celebrate.js"></script>
+<script src="js/title-art.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/boot.js"></script>

@@ -270,7 +270,7 @@ const LEVEL_8 = (() => {
     // an earlier draft crossed scree-path at (5,7) and was caught by
     // tools/validate-levels.js's "routes stay merged once they meet" check.
     routes: [
-      { id: 'scree-path', waypoints: [[0, 4], [5, 4], [5, 10], ...tail] },
+      { id: 'scree-path', waypoints: [[0, 4], [5, 4], [5, 7], [5, 10], ...tail] },
       { id: 'high-trail', waypoints: [[9, 0], [9, 3], [6, 3], [6, 6], [9, 6], [9, 10], ...tail] },
       { id: 'frozen-draw', waypoints: [[0, 13], [4, 13], [4, 10], ...tail] },
     ],
@@ -279,6 +279,8 @@ const LEVEL_8 = (() => {
       name: 'the Frostpine Camp', properName: 'The Frostpine Camp',
       cells: [[12, 12], [13, 12], [14, 12], [12, 13], [13, 13], [14, 13]], gateCell: [13, 13],
     },
+    curvyRoads: true,   // the road is a smooth ribbon and enemies follow the curve
+    curveKeepsPace: true,   // shorter road, proportionally slower walkers: same time spawn to gate as the straight road
     cobbleTailCells: 3,
     theme: {
       center: [1, 8], radiusOut: { x: 14, z: 12 }, radiusIn: 0.55, falloffWidth: 0.45,

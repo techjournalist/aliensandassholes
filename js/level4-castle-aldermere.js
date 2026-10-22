@@ -191,7 +191,7 @@ const LEVEL_4 = (() => {
     // the Highway (west), the Ridge Road hairpins (north) and the Fen dash
     // (south) meet on row 6, then cross the drawbridge to the castle gate
     routes: [
-      { id: 'highway', waypoints: [[0, 9], [5, 9], [5, 11], [8, 11], [8, 6], ...tail] },
+      { id: 'highway', waypoints: [[0, 9], [4, 9], [4, 11], [8, 11], [8, 8], [8, 6], [11, 6], ...tail] },
       { id: 'ridge', waypoints: [[0, 2], [10, 2], [10, 4], [6, 4], [6, 6], ...tail] },
       { id: 'fen', waypoints: [[12, 12], [12, 10], [14, 10], [14, 8], [11, 8], [11, 6], ...tail] },
     ],
@@ -202,6 +202,8 @@ const LEVEL_4 = (() => {
       gateCell: [20, 8],
     },
     cobbleTailCells: 6,
+    curvyRoads: true,   // the road is a smooth ribbon and enemies follow the curve
+    curveKeepsPace: true,   // shorter road, proportionally slower walkers: same time spawn to gate as the straight road
     theme: { center: [0.5, 5.5], radiusOut: { x: 8.5, z: 7.5 }, radiusIn: 1.2, falloffWidth: 0.5, motes: { embers: 34, fireflies: 16 },
       groundMeadow: 0x7cab4e, groundMeadowDark: 0x64933f },
     spawnBlockedText: "That's the Baron's camp. Nothing of ours stands there.",

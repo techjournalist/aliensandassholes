@@ -103,6 +103,8 @@ const RendererFX = (() => {
           float bank = step(0.84 - 0.07 * sin(vW.z * 8.0 + uTime * 1.9), edge);
           col = mix(col, uFoam, bank * 0.85);
           gl_FragColor = vec4(col, 1.0);
+          #include <tonemapping_fragment>
+          #include <encodings_fragment>
           #include <fog_fragment>
         }`,
       fog: true,
@@ -213,6 +215,8 @@ const RendererFX = (() => {
           ${shape}
           if (a * vAlpha < 0.01) discard;
           gl_FragColor = vec4(uColor, a * vAlpha);
+          #include <tonemapping_fragment>
+          #include <encodings_fragment>
         }`,
       transparent: true,
       depthWrite: false,
@@ -241,5 +245,26 @@ const RendererFX = (() => {
     return shadowTex;
   }
 
-  return { noise, fbm, patchGround, waterMaterial, grassBladeGeometry, grassMaterial, motes, shadowTexture, MOTE_KINDS };
+  // Cast shadow: a dark contact blob at the base that trails off into a long,
+  // soft tail, so a tree or building reads as throwing a shadow away from the
+  // sun instead of sitting on a round puddle. The tail runs along +u.
+  let castTex = null;
+  function castShadowTexture() {
+    if (castTex) return castTex;
+    const c = document.createElement('canvas');
+    c.width = 128; c.height = 64;
+    const ctx = c.getContext('2d');
+    const blob = (cx, rx, ry, a0) => {
+      ctx.save(); ctx.translate(cx, 32); ctx.scale(rx / ry, 1);
+      const g = ctx.createRadialGradient(0, 0, 0, 0, 0, ry);
+      g.addColorStop(0, `rgba(255,255,255,${a0})`); g.addColorStop(0.55, `rgba(255,255,255,${a0 * 0.6})`); g.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, ry, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    };
+    blob(46, 44, 28, 0.95);     // the body of the shadow, near the base
+    blob(80, 46, 20, 0.5);      // the tail, thinner and fainter
+    castTex = new THREE.CanvasTexture(c);
+    return castTex;
+  }
+
+  return { noise, fbm, patchGround, waterMaterial, grassBladeGeometry, grassMaterial, motes, shadowTexture, castShadowTexture, MOTE_KINDS };
 })();

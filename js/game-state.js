@@ -75,6 +75,45 @@ const GameState = (() => {
     dragon:    { id: 'dragon',    name: 'The Black Dragon', hp: 700, speed: 0.72, bounty: 200, flying: true,  armor: 2, boss: true },
   };
 
+  // Difficulty tiers. Meadow is the game as tuned: every multiplier is 1 and
+  // the level's own lives apply, so it plays exactly as before tiers existed.
+  // Bramble is the harder tier. hp, speed and bounty apply to each enemy as
+  // it spawns, gold and lives when a level loads. Waves and maps never change.
+  // Tuned with seeded bot runs (tools/bot-runner.js, 30 per level): the first
+  // draft (hp 1.25, speed 1.1, gold 0.85, 15 lives, bounty 0.9) lost all 200
+  // runs by wave 9. These numbers win 192 of 300 (AGENTS.md P3-D1).
+  const DIFFICULTY = {
+    meadow:  { id: 'meadow',  name: 'Squire',  hp: 1,    speed: 1, gold: 1, lives: null, bounty: 1 },
+    bramble: { id: 'bramble', name: 'Knight', hp: 1.05, speed: 1, gold: 1, lives: 16,   bounty: 0.95 },
+  };
+  let difficulty = DIFFICULTY.meadow;
+
+  // Endless mode (ENDLESS-MODE.md section 2). A level plays its own handmade
+  // waves first, then waves made by genWave(): a pure function of the level,
+  // the wave number and a seed, never Math.random, so a map's endless run is
+  // the same every time. Only endless runs read any of this; the campaign
+  // plays exactly as before.
+  const ENDLESS = {
+    cap: 45,          // enemies alive at once; later spawns wait for room
+    hpSlope: 0.04,    // extra hpScale per wave past the level's own waves
+    growth: 0.09,     // budget growth per wave past the level's own waves
+    bossEvery: 5,     // a generated wave divisible by this brings a boss
+    breather: 12,     // extra prep seconds after every 5th wave
+    cost: { grunt: 1, trickster: 0.8, troll: 5, bat: 1.6 },
+    gap: { grunt: 0.85, trickster: 0.55, troll: 2.1, bat: 0.95 },
+    weight: { grunt: 4, trickster: 3, troll: 2, bat: 2 },
+    bosses: ['ram', 'stonelord', 'dragon'],
+    names: ['The Baron sends more', 'More boots on the road', 'A thicker rabble', 'The long dusk', 'Torches in the dark', 'No end in sight', 'The war camps empty', 'Another push', 'Fresh from Blackmoor', 'The roads fill up'],
+  };
+  let endless = false, refBudget = 1;
+  const genCache = new Map();
+  // a small seeded generator (mulberry32) and a string hash (FNV-1a) for its seeds
+  function hashStr(str) { let h = 2166136261; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+  function rngFrom(seed) {
+    let a = seed >>> 0;
+    return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  }
+
   const listeners = {};
   function on(event, fn) { (listeners[event] = listeners[event] || []).push(fn); }
   // Each listener runs on its own: a failing sound, visual or UI listener
@@ -177,11 +216,35 @@ const GameState = (() => {
         if (i === 0) cells.push([x, z]);
         while (x !== bx || z !== bz) { x += dx; z += dz; cells.push([x, z]); }
       }
-      const points = wps.map(([c, r]) => ({ x: worldX(c), z: worldZ(r) }));
+      let points = wps.map(([c, r]) => ({ x: worldX(c), z: worldZ(r) }));
       points.push(gate);
+      // Optional `curvyRoads`: round every corner (Chaikin corner cutting) so
+      // the road and the enemies on it sweep in curves instead of turning
+      // on grid corners. The cells (what is road, what is buildable) are
+      // unchanged; the curve only ever cuts inside the corner, staying
+      // within about half a cell of them. Start and gate stay exact.
+      let straightLen = 0;
+      for (let i = 1; i < points.length; i++) straightLen += Math.hypot(points[i].x - points[i - 1].x, points[i].z - points[i - 1].z);
+      if (def.curvyRoads) {
+        for (let pass = 0; pass < 3; pass++) {
+          const q = [points[0]];
+          for (let i = 0; i < points.length - 1; i++) {
+            const a = points[i], b = points[i + 1];
+            q.push({ x: a.x * 0.75 + b.x * 0.25, z: a.z * 0.75 + b.z * 0.25 }, { x: a.x * 0.25 + b.x * 0.75, z: a.z * 0.25 + b.z * 0.75 });
+          }
+          q.push(points[points.length - 1]);
+          points = q;
+        }
+      }
       const lens = [0];
       for (let i = 1; i < points.length; i++) lens.push(lens[i - 1] + Math.hypot(points[i].x - points[i - 1].x, points[i].z - points[i - 1].z));
-      return { id: rd.id, index, cells, points, lens, length: lens[lens.length - 1] };
+      const length = lens[lens.length - 1];
+      // Optional `curveKeepsPace`: rounding the corners shortens a road, so
+      // enemies walk it proportionally slower and take as long from spawn to
+      // gate as they did on the straight road. A level tuned before it got
+      // curves keeps its wave table and its time in tower range.
+      const pace = def.curvyRoads && def.curveKeepsPace ? length / straightLen : 1;
+      return { id: rd.id, index, cells, points, lens, length, pace };
     });
     // the union of every route's cells, primary route first and in order
     pathCells = []; pathIndex = new Map();
@@ -191,17 +254,101 @@ const GameState = (() => {
     const primary = routes[0].cells;
     cobbleCells = new Set(primary.slice(Math.max(0, primary.length - def.cobbleTailCells)).map(([c, r]) => key(c, r)));
     spawnCells = new Set(routes.map((rt) => key(rt.cells[0][0], rt.cells[0][1])));
+    // A road can carry flyers only if some build plot has it in reach of a
+    // tower that hits flyers (tier 1 range). Endless never sends flyers elsewhere.
+    const aaTypes = Object.values(TOWER_TYPES).filter((t) => t.hitsFlying), plots = [], p = { x: 0, z: 0 };
+    for (let c = 0; c < cols; c++) for (let r = 0; r < rows; r++) if (isBuildable(c, r)) plots.push({ x: worldX(c), z: worldZ(r) });
+    for (const rt of routes) {
+      rt.antiAir = false;
+      for (let d = 0; d <= rt.length && !rt.antiAir; d += 0.25) {
+        pathPosAt(d, p, rt);
+        rt.antiAir = plots.some((q) => aaTypes.some((t) => { const dd = Math.hypot(q.x - p.x, q.z - p.z); return dd <= t.range && dd >= (t.minRange || 0); }));
+      }
+    }
+    // endless waves start from the strongest of the level's last four waves (bosses aside)
+    const costOf = (w) => w.groups.reduce((sum, g) => sum + (ENEMY_TYPES[g.type].boss ? 0 : g.count * (ENDLESS.cost[g.type] || 1)), 0);
+    refBudget = Math.max(1, ...def.waves.slice(-4).map(costOf));
+    genCache.clear();
 
+    const startLives = difficulty.lives || def.startLives;
     Object.assign(state, {
-      gold: def.startGold, lives: def.startLives, wave: 0, time: 0,
+      gold: Math.round(def.startGold * difficulty.gold), lives: startLives, startLives, difficulty: difficulty.id, wave: 0, time: 0,
       selected: null, towers: [], enemies: [], waveActive: false, waveQueue: [],
       hpScale: 1, schedule: [], waveTime: 0, prep: 0, endpointState: 0,
       projectiles: [], phase: 'title', paused: false, speed: 1, kills: 0,
+      endless, endlessSeed: hashStr(def.id), earned: 0,
     });
     emit('levelLoaded', def);
   }
   function currentLevel() { return level; }
-  function totalWaves() { return level.waves.length; }
+  // Pick the tier for the next level load. On a level that has not started
+  // yet it also resets the starting gold and lives to the new tier's.
+  function setDifficulty(id) {
+    difficulty = DIFFICULTY[id] || DIFFICULTY.meadow;
+    if (level && state.phase === 'title' && state.wave === 0) {
+      state.difficulty = difficulty.id;
+      state.startLives = difficulty.lives || level.startLives;
+      state.lives = state.startLives;
+      state.gold = Math.round(level.startGold * difficulty.gold);
+      emit('livesChanged', state.lives);
+      emit('goldChanged', state.gold);
+    }
+    emit('difficultyChanged', difficulty.id);
+    return difficulty.id;
+  }
+  // Endless on or off for the next level load; like the tier, it applies at once
+  // to a level that has not started yet.
+  function setEndless(on) {
+    endless = !!on;
+    if (level && state.phase === 'title' && state.wave === 0) { state.endless = endless; genCache.clear(); }
+    emit('modeChanged', endless);
+    return endless;
+  }
+  function totalWaves() { return state.endless ? Infinity : level.waves.length; }
+  // wave n's definition: the level's own, then (endless only) a generated one
+  function waveDef(n) {
+    if (n >= 1 && n <= level.waves.length) return level.waves[n - 1];
+    if (!state.endless || n < 1) return null;
+    if (!genCache.has(n)) genCache.set(n, genWave(n));
+    return genCache.get(n);
+  }
+  function genWave(n) {
+    const N = level.waves.length, k = n - N, E = ENDLESS;
+    const rand = rngFrom(hashStr(`${state.endlessSeed}|${n}`));
+    const weighted = (items, w) => { let t = 0; for (const it of items) t += w(it); let x = rand() * t; for (const it of items) { x -= w(it); if (x < 0) return it; } return items[items.length - 1]; };
+    const boss = n % E.bossEvery === 0;
+    // roads: favor the ones the last wave did not use, so every road stays live
+    const prev = new Set(routesForWave(n - 1));
+    const nRoads = routes.length === 1 ? 1 : 1 + Math.floor(rand() * Math.min(3, routes.length));
+    const pool = routes.map((rt) => rt.index), chosen = [];
+    while (chosen.length < nRoads) { const i = weighted(pool, (r) => (prev.has(r) ? 1 : 3)); chosen.push(i); pool.splice(pool.indexOf(i), 1); }
+    const aaChosen = chosen.filter((i) => routes[i].antiAir);
+    const budget = refBudget * (1 + E.growth * k) * (boss ? 0.55 : 1);
+    const nGroups = 2 + Math.floor(rand() * 3);
+    const cursor = {}, groups = [];
+    for (let g = 0; g < nGroups; g++) {
+      let road = chosen[g % chosen.length];
+      let type = weighted(['grunt', 'trickster', 'troll', 'bat'], (t) => (t === 'bat' && !aaChosen.length ? 0 : t === 'troll' ? E.weight.troll + k * 0.08 : E.weight[t]));
+      if (type === 'bat' && !routes[road].antiAir) road = aaChosen[g % aaChosen.length];
+      const count = Math.max(1, Math.min(40, Math.round(budget / nGroups / E.cost[type])));
+      const gap = Math.round(E.gap[type] * (0.85 + rand() * 0.3) * 100) / 100;
+      const at = cursor[road] || 0;
+      cursor[road] = at + count * gap + 1.5 + rand() * 2;
+      groups.push({ type, count, gap, at: Math.round(at * 100) / 100, route: routes[road].id });
+    }
+    let name = E.names[Math.floor(rand() * E.names.length)];
+    if (boss) {
+      // bosses fly: only down a road with anti-air reach, a different boss each time
+      const aaAll = routes.filter((rt) => rt.antiAir).map((rt) => rt.index);
+      const road = aaChosen.length ? aaChosen[0] : aaAll[0];
+      if (road !== undefined) {
+        const type = E.bosses[(Math.floor(n / E.bossEvery) + level.index) % E.bosses.length];
+        groups.push({ type, count: 1, gap: 1, at: Math.round((6 + rand() * 4) * 100) / 100, route: routes[road].id });
+        name = `${ENEMY_TYPES[type].name} rises`;
+      }
+    }
+    return { name, groups, generated: true };
+  }
 
   function routeOf(id) {
     if (id === undefined || id === null) return routes[0];
@@ -235,7 +382,7 @@ const GameState = (() => {
     return true;
   }
   function setSpeed(x) {
-    state.speed = x === 2 ? 2 : 1;
+    state.speed = x === 2 || x === 4 || x === 8 ? x : 1;   // 1x, 2x, 4x or 8x
     emit('speedChanged', state.speed);
     return state.speed;
   }
@@ -373,10 +520,11 @@ const GameState = (() => {
   // -------- enemies --------
   function spawnEnemy(typeId, routeId) {
     const t = ENEMY_TYPES[typeId], route = routeOf(routeId);
-    const hp = Math.round(t.hp * state.hpScale);
+    const d = DIFFICULTY[state.difficulty] || DIFFICULTY.meadow;
+    const hp = Math.round(t.hp * state.hpScale * d.hp);
     const e = {
-      id: nextId++, type: typeId, name: t.name, hp, maxHp: hp, speed: t.speed,
-      flying: t.flying, bounty: t.bounty,
+      id: nextId++, type: typeId, name: t.name, hp, maxHp: hp, speed: t.speed * d.speed,
+      flying: t.flying, bounty: Math.round(t.bounty * d.bounty),
       dist: 0, lane: t.boss ? 0 : (Math.random() - 0.5) * 0.44,   // lateral offset so a crowd doesn't walk single file
       route: route.index, x: route.points[0].x, z: route.points[0].z, dirX: 1, dirZ: 0, age: 0,
       chillUntil: 0, chillMul: 1, rootUntil: 0, speedMul: 1,
@@ -393,7 +541,7 @@ const GameState = (() => {
     e.rooted = state.time < e.rootUntil;
     e.chilled = state.time < e.chillUntil;
     e.speedMul = e.rooted ? 0 : (e.chilled ? e.chillMul : 1);
-    e.dist += e.speed * e.speedMul * dt;
+    e.dist += e.speed * e.speedMul * dt * routes[e.route].pace;
     const route = routes[e.route];
     pathPosAt(e.dist - 0.3, _a, route);
     pathPosAt(e.dist + 0.3, _b, route);
@@ -409,15 +557,17 @@ const GameState = (() => {
     e.z = _a.z + dx * lane * funnel;
   }
 
-  // Scale the endpoint's 3 damage-state thresholds to this level's starting
-  // lives, so a level with a different startLives still swaps states at
+  // Scale the endpoint's 3 damage-state thresholds to this run's starting
+  // lives, so a level or tier with a different startLives still swaps states at
   // roughly 65%/30% remaining, matching Level 1's original 13/6-of-20 feel.
   function endpointStateFor(lives) {
-    const L = level.startLives;
+    const L = state.startLives || level.startLives;
     return lives > L * 0.65 ? 0 : lives > L * 0.3 ? 1 : 2;
   }
   function stars() {
-    const [three, two] = level.starThresholds;
+    // a tier with fewer lives scales the thresholds the same way (Bramble: 12 and 6 of 15)
+    const k = (state.startLives || level.startLives) / level.startLives;
+    const three = Math.round(level.starThresholds[0] * k), two = Math.round(level.starThresholds[1] * k);
     return state.lives >= three ? 3 : state.lives >= two ? 2 : 1;
   }
   function leak(e) {
@@ -561,6 +711,7 @@ const GameState = (() => {
       const i = state.enemies.indexOf(e);
       if (i >= 0) state.enemies.splice(i, 1);
       state.gold += e.bounty;
+      state.earned += e.bounty;
       state.kills += 1;
       emit('enemyKilled', e);
       emit('goldChanged', state.gold);
@@ -569,9 +720,10 @@ const GameState = (() => {
 
   // -------- waves --------
   function startWave() {
-    if (state.waveActive || state.phase !== 'playing' || state.wave >= level.waves.length) return false;
+    if (state.waveActive || state.phase !== 'playing') return false;
+    const def = waveDef(state.wave + 1);
+    if (!def) return false;
     state.wave += 1;
-    const def = level.waves[state.wave - 1];
     // Groups run one after another (`delay` counts from the previous group's
     // last spawn). A group with `at` instead starts at that time on its own,
     // so groups on different routes can come at once. `route` picks the road.
@@ -589,7 +741,8 @@ const GameState = (() => {
     state.waveQueue = sched.map((e) => e.type);
     state.waveTime = 0;
     state.prep = 0;
-    state.hpScale = 1 + (state.wave - 1) * 0.05;   // a gentle stiffening on top of the roster
+    // a gentle stiffening on top of the roster, steeper past the level's own waves (endless only)
+    state.hpScale = 1 + (state.wave - 1) * 0.05 + Math.max(0, state.wave - level.waves.length) * ENDLESS.hpSlope;
     state.waveActive = true;
     emit('waveStarted', state.wave);
     return true;
@@ -599,13 +752,13 @@ const GameState = (() => {
     if (state.waveActive || state.phase !== 'playing') return false;
     const bonus = state.prep > 0 ? Math.round(state.prep * 1.5) : 0;
     if (!startWave()) return false;
-    if (bonus > 0) { state.gold += bonus; emit('earlyBonus', bonus); emit('goldChanged', state.gold); }
+    if (bonus > 0) { state.gold += bonus; state.earned += bonus; emit('earlyBonus', bonus); emit('goldChanged', state.gold); }
     return true;
   }
-  function waveInfo(n) { return level.waves[n - 1] || null; }
+  function waveInfo(n) { return waveDef(n); }
   // Which roads wave n comes down (route indexes), for the incoming-road markers.
   function routesForWave(n) {
-    const w = level.waves[n - 1];
+    const w = waveDef(n);
     if (!w) return [];
     return [...new Set(w.groups.map((grp) => routeOf(grp.route).index))].sort();
   }
@@ -618,7 +771,8 @@ const GameState = (() => {
     updateProjectiles(dt);
     if (state.waveActive) {
       state.waveTime += dt;
-      while (state.schedule.length && state.schedule[0].t <= state.waveTime) {
+      // endless: a cap on enemies alive at once, so a long run never floods a phone
+      while (state.schedule.length && state.schedule[0].t <= state.waveTime && !(state.endless && state.enemies.length >= ENDLESS.cap)) {
         const next = state.schedule.shift();
         spawnEnemy(next.type, next.route);
         state.waveQueue.shift();
@@ -642,12 +796,14 @@ const GameState = (() => {
       state.waveActive = false;
       const bonus = 15 + state.wave * 5;
       state.gold += bonus;
+      state.earned += bonus;
       emit('waveEnded', { wave: state.wave, bonus });
       emit('goldChanged', state.gold);
-      if (state.wave >= level.waves.length) {
+      if (!state.endless && state.wave >= level.waves.length) {
         if (state.phase === 'playing') { state.phase = 'won'; emit('gameWon'); }
       } else {
-        state.prep = level.prepSeconds;
+        // endless has no last wave; every 5th wave buys a longer breather
+        state.prep = level.prepSeconds + (state.endless && state.wave % ENDLESS.bossEvery === 0 ? ENDLESS.breather : 0);
       }
     }
   }
@@ -658,7 +814,8 @@ const GameState = (() => {
     TOWER_TYPES, TOWER_ORDER, TIERS, BRANCHES, ENEMY_TYPES, towerStats, upgradeCost, sellValue, towerById, upgradeTower, sellTower,
     pathPosAt,
     state, on, emit, update, worldX, worldZ, startGame, pause, resume, setSpeed,
-    loadLevel, currentLevel, totalWaves,
+    loadLevel, currentLevel, totalWaves, DIFFICULTY, setDifficulty, get difficulty() { return difficulty.id; },
+    ENDLESS, setEndless, get endless() { return endless; },
     selectTile, clearSelection, placeTower, canAfford, towerAt, startWave, sendWave, spawnEnemy, waveInfo, routesForWave, enemiesLeft, stars,
     inGrid, isPath, isStream, isBridge, isBastion, isSpawn, isBuildable, isCobble,
     cellKind, zoneFalloff, pathIndexOf,

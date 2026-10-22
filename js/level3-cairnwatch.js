@@ -21,6 +21,7 @@ const LEVEL_3 = (() => {
     { name: 'Pressed Hard',      flavor: 'The border bends but does not break. Not yet.',                  groups: [g('troll', 3, 2.0), g('trickster', 14, 0.45, 1), g('bat', 7, 0.65, 4)] },
     { name: 'Almost Through',    flavor: 'The last quiet before the line breaks.',                          groups: [g('grunt', 14, 0.5), g('troll', 3, 1.8, 2), g('bat', 8, 0.6, 5)] },
     { name: 'The Line Breaks',   flavor: 'A Troll column, a Trickster rush, and a Bat swarm — together, all at once.', groups: [g('troll', 4, 2.0, 0), g('trickster', 14, 0.4, 0), g('bat', 9, 0.55, 0)] },
+    { name: 'The Ashen Swarm Rises', flavor: 'Embers lift out of the ravine and take wing. Only Druids and Artillery reach it.', groups: [g('bat', 5, 1.0), g('grunt', 6, 0.9, 1), g('ashen', 1, 1, 6)] },
   ];
 
   // -------- this level's scene (Ravine Stair chokepoint, Cairnwatch Tower endpoint) --------
@@ -483,6 +484,8 @@ const LEVEL_3 = (() => {
       name: 'the Cairnwatch', properName: 'The Cairnwatch',
       cells: [[17, 3], [18, 3], [17, 4], [18, 4], [17, 5], [18, 5]], gateCell: [17, 5],
     },
+    curvyRoads: true,   // the road is a smooth ribbon and enemies follow the curve
+    curveKeepsPace: true,   // shorter road, proportionally slower walkers: same time spawn to gate as the straight road
     cobbleTailCells: 3,
     theme: {
       center: [7, 5], radiusOut: { x: 9, z: 6.2 }, radiusIn: 1.6, falloffWidth: 0.7,

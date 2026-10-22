@@ -470,6 +470,8 @@ const LEVEL_2 = (() => {
       name: 'the Watch-Mill', properName: 'The Watch-Mill',
       cells: [[16, 5], [17, 5], [16, 6], [17, 6], [16, 7], [17, 7]], gateCell: [16, 7],
     },
+    curvyRoads: true,   // the road is a smooth ribbon and enemies follow the curve
+    curveKeepsPace: true,   // shorter road, proportionally slower walkers: same time spawn to gate as the straight road
     cobbleTailCells: 3,
     theme: {
       center: [0.5, 3.5], radiusOut: { x: 5.5, z: 4.2 }, radiusIn: 1.3, falloffWidth: 0.5,

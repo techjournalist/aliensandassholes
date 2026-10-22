@@ -3,6 +3,25 @@
 // ===================================================================
 const Audio = (() => {
   let ctx = null, master = null, noiseBuf = null, muted = false;
+  let sfxOut = null, musicOut = null;   // per-kind volume buses, both feeding master
+  // Player settings, saved under kk-audio. Music defaults a little lower than
+  // the effects, since it plays continuously and effects are short events.
+  const settings = { sfxOn: true, sfxVol: 1, musicOn: true, musicVol: 0.6 };
+  try {
+    const saved = JSON.parse(localStorage.getItem('kk-audio') || 'null');
+    if (saved && typeof saved === 'object') {
+      if (typeof saved.sfxOn === 'boolean') settings.sfxOn = saved.sfxOn;
+      if (typeof saved.musicOn === 'boolean') settings.musicOn = saved.musicOn;
+      if (Number.isFinite(saved.sfxVol)) settings.sfxVol = Math.max(0, Math.min(1, saved.sfxVol));
+      if (Number.isFinite(saved.musicVol)) settings.musicVol = Math.max(0, Math.min(1, saved.musicVol));
+    }
+  } catch (e) { /* storage may be blocked or hold junk: keep the defaults */ }
+  function saveSettings() { try { localStorage.setItem('kk-audio', JSON.stringify(settings)); } catch (e) { /* ignore */ } }
+  function applySettings() {
+    if (!ctx || !sfxOut || rendering) return;
+    sfxOut.gain.setTargetAtTime(settings.sfxOn ? settings.sfxVol : 0, ctx.currentTime, 0.03);
+    musicOut.gain.setTargetAtTime(settings.musicOn ? settings.musicVol : 0, ctx.currentTime, 0.05);
+  }
   let baseDelay = 0, rendering = false;
   const recent = [];      // start times of recent voices, for crowd ducking
   const lastAt = {};      // per-key rate limiting
@@ -13,6 +32,8 @@ const Audio = (() => {
     comp.threshold.value = -16; comp.knee.value = 18; comp.ratio.value = 6; comp.attack.value = 0.004; comp.release.value = 0.18;
     master = c.createGain();
     master.connect(comp); comp.connect(c.destination);
+    sfxOut = c.createGain(); musicOut = c.createGain();
+    sfxOut.connect(master); musicOut.connect(master);
     const len = Math.floor(c.sampleRate * 2), buf = c.createBuffer(1, len, c.sampleRate), d = buf.getChannelData(0);
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
     noiseBuf = buf;
@@ -26,7 +47,9 @@ const Audio = (() => {
       buildGraph(ctx);
       try { muted = localStorage.getItem('kk-muted') === '1'; } catch (e) { /* storage may be blocked */ }
       master.gain.value = muted ? 0 : 0.6;
+      applySettings();
       startAmbience();
+      startMusic();
     }
     if (ctx.state === 'suspended') ctx.resume();
   }
@@ -58,7 +81,7 @@ const Audio = (() => {
   // One tonal voice: oscillator -> lowpass -> gain envelope. Slight random
   // detune keeps repeats from sounding stamped out.
   function voice({ type = 'sine', freq = 440, to = null, dur = 0.15, vol = 0.4, cutoff = 2400, delay = 0, attack = 0.008, jitter = 0.04, key = null, gap = 0.05 }) {
-    if (!ctx || limited(key, gap)) return;
+    if (!ctx || (!settings.sfxOn && !rendering) || limited(key, gap)) return;
     const t0 = ctx.currentTime + baseDelay + delay;
     const j = 1 + (Math.random() * 2 - 1) * jitter;
     const osc = ctx.createOscillator(), filt = ctx.createBiquadFilter(), g = ctx.createGain();
@@ -72,7 +95,7 @@ const Audio = (() => {
     g.gain.setValueAtTime(0.0001, t0);
     g.gain.exponentialRampToValueAtTime(v, t0 + attack);
     g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-    osc.connect(filt); filt.connect(g); g.connect(master);
+    osc.connect(filt); filt.connect(g); g.connect(sfxOut);
     osc.start(t0); osc.stop(t0 + dur + 0.03);
   }
   // A shaped noise burst: bandpass or lowpass noise with an envelope. Puffs,
@@ -90,7 +113,7 @@ const Audio = (() => {
     g.gain.setValueAtTime(0.0001, t0);
     g.gain.exponentialRampToValueAtTime(v, t0 + attack);
     g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-    src.connect(filt); filt.connect(g); g.connect(master);
+    src.connect(filt); filt.connect(g); g.connect(sfxOut);
     src.start(t0, Math.random() * 1.5); src.stop(t0 + dur + 0.03);
   }
 
@@ -102,13 +125,13 @@ const Audio = (() => {
     const wg = ctx.createGain(); wg.gain.value = 0.0;
     const lfo = ctx.createOscillator(), lg = ctx.createGain();
     lfo.frequency.value = 0.09; lg.gain.value = 0.02; lfo.connect(lg); lg.connect(wg.gain);
-    wind.connect(wf); wf.connect(wg); wg.connect(master);
+    wind.connect(wf); wf.connect(wg); wg.connect(sfxOut);
     wind.start(); lfo.start();
     wg.gain.setTargetAtTime(0.045, ctx.currentTime, 2);
     const drone = ctx.createOscillator(); drone.type = 'triangle'; drone.frequency.value = 55;
     const d2 = ctx.createOscillator(); d2.type = 'sine'; d2.frequency.value = 82.5;
     const dg = ctx.createGain(); dg.gain.value = 0;
-    drone.connect(dg); d2.connect(dg); dg.connect(master);
+    drone.connect(dg); d2.connect(dg); dg.connect(sfxOut);
     drone.start(); d2.start();
     amb.windGain = wg; amb.droneGain = dg; amb.birdTimer = 2 + Math.random() * 3;
   }
@@ -188,10 +211,33 @@ const Audio = (() => {
     tickLast() {
       voice({ type: 'sine', freq: 1320, to: 1320, dur: 0.12, vol: 0.2, cutoff: 5000, jitter: 0 });
     },
-    win() {
-      [523, 659, 784, 1047].forEach((f, i) => voice({ type: 'triangle', freq: f, to: f, dur: i === 3 ? 0.8 : 0.2, vol: 0.26, cutoff: 3000, delay: i * 0.16, jitter: 0 }));
-      [392, 523].forEach((f, i) => voice({ type: 'sawtooth', freq: f, to: f, dur: 0.8, vol: 0.1, cutoff: 1200, delay: 0.48 + i * 0.05, jitter: 0.005 }));
-      noise({ dur: 0.6, vol: 0.1, freq: 7000, q: 0.5, delay: 0.5 });
+    win() {      // a brass fanfare with a sparkle tail over a warm chord
+      [523, 659, 784, 1047].forEach((f, i) => voice({ type: 'triangle', freq: f, to: f, dur: i === 3 ? 1.1 : 0.2, vol: 0.28, cutoff: 3200, delay: i * 0.15, jitter: 0 }));
+      [262, 392, 523].forEach((f, i) => voice({ type: 'sawtooth', freq: f, to: f, dur: 1.1, vol: 0.09, cutoff: 1300, delay: 0.45 + i * 0.03, jitter: 0.004 }));
+      [1568, 1976, 2349, 2637, 3136].forEach((f, i) => voice({ type: 'sine', freq: f, to: f, dur: 0.28, vol: 0.09, cutoff: 6000, delay: 0.7 + i * 0.07, jitter: 0 }));
+      noise({ dur: 0.8, vol: 0.1, freq: 7000, q: 0.5, delay: 0.5 });
+    },
+    star(i = 0) {   // a bell for each star as it lands, rising with every one
+      const f = [784, 988, 1319][i % 3];
+      voice({ type: 'sine', freq: f, to: f, dur: 0.7, vol: 0.26, cutoff: 5000, jitter: 0 });
+      voice({ type: 'triangle', freq: f * 2, to: f * 2, dur: 0.4, vol: 0.1, cutoff: 6000, jitter: 0 });
+      voice({ type: 'sine', freq: f * 3, to: f * 3, dur: 0.18, vol: 0.05, cutoff: 7000, delay: 0.02, jitter: 0 });
+      noise({ dur: 0.1, vol: 0.07, freq: 6500, q: 1.5 });
+    },
+    firework() {    // a rising whistle, a boom and a crackle
+      voice({ type: 'sine', freq: 520 + Math.random() * 200, to: 1700, dur: 0.28, vol: 0.07, cutoff: 5000, key: 'firework', gap: 0.12, jitter: 0 });
+      noise({ dur: 0.55, vol: 0.2, freq: 2600, to: 500, q: 0.6, delay: 0.28 });
+      voice({ type: 'triangle', freq: 130, to: 55, dur: 0.35, vol: 0.2, cutoff: 500, delay: 0.28, jitter: 0 });
+      for (let i = 0; i < 5; i++) noise({ dur: 0.03, vol: 0.09, freq: 4500 + Math.random() * 2500, q: 2, delay: 0.5 + i * 0.07 + Math.random() * 0.05 });
+    },
+    finale() {   // the campaign is won: two rising phrases, a held chord and a bell run
+      const phrase = (notes, t0, last) => notes.forEach((f, i) => voice({ type: 'triangle', freq: f, to: f, dur: i === notes.length - 1 ? last : 0.2, vol: 0.28, cutoff: 3400, delay: t0 + i * 0.17, jitter: 0 }));
+      phrase([392, 523, 659, 784], 0, 0.6);
+      phrase([523, 659, 784, 1047, 1319], 1.1, 1.6);
+      [[262, 330, 392], [330, 392, 523], [392, 523, 659]].forEach((ch, k) => ch.forEach((f) => voice({ type: 'sawtooth', freq: f, to: f, dur: k === 2 ? 2.4 : 1.0, vol: 0.075, cutoff: 1400, delay: k === 2 ? 2.0 : k * 1.1 + 0.4, jitter: 0.004 })));
+      [1319, 1568, 1976, 2349, 2637, 3136, 2637, 3136, 3951].forEach((f, i) => voice({ type: 'sine', freq: f, to: f, dur: 0.45, vol: 0.09, cutoff: 7000, delay: 2.2 + i * 0.13, jitter: 0 }));
+      noise({ dur: 1.6, vol: 0.12, freq: 7000, q: 0.5, delay: 1.9 });
+      voice({ type: 'triangle', freq: 98, to: 98, dur: 2.6, vol: 0.2, cutoff: 400, delay: 2.0, jitter: 0 });
     },
     lose() {
       [330, 311, 294, 220].forEach((f, i) => voice({ type: 'sawtooth', freq: f, to: f * 0.97, dur: i === 3 ? 1.0 : 0.3, vol: 0.18, cutoff: 1100, delay: i * 0.28, jitter: 0.005 }));
@@ -319,13 +365,13 @@ const Audio = (() => {
     const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
     const names = Object.keys(sfx), step = 1.4, rate = 44100;
     const off = new OAC(1, Math.ceil(rate * (names.length * step + 1)), rate);
-    const saved = { ctx, master, noiseBuf };
+    const saved = { ctx, master, noiseBuf, sfxOut, musicOut };
     ctx = off; buildGraph(off); master.gain.value = 0.6; rendering = true;
     const marks = names.map((name, i) => { baseDelay = i * step; sfx[name](); return { name, at: i * step }; });
     baseDelay = 0;
     const buffer = await off.startRendering();
     rendering = false;
-    ctx = saved.ctx; master = saved.master; noiseBuf = saved.noiseBuf;
+    ctx = saved.ctx; master = saved.master; noiseBuf = saved.noiseBuf; sfxOut = saved.sfxOut; musicOut = saved.musicOut;
     return { buffer, marks };
   }
 
@@ -352,12 +398,205 @@ const Audio = (() => {
     GameState.on('enemyKilled', (e) => { if (e.boss) sfx.bossDeath(); else sfx.death(); sfx.gold(); });
     GameState.on('enemyLeaked', () => sfx.leak());
     GameState.on('endpointStateChanged', () => sfx.crumble());
-    GameState.on('gameWon', () => sfx.win());
+    GameState.on('gameWon', () => { if (LEVELS.some((l) => l.index === GameState.currentLevel().index + 1)) sfx.win(); else sfx.finale(); });
     GameState.on('gameLost', () => sfx.lose());
     GameState.on('paused', () => { if (ctx && ctx.state === 'running') ctx.suspend(); });
     GameState.on('resumed', () => { if (ctx && ctx.state === 'suspended') ctx.resume(); });
     GameState.on('speedChanged', () => sfx.select());
   }
 
-  return { init, unlock, update, sfx, setMuted, isMuted, renderBoard };
+
+  // ===================================================================
+  // Music: layered, generative, synthesized. A pastoral pad and plucked arpeggio
+  // while the player builds, then bass, war drums and a lead fade in when a wave
+  // is live, and a faster, heavier mix for a boss. Five layers (pad, arp, bass,
+  // drums, lead) crossfade with game state. Notes are scheduled on the audio
+  // clock a short way ahead (never on the frame loop), each level has its own
+  // key, and the melody is seeded so it repeats like a tune instead of wandering.
+  // ===================================================================
+  const MUSIC_KEYS = {
+    'hollybrook':       { root: 38, minor: false },
+    'ravensford':       { root: 43, minor: false },
+    'st-wendels':       { root: 45, minor: true },
+    'castle-aldermere': { root: 41, minor: false },
+  };
+  // chord = [semitones above the key root, 'maj' | 'min']; one chord per bar
+  const PROG = {
+    major: { calm: [[0, 'maj'], [9, 'min'], [5, 'maj'], [7, 'maj']], war: [[9, 'min'], [5, 'maj'], [0, 'maj'], [7, 'maj']] },
+    minor: { calm: [[0, 'min'], [8, 'maj'], [3, 'maj'], [10, 'maj']], war: [[0, 'min'], [5, 'min'], [8, 'maj'], [10, 'maj']] },
+  };
+  const PENTA = { major: [0, 2, 4, 7, 9], minor: [0, 3, 5, 7, 10] };
+  const TRIAD = { maj: [0, 4, 7], min: [0, 3, 7] };
+  // per-state mix: layer gains, tempo and which chord order to play
+  const MIX = {
+    calm:   { pad: 0.55, arp: 0.55, bass: 0.22, drums: 0,    lead: 0,    bpm: 84,  prog: 'calm' },
+    combat: { pad: 0.34, arp: 0.3,  bass: 0.55, drums: 0.65, lead: 0.36, bpm: 112, prog: 'war' },
+    boss:   { pad: 0.4,  arp: 0.22, bass: 0.72, drums: 1,    lead: 0.6,  bpm: 128, prog: 'war' },
+    end:    { pad: 0,    arp: 0,    bass: 0,    drums: 0,    lead: 0,    bpm: 84,  prog: 'calm' },
+  };
+  const mus = { bus: null, layers: null, timer: null, step: 0, nextTime: 0, state: 'calm', key: null, plan: null };
+  const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);
+
+  function seededRand(seed) { let s = seed >>> 0 || 1; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
+  function hashStr(str) { let h = 2166136261; for (let i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 16777619); return h >>> 0; }
+
+  // the tune for one level: a fixed 4-bar arpeggio and lead phrase, built once from a seed
+  function buildPlan(levelId) {
+    const key = MUSIC_KEYS[levelId] || { root: 38, minor: false };
+    const mode = key.minor ? 'minor' : 'major', scale = PENTA[mode];
+    const r = seededRand(hashStr(levelId || 'x'));
+    const arp = [], lead = [];
+    for (let bar = 0; bar < 4; bar++) {
+      const a = [], l = [];
+      for (let i = 0; i < 8; i++) a.push(r() < 0.14 ? -1 : [0, 1, 2, 3, 2, 1, 2, 3][i]);       // -1 is a rest
+      let deg = 5 + Math.floor(r() * 3);
+      for (let i = 0; i < 16; i++) {
+        const weight = i % 8 === 0 ? 0.95 : i % 4 === 0 ? 0.6 : i % 2 === 0 ? 0.28 : 0;
+        if (r() < weight) { deg = Math.max(2, Math.min(11, deg + [-2, -1, -1, 0, 1, 1, 2][Math.floor(r() * 7)])); l.push(deg); } else l.push(-1);
+      }
+      arp.push(a); lead.push(l);
+    }
+    return { key, mode, scale, arp, lead };
+  }
+
+  function makeMusicGraph(c, dest) {
+    const bus = c.createGain(); bus.gain.value = 0.32; bus.connect(dest);   // kept well under the sound effects so hits and clinks stay audible
+    const layers = {};
+    for (const n of ['pad', 'arp', 'bass', 'drums', 'lead']) { const g = c.createGain(); g.gain.value = 0; g.connect(bus); layers[n] = g; }
+    return { bus, layers };
+  }
+  function mTone(dest, type, freq, t, dur, vol, o = {}) {
+    const osc = ctx.createOscillator(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+    osc.type = type; osc.frequency.setValueAtTime(freq, t);
+    if (o.detune) osc.detune.value = o.detune;
+    f.type = 'lowpass'; f.frequency.setValueAtTime(o.cutoff || 2400, t);
+    if (o.cutTo) f.frequency.exponentialRampToValueAtTime(o.cutTo, t + dur);
+    const a = o.attack || 0.006;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + a);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    osc.connect(f); f.connect(g); g.connect(dest);
+    osc.start(t); osc.stop(t + dur + 0.05);
+  }
+  function mNoise(dest, t, dur, vol, freq, filter = 'bandpass', q = 1) {
+    const src = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+    src.buffer = noiseBuf; f.type = filter; f.frequency.value = freq; f.Q.value = q;
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(f); f.connect(g); g.connect(dest);
+    src.start(t, (t * 7.31) % 1.5, dur + 0.05);   // a moving read point, so no Math.random (the balance tests seed it)
+  }
+  function mKick(dest, t, vol) {
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = 'sine'; o.frequency.setValueAtTime(130, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.14);
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.26);
+    o.connect(g); g.connect(dest); o.start(t); o.stop(t + 0.3);
+  }
+
+  // One 16th-note step of the score. `step` counts up forever; a bar is 16 steps.
+  function scheduleStep(step, t, stateName, graph, plan) {
+    const mix = MIX[stateName], L = graph.layers;
+    const bar = Math.floor(step / 16), i = step % 16, sd = 60 / mix.bpm / 4;
+    const chord = PROG[plan.mode][mix.prog][bar % 4], root = plan.key.root + chord[0], tri = TRIAD[chord[1]];
+    const war = stateName !== 'calm', boss = stateName === 'boss';
+    // pad: one soft chord per bar, long attack and release
+    if (i === 0 && mix.pad > 0) {
+      for (const semi of [tri[0], tri[1], tri[2]]) {
+        mTone(L.pad, 'sine', mtof(root + 12 + semi), t, sd * 16 + 0.6, 0.14, { attack: 0.7, cutoff: 1800, detune: -4 });
+        mTone(L.pad, 'triangle', mtof(root + 12 + semi), t, sd * 16 + 0.6, 0.06, { attack: 0.9, cutoff: 1400, detune: 5 });
+      }
+    }
+    // bass: long roots when calm, an eighth-note drive in a fight, a 16th pulse for a boss
+    if (mix.bass > 0) {
+      if (!war && (i === 0 || i === 8)) mTone(L.bass, 'triangle', mtof(root), t, sd * 7, 0.24, { attack: 0.02, cutoff: 500 });
+      else if (war && !boss && i % 2 === 0) mTone(L.bass, 'triangle', mtof(root + (i % 8 === 6 ? 7 : 0)), t, sd * 1.7, 0.26, { attack: 0.008, cutoff: 650 });
+      else if (boss && (i % 4 === 0 || i % 4 === 2 || i === 15)) mTone(L.bass, 'sawtooth', mtof(root - (i === 15 ? 12 : 0)), t, sd * 1.5, 0.15, { attack: 0.006, cutoff: 480, cutTo: 260 });
+    }
+    // arp: a plucked lute-like arpeggio on the eighth notes
+    if (mix.arp > 0 && i % 2 === 0) {
+      const idx = plan.arp[bar % 4][i / 2];
+      if (idx >= 0) {
+        const n = tri[idx % 3] + 12 * Math.floor(idx / 3);
+        mTone(L.arp, 'triangle', mtof(root + 24 + n), t, sd * 3, 0.2, { attack: 0.004, cutoff: 3200, cutTo: 900 });
+      }
+    }
+    // lead: the tune, a reedy pentatonic line that only plays once a wave is live
+    if (mix.lead > 0) {
+      const deg = plan.lead[bar % 4][i];
+      if (deg >= 0) {
+        const semi = plan.scale[deg % 5] + 12 * Math.floor(deg / 5);
+        const f = mtof(plan.key.root + 36 + semi);
+        mTone(L.lead, boss ? 'sawtooth' : 'square', f, t, sd * (boss ? 2.4 : 1.8), boss ? 0.11 : 0.085, { attack: 0.012, cutoff: boss ? 2600 : 1700 });
+        mTone(L.lead, 'triangle', f * 2, t, sd * 1.6, 0.05, { attack: 0.01, cutoff: 2200 });
+      }
+    }
+    // drums: war drums in a fight, four on the floor and rolls for a boss
+    if (mix.drums > 0) {
+      const kickAt = boss ? (i % 4 === 0) : (i === 0 || i === 8 || i === 10);
+      if (kickAt) mKick(L.drums, t, boss ? 0.5 : 0.42);
+      if (i === 4 || i === 12) { mNoise(L.drums, t, 0.14, 0.28, 1900, 'bandpass', 0.8); mTone(L.drums, 'triangle', 190, t, 0.1, 0.16, { cutoff: 900 }); }
+      if (boss && i >= 14) mNoise(L.drums, t, 0.06, 0.16, 1400, 'bandpass', 0.8);
+      if (i % 2 === 0) mNoise(L.drums, t, 0.035, i % 4 === 0 ? 0.07 : 0.045, 7000, 'highpass', 0.7);
+    }
+  }
+
+  function musicTarget() {
+    const s = GameState.state;
+    if (s.phase === 'won' || s.phase === 'lost') return 'end';
+    if (s.phase === 'playing' && s.waveActive) return s.enemies.some((e) => e.boss) ? 'boss' : 'combat';
+    return 'calm';
+  }
+  function applyMix(stateName, graph, c, instant) {
+    const mix = MIX[stateName], now = c.currentTime;
+    for (const n in graph.layers) {
+      const g = graph.layers[n].gain;
+      if (instant) g.value = mix[n]; else g.setTargetAtTime(mix[n], now, stateName === 'end' ? 0.5 : 0.9);
+    }
+  }
+  function musicTick() {
+    if (!ctx || rendering) return;
+    if (ctx.state !== 'running') return;
+    if (muted || !settings.musicOn) { mus.nextTime = ctx.currentTime + 0.05; return; }
+    const target = musicTarget();
+    if (target !== mus.state) { mus.state = target; applyMix(target, mus, ctx, false); }
+    if (mus.nextTime < ctx.currentTime) mus.nextTime = ctx.currentTime + 0.05;   // fell behind (tab hidden): skip the gap, never burst
+    while (mus.nextTime < ctx.currentTime + 0.35) {
+      scheduleStep(mus.step, mus.nextTime, mus.state === 'end' ? 'calm' : mus.state, mus, mus.plan);
+      mus.nextTime += 60 / MIX[mus.state].bpm / 4;
+      mus.step++;
+    }
+  }
+  function startMusic() {
+    if (mus.timer) return;
+    const g = makeMusicGraph(ctx, musicOut);
+    mus.bus = g.bus; mus.layers = g.layers;
+    mus.plan = buildPlan(GameState.currentLevel().id);
+    mus.state = musicTarget();
+    applyMix(mus.state, mus, ctx, true);
+    mus.nextTime = ctx.currentTime + 0.1;
+    mus.timer = setInterval(musicTick, 50);
+  }
+  // Offline render of one music state, for checking levels and structure outside the game.
+  async function renderMusic(stateName, seconds, levelId) {
+    const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext, rate = 44100;
+    const off = new OAC(1, Math.ceil(rate * seconds), rate);
+    const saved = { ctx, master, noiseBuf, sfxOut, musicOut };
+    ctx = off; buildGraph(off); master.gain.value = 0.6; rendering = true;
+    const graph = makeMusicGraph(off, musicOut), plan = buildPlan(levelId || 'hollybrook');
+    applyMix(stateName, graph, off, true);
+    const sd = 60 / MIX[stateName].bpm / 4;
+    let notes = 0;
+    for (let step = 0, t = 0; t < seconds; step++, t += sd) { scheduleStep(step, t, stateName, graph, plan); notes++; }
+    const buffer = await off.startRendering();
+    rendering = false;
+    ctx = saved.ctx; master = saved.master; noiseBuf = saved.noiseBuf; sfxOut = saved.sfxOut; musicOut = saved.musicOut;
+    return { buffer, steps: notes };
+  }
+
+  const getSettings = () => ({ ...settings });
+  function setSfxOn(on) { settings.sfxOn = !!on; saveSettings(); applySettings(); }
+  function setMusicOn(on) { settings.musicOn = !!on; saveSettings(); applySettings(); }
+  function setSfxVolume(v) { settings.sfxVol = Math.max(0, Math.min(1, +v || 0)); saveSettings(); applySettings(); }
+  function setMusicVolume(v) { settings.musicVol = Math.max(0, Math.min(1, +v || 0)); saveSettings(); applySettings(); }
+
+  return { init, unlock, update, sfx, setMuted, isMuted, getSettings, setSfxOn, setMusicOn, setSfxVolume, setMusicVolume, renderBoard, renderMusic, musicState: () => mus.state };
 })();

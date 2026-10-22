@@ -3,14 +3,22 @@
 // ===================================================================
 const UI = (() => {
   const $ = (id) => document.getElementById(id);
+  // true while a key press is going into a text box or slider (game hotkeys must stay out of the way)
+  const typingTarget = (e) => { const t = e.target; return !!(t && t.tagName && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)); };
   let toastTimer = 0;
   let debugOn = false, fpsAcc = 0, fpsFrames = 0, fpsShown = 0;
-  const shown = { gold: null, lives: null, wave: null, waveBtn: null, bossName: null };
+  const shown = { gold: null, lives: null, tier: null, wave: null, waveBtn: null, bossName: null };
 
   function updateHud() {
     const s = GameState.state, total = GameState.totalWaves();
     if (shown.gold !== s.gold) { $('hud-gold').textContent = s.gold; shown.gold = s.gold; }
     if (shown.lives !== s.lives) { $('hud-lives').textContent = s.lives; shown.lives = s.lives; }
+    if (shown.tier !== s.difficulty) {
+      const pill = $('hud-lives').parentElement;
+      pill.classList.toggle('bramble', s.difficulty === 'bramble');
+      pill.setAttribute('aria-label', s.difficulty === 'bramble' ? `${s.lives} lives, ${GameState.DIFFICULTY.bramble.name}` : `${s.lives} lives`);
+      shown.tier = s.difficulty;
+    }
     const wave = s.wave > 0 ? `Wave ${s.wave}/${total}` : 'Prep';
     if (shown.wave !== wave) { $('hud-wave').textContent = wave; shown.wave = wave; }
     const btn = $('wave-btn');
@@ -177,17 +185,56 @@ const UI = (() => {
     }
   }
 
+  // A win has just happened (not a reopened end screen): play the star
+  // bells and firework sounds once, not every time the screen comes back.
+  let celebrateFresh = false;
+  function countUp(el, to, ms, delay) {
+    el.textContent = '0';
+    if (!to || reducedMotion()) { el.textContent = String(to); return; }
+    const t0 = performance.now() + delay;
+    const tick = (now) => {
+      if (!el.isConnected) return;
+      const k = Math.max(0, Math.min(1, (now - t0) / ms));
+      el.textContent = String(Math.round(to * (1 - (1 - k) ** 3)));
+      if (k < 1) requestAnimationFrame(tick); else el.textContent = String(to);
+    };
+    requestAnimationFrame(tick);
+  }
+  const RIBBON = { 3: 'Flawless!', 2: 'Well held!', 1: 'Victory!' };
+  function fillFinale() {
+    const data = Progress.load().levels, bramble = GameState.state.difficulty === 'bramble';
+    let total = 0;
+    const badges = LEVELS.map((lv) => {
+      const e = data[lv.id];
+      const n = (e && (bramble ? e.bramble && e.bramble.stars : e.stars)) || 0;
+      total += n;
+      return `<div class="fb" title="${lv.name}"><b>${lv.index}</b><i>${[1, 2, 3].map((k) => `<span class="${k <= n ? 'on' : ''}">&#9733;</span>`).join('')}</i></div>`;
+    });
+    const max = LEVELS.length * 3;
+    $('finale-line').textContent = 'The Black Dragon is down and the Baron has fled back to Blackmoor. Bells ring in every village from Hollybrook to the King\'s own walls.';
+    $('finale-badges').innerHTML = badges.join('');
+    const on = bramble ? ` on ${GameState.DIFFICULTY.bramble.name}` : '';
+    $('finale-total').textContent = total === max
+      ? `${total} of ${max} stars${on}. A perfect campaign. Not one wall was breached.`
+      : `${total} of ${max} stars across the campaign${on}. Replay any level to earn the rest.`;
+  }
   function showEnd(won) {
     const s = GameState.state, level = GameState.currentLevel();
-    $('end-title').textContent = won ? `${level.endpoint.properName} holds!` : `${level.endpoint.properName} has fallen`;
+    // Right after a win, the next level is already unlocked: offer to
+    // continue straight to it instead of a generic "pick something" label.
+    const next = LEVELS.find((l) => l.index === level.index + 1);
+    const finale = won && !next;     // the last level of the campaign gets the big one
+    // Showing a win records it again. recordWin only ever adds, so this is harmless when the
+    // gameWon listener already did it, and it saves the win if that listener failed to run.
+    if (won) { try { Progress.recordWin(level.id, GameState.stars(), s.lives, s.difficulty); } catch (e) { /* never block the win screen */ } }
+    const end = $('end');
+    $('end-title').textContent = finale ? 'The realm is saved!' : won ? `${level.endpoint.properName} holds!` : `${level.endpoint.properName} has fallen`;
     const stars = won ? GameState.stars() : 0;
     const text = won ? level.endScreenText[stars](s) : level.endScreenText.lose(s);
     $('end-text').textContent = text;
     $('stars').classList.toggle('show', won);
     $('stars').querySelectorAll('span').forEach((el, i) => el.classList.toggle('lit', i < stars));
-    // Right after a win, the next level is already unlocked: offer to
-    // continue straight to it instead of a generic "pick something" label.
-    const next = LEVELS.find((l) => l.index === level.index + 1);
+    $('end-ribbon-text').textContent = finale ? 'Long live the King!' : (s.difficulty === 'bramble' ? `${GameState.DIFFICULTY.bramble.name} won!` : (RIBBON[stars] || 'Victory!'));
     const mapBtn = $('end-map-btn');
     if (won && next) {
       mapBtn.textContent = 'Continue';
@@ -196,7 +243,24 @@ const UI = (() => {
       mapBtn.textContent = 'Choose another battle';
       delete mapBtn.dataset.nextLevel;
     }
-    $('end').classList.add('show');
+    if (finale) fillFinale();
+    // restart the entrance animations each time the screen opens
+    end.classList.toggle('win', won);
+    end.classList.toggle('finale', finale);
+    end.classList.remove('show');
+    void end.offsetWidth;
+    end.classList.add('show');
+    if (won) {
+      const fresh = celebrateFresh; celebrateFresh = false;
+      countUp($('stat-lives'), s.lives, 900, 700);
+      countUp($('stat-kills'), s.kills || 0, 1100, 800);
+      countUp($('stat-waves'), GameState.totalWaves(), 700, 900);
+      Celebrate.start({ mode: finale ? 'finale' : 'win', stars, onBurst: fresh && finale ? () => { try { Audio.sfx.firework(); } catch (e) { /* audio is optional */ } } : null });
+      if (fresh) {
+        for (let i = 0; i < stars; i++) setTimeout(() => { if (end.classList.contains('show')) { try { Audio.sfx.star(i); } catch (e) { /* audio is optional */ } } }, 800 + i * 450);
+        if (stars === 3 && !finale) for (let i = 0; i < 3; i++) setTimeout(() => { if (end.classList.contains('show')) { try { Audio.sfx.firework(); } catch (e) { /* audio is optional */ } } }, 900 + i * 700);
+      }
+    } else Celebrate.stop();
   }
   function waveBanner(n) {
     const info = GameState.waveInfo(n);
@@ -261,14 +325,67 @@ const UI = (() => {
       dead.appendChild(svgEl('path', { d: `M ${x} ${y + 8} L ${x} ${y - 8} M ${x} ${y - 2} L ${x - 6} ${y - 9} M ${x} ${y - 5} L ${x + 5} ${y - 11}` }, 'wm-deadtree'));
     }
   }
+  // Where one road crosses another, the later road goes over on a small wooden
+  // bridge and the earlier road passes beneath in its shadow, so a crossing
+  // reads as depth and not as a four-way junction.
+  function drawBridges(layer, curves, ordered) {
+    const pt = (k, t) => ({
+      x: (1 - t) * (1 - t) * k.a.x + 2 * (1 - t) * t * k.c.x + t * t * k.b.x,
+      y: (1 - t) * (1 - t) * k.a.y + 2 * (1 - t) * t * k.c.y + t * t * k.b.y,
+    });
+    const N = 48, polys = curves.map((k) => Array.from({ length: N + 1 }, (_, n) => pt(k, n / N)));
+    const nodes = ordered.map((lv, i) => mapPos(lv, i));
+    for (let m = 0; m < curves.length; m++) for (let n = m + 2; n < curves.length; n++) {
+      // road n (the later one) crosses road m
+      for (let u = 0; u < N; u++) for (let v = 0; v < N; v++) {
+        const p1 = polys[m][u], p2 = polys[m][u + 1], q1 = polys[n][v], q2 = polys[n][v + 1];
+        const rx = p2.x - p1.x, ry = p2.y - p1.y, sx = q2.x - q1.x, sy = q2.y - q1.y;
+        const den = rx * sy - ry * sx;
+        if (Math.abs(den) < 1e-9) continue;
+        const tt = ((q1.x - p1.x) * sy - (q1.y - p1.y) * sx) / den, uu = ((q1.x - p1.x) * ry - (q1.y - p1.y) * rx) / den;
+        if (tt < 0 || tt >= 1 || uu < 0 || uu >= 1) continue;
+        const x = p1.x + rx * tt, y = p1.y + ry * tt;
+        if (nodes.some((nd) => Math.hypot(nd.x - x, nd.y - y) < 22)) continue;   // never under a level marker
+        const ang = Math.atan2(sy, sx) * 180 / Math.PI;
+        const lowerAng = Math.atan2(ry, rx) * 180 / Math.PI;
+        const g = svgEl('g', { transform: `translate(${x.toFixed(1)} ${y.toFixed(1)})` }, 'wm-bridge');
+        const shadow = svgEl('ellipse', { cx: 2, cy: 4, rx: 18, ry: 5.5, transform: `rotate(${lowerAng.toFixed(1)})` }, 'wm-bridge-shadow');
+        const deck = svgEl('g', { transform: `rotate(${ang.toFixed(1)})` }, 'wm-bridge-deck');
+        deck.appendChild(svgEl('rect', { x: -14, y: -7.5, width: 28, height: 15, rx: 2.5 }, 'wm-bridge-wood'));
+        for (const px of [-7, 0, 7]) deck.appendChild(svgEl('path', { d: `M ${px} -7 V 7` }, 'wm-bridge-plank'));
+        deck.appendChild(svgEl('path', { d: 'M -14 -7.5 H 14 M -14 7.5 H 14' }, 'wm-bridge-rail'));
+        g.appendChild(shadow); g.appendChild(deck);
+        layer.appendChild(g);
+      }
+    }
+  }
   let mapSelected = null, firstWin = null;
+  // a ring of hooked thorns around a node beaten on Bramble
+  const THORN_RING = (() => {
+    let d = '';
+    for (let i = 0; i < 9; i++) {
+      const a = (i / 9) * Math.PI * 2 - Math.PI / 2 + 0.2, p = (r, da) => `${(Math.cos(a + da) * r).toFixed(1)} ${(Math.sin(a + da) * r).toFixed(1)}`;
+      d += `M ${p(21.5, -0.2)} L ${p(29, 0.12)} L ${p(21.5, 0.13)} Z `;
+    }
+    return d.trim();
+  })();
   function renderWorldMap() {
     drawMapArt();
     const svg = $('wm-svg');
     svg.querySelectorAll('.wm-node').forEach((n) => n.remove());
     const cuts = $('wm-cuts'), roads = $('wm-roads');
     cuts.innerHTML = ''; roads.innerHTML = '';
-    const won = (lv) => Progress.starsFor(lv.id) > 0;
+    const won = (lv) => Progress.isWon(lv.id);
+    // the tier shown: the battle's own while it is in progress, else the player's pick
+    const sel0 = LEVELS.find((l) => l.id === mapSelected);
+    const inBattle = !!sel0 && sel0.id === GameState.currentLevel().id && GameState.state.phase === 'playing';
+    const tier = inBattle ? GameState.state.difficulty : Progress.tier();
+    $('wm-tier').querySelector('.bramble .tier-sub').textContent = `Tougher, ${GameState.DIFFICULTY.bramble.lives} lives`;
+    document.querySelectorAll('#wm-tier .tier-btn').forEach((b) => {
+      b.setAttribute('aria-checked', String(b.dataset.tier === tier));
+      b.tabIndex = b.dataset.tier === tier ? 0 : -1;
+      b.disabled = inBattle;
+    });
     const ordered = LEVELS.slice().sort((a, b) => a.index - b.index);
     // the next battle to fight: the first unlocked level not yet won
     const next = ordered.find((lv) => Progress.isUnlocked(lv.id) && !won(lv));
@@ -279,32 +396,39 @@ const UI = (() => {
       cuts.appendChild(svgEl('circle', { cx: p.x, cy: p.y, r: p.reclaim, fill: 'url(#wm-soft)', 'data-level': lv.id }, 'wm-cut'));
     });
     // roads between consecutive battles: claimed, open (the way forward) or locked
+    const curves = [];   // each road's quadratic curve, for the bridges below
     for (let i = 0; i < ordered.length - 1; i++) {
       const a = mapPos(ordered[i], i), b = mapPos(ordered[i + 1], i + 1);
       const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2, len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
       const bend = (i % 2 ? -1 : 1) * 16;
-      const d = `M ${a.x} ${a.y} Q ${mx - (b.y - a.y) / len * bend} ${my + (b.x - a.x) / len * bend} ${b.x} ${b.y}`;
+      const cx = mx - (b.y - a.y) / len * bend, cy = my + (b.x - a.x) / len * bend;
+      const d = `M ${a.x} ${a.y} Q ${cx} ${cy} ${b.x} ${b.y}`;
+      curves.push({ a, c: { x: cx, y: cy }, b, i });
       const state = won(ordered[i]) && won(ordered[i + 1]) ? 'claimed'
         : Progress.isUnlocked(ordered[i + 1].id) ? 'open' : 'locked';
       if (state === 'claimed') roads.appendChild(svgEl('path', { d }, 'wm-seg wm-seg-edge'));
       roads.appendChild(svgEl('path', { d, 'data-from': ordered[i].id, 'data-to': ordered[i + 1].id }, `wm-seg ${state}`));
     }
+    drawBridges(roads, curves, ordered);
     ordered.forEach((lv, i) => {
       const unlocked = Progress.isUnlocked(lv.id);
-      const stars = Progress.starsFor(lv.id);
+      const stars = Progress.starsFor(lv.id, tier), meadowStars = Progress.starsFor(lv.id), brambleStars = Progress.starsFor(lv.id, 'bramble');
       const { x, y } = mapPos(lv, i);
       const cls = 'wm-node' + (unlocked ? '' : ' locked') + (lv.id === mapSelected ? ' selected' : '') + (next && lv.id === next.id ? ' next' : '');
       const g = svgEl('g', { 'data-level': lv.id, transform: `translate(${x}, ${y})`, tabindex: unlocked ? '0' : '-1', role: 'button' }, cls);
-      g.setAttribute('aria-label', unlocked ? `${lv.name}, ${stars} stars` : `${lv.name}, locked`);
+      g.setAttribute('aria-label', !unlocked ? `${lv.name}, locked`
+        : `${lv.name}, ${meadowStars} stars on ${GameState.DIFFICULTY.meadow.name}` + (brambleStars ? `, beaten on ${GameState.DIFFICULTY.bramble.name} with ${brambleStars} stars` : ''));
       const starDots = unlocked
         ? [0, 1, 2].map((k) => `<circle class="wm-star ${k < stars ? 'lit' : ''}" cx="${(k - 1) * 11}" cy="34" r="4"></circle>`).join('')
         : '';
       const glyph = lv.map && GLYPHS[lv.map.icon] ? `<g class="wm-glyph" transform="translate(-36 -16)">${GLYPHS[lv.map.icon]}</g>` : '';
-      const pennant = stars > 0 ? '<line class="wm-pennant-pole" x1="17" y1="-14" x2="17" y2="-40"></line><path class="wm-pennant" d="M 17 -40 L 33 -35 L 17 -30 Z"></path>' : '';
+      // beaten on Bramble: a ring of thorns around the badge
+      const thorn = brambleStars > 0 ? `<g class="wm-thorn"><circle r="22.5"></circle><path d="${THORN_RING}"></path></g>` : '';
+      const pennant = won(lv) ? '<line class="wm-pennant-pole" x1="17" y1="-14" x2="17" y2="-40"></line><path class="wm-pennant" d="M 17 -40 L 33 -35 L 17 -30 Z"></path>' : '';
       g.innerHTML = `
         <circle class="wm-node-hit" r="46"></circle>
         ${next && lv.id === next.id ? '<circle class="wm-next-ring" r="24"></circle>' : ''}
-        ${glyph}${pennant}
+        ${glyph}${pennant}${thorn}
         <circle class="wm-node-badge" r="20"></circle>
         ${unlocked ? `<text class="wm-node-label" text-anchor="middle" dy="6">${lv.index}</text>` : `<text class="wm-lock-icon" text-anchor="middle" dy="6">&#128274;</text>`}
         ${starDots}`;
@@ -337,7 +461,7 @@ const UI = (() => {
     cut.setAttribute('r', 0);
     const step = (now) => {
       if (!cut.isConnected) return;
-      const k = Math.min(1, (now - t0) / dur), e = 1 - (1 - k) ** 3;
+      const k = Math.max(0, Math.min(1, (now - t0) / dur)), e = 1 - (1 - k) ** 3;   // the frame timestamp can precede t0 by a few ms
       cut.setAttribute('r', (full * e).toFixed(1));
       if (k < 1) requestAnimationFrame(step);
     };
@@ -385,6 +509,22 @@ const UI = (() => {
     location.reload();
   }
 
+  // The boss entrance: a ribbon banner and dark screen edges. Restarting the
+  // CSS animation needs a forced reflow between removing and adding the class.
+  function bossIntro(name) {
+    const b = $('boss-intro'), v = $('boss-vig');
+    $('boss-intro-name').textContent = name || 'The Boss';
+    for (const el of [b, v]) { el.classList.remove('go'); void el.offsetWidth; el.classList.add('go'); }
+  }
+  function seedFireflies() {
+    const host = $('t-flies');
+    if (!host || host.childElementCount) return;
+    for (let i = 0; i < 16; i++) {
+      const f = document.createElement('i');
+      f.style.cssText = `left:${Math.round(Math.random() * 100)}%;top:${Math.round(20 + Math.random() * 70)}%;--dur:${(6 + Math.random() * 6).toFixed(1)}s;--tw:${(2 + Math.random() * 3).toFixed(1)}s;--dl:-${(Math.random() * 8).toFixed(1)}s`;
+      host.appendChild(f);
+    }
+  }
   function init() {
     debugOn = /[?&]debug\b/.test(location.search);
     $('debug').classList.toggle('show', debugOn);
@@ -413,7 +553,20 @@ const UI = (() => {
       if (res && !res.ok && res.reason) toast(res.reason, true);
       renderPanel();
     });
-    $('wave-btn').addEventListener('click', () => { Audio.unlock(); GameState.sendWave(); });
+    // Send on press-and-release of the pointer as well as on click: a click is only
+    // delivered when the press and release land on the same element, and the label
+    // under the finger changes every second, so some taps were lost. sendWave is
+    // idempotent (it refuses while a wave is active), so firing from both is safe.
+    // The wave goes first and sound last, so an audio error can never eat a tap.
+    {
+      const wb = $('wave-btn');
+      let armed = false;
+      const send = () => { GameState.sendWave(); try { Audio.unlock(); } catch (err) { /* sound must never block the wave */ } };
+      wb.addEventListener('pointerdown', () => { armed = true; });
+      wb.addEventListener('pointerup', () => { if (armed) { armed = false; send(); } });
+      wb.addEventListener('pointercancel', () => { armed = false; });
+      wb.addEventListener('click', send);
+    }
     let skipToPlay = false;
     try { skipToPlay = sessionStorage.getItem('kk-enter-play') === '1'; sessionStorage.removeItem('kk-enter-play'); } catch (e) { /* ignore */ }
     if (skipToPlay) GameState.startGame(); else $('title').classList.add('show');
@@ -442,6 +595,23 @@ const UI = (() => {
       pickNode(e);
     });
     $('wm-play-btn').addEventListener('click', () => { if (mapSelected) commitLevel(mapSelected); });
+    // difficulty: remembered, and applied at once to a level that has not started yet
+    const pickTier = (t) => {
+      Audio.unlock();
+      const v = Progress.setTier(t);
+      if (GameState.difficulty !== v) { try { Audio.sfx.select(); } catch (e) { /* audio is optional */ } }
+      GameState.setDifficulty(v);
+      renderWorldMap();
+      const b = document.querySelector(`#wm-tier .tier-btn[data-tier="${v}"]`);
+      if (b && !b.disabled) b.focus();
+    };
+    $('wm-tier').addEventListener('click', (e) => { const b = e.target.closest('.tier-btn'); if (b && !b.disabled) pickTier(b.dataset.tier); });
+    $('wm-tier').addEventListener('keydown', (e) => {
+      if (!/^Arrow(Left|Right|Up|Down)$/.test(e.key)) return;
+      e.preventDefault(); e.stopPropagation();
+      if (!e.target.closest('.tier-btn') || e.target.disabled) return;
+      pickTier(Progress.tier() === 'meadow' ? 'bramble' : 'meadow');
+    });
     $('restart-btn').addEventListener('click', () => location.reload());
     $('end-map-btn').addEventListener('click', () => {
       const nextId = $('end-map-btn').dataset.nextLevel;
@@ -459,7 +629,20 @@ const UI = (() => {
     });
     $('pause-map-btn').addEventListener('click', () => { $('pause').classList.remove('show'); enterWorldMap(); });
     $('resume-btn').addEventListener('click', () => { Audio.unlock(); GameState.resume(); });
-    $('speed-btn').addEventListener('click', () => { Audio.unlock(); GameState.setSpeed(GameState.state.speed === 1 ? 2 : 1); });
+    const NEXT_SPEED = { 1: 2, 2: 4, 4: 8, 8: 1 };   // the speed button cycles 1x, 2x, 4x, 8x
+    // four fixed views of the battlefield; the angle is remembered between visits
+    const turnView = (dir) => { Audio.unlock(); try { Audio.sfx.select(); } catch (e) { /* audio is optional */ } Renderer.rotateView(dir); };
+    $('rot-left-btn').addEventListener('click', () => turnView(-1));
+    $('rot-right-btn').addEventListener('click', () => turnView(1));
+    // zoom the camera; wheel, pinch and drag are in input.js
+    const zoomView = (dir) => { Audio.unlock(); try { Audio.sfx.select(); } catch (e) { /* audio is optional */ } Renderer.zoomStep(dir); };
+    $('zoom-in-btn').addEventListener('click', () => zoomView(1));
+    $('zoom-out-btn').addEventListener('click', () => zoomView(-1));
+    // tilt the camera (higher = looking more from above); right-drag and a two-finger swipe are in input.js
+    const tiltView = (dir) => { Audio.unlock(); try { Audio.sfx.select(); } catch (e) { /* audio is optional */ } Renderer.tiltStep(dir); };
+    $('tilt-up-btn').addEventListener('click', () => tiltView(1));
+    $('tilt-down-btn').addEventListener('click', () => tiltView(-1));
+    $('speed-btn').addEventListener('click', () => { Audio.unlock(); GameState.setSpeed(NEXT_SPEED[GameState.state.speed] || 1); });
     GameState.on('paused', () => {
       const s = GameState.state;
       $('pause-text').textContent = s.waveActive
@@ -469,12 +652,19 @@ const UI = (() => {
       updateTip();
     });
     GameState.on('resumed', () => $('pause').classList.remove('show'));
-    GameState.on('speedChanged', (x) => { $('speed-btn').textContent = x + '×'; $('speed-btn').classList.toggle('fast', x === 2); });
+    GameState.on('speedChanged', (x) => {
+      $('speed-btn').textContent = x + '×';
+      $('speed-btn').classList.toggle('fast', x === 2);
+      $('speed-btn').classList.toggle('faster', x === 4);
+      $('speed-btn').classList.toggle('fastest', x === 8);
+      $('speed-btn').setAttribute('aria-label', `Game speed ${x}×`);
+    });
     // the tab going away pauses the fight, so nobody comes back to an empty endpoint
     document.addEventListener('visibilitychange', () => { if (document.hidden) GameState.pause(); });
     window.addEventListener('blur', () => GameState.pause());
     window.addEventListener('keydown', (e) => {
       if (e.repeat) return;
+      if (typingTarget(e)) return;   // typing a save code must never turn the camera or send a wave
       const s = GameState.state;
       if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') {
         if (s.phase !== 'playing') return;
@@ -484,13 +674,113 @@ const UI = (() => {
         if (s.phase === 'title') { e.preventDefault(); $('start-btn').click(); }
         else if (s.phase === 'playing' && !s.paused && !s.waveActive) { e.preventDefault(); Audio.unlock(); GameState.sendWave(); }
       } else if (e.key === 'f' || e.key === 'F') {
-        if (s.phase === 'playing') GameState.setSpeed(s.speed === 1 ? 2 : 1);
+        if (s.phase === 'playing') GameState.setSpeed(NEXT_SPEED[s.speed] || 1);
+      } else if (e.key === 'q' || e.key === 'Q' || e.key === 'e' || e.key === 'E') {
+        if (s.phase === 'playing') turnView(e.key === 'q' || e.key === 'Q' ? -1 : 1);
+      } else if (e.key === '+' || e.key === '=') {
+        if (s.phase === 'playing') zoomView(1);
+      } else if (e.key === '-' || e.key === '_') {
+        if (s.phase === 'playing') zoomView(-1);
+      } else if (e.key === ']' || e.key === '[') {
+        if (s.phase === 'playing') tiltView(e.key === ']' ? 1 : -1);
+      } else if (e.key === '0') {
+        if (s.phase === 'playing') { Renderer.resetLook(); Renderer.resetTilt(); }
       }
     });
     const syncMute = () => { const m = Audio.isMuted(); $('mute-btn').classList.toggle('muted', m); $('mute-btn').querySelector('.icon').innerHTML = m ? '&#128263;' : '&#128266;'; $('mute-btn').setAttribute('aria-label', m ? 'Sound off' : 'Sound on'); };
     $('mute-btn').addEventListener('click', () => { Audio.unlock(); Audio.setMuted(!Audio.isMuted()); syncMute(); });
     try { if (localStorage.getItem('kk-muted') === '1') { Audio.setMuted(true); } } catch (e) { /* ignore */ }
     syncMute();
+
+    // ---- settings: master mute, effects and music each get a switch and a volume ----
+    const settingsEl = $('settings');
+    const setChecked = (btn, on) => btn.setAttribute('aria-checked', on ? 'true' : 'false');
+    function syncSettings() {
+      const a = Audio.getSettings();
+      setChecked($('set-camui'), !document.body.classList.contains('hide-camui'));
+      setChecked($('set-master'), !Audio.isMuted());
+      setChecked($('set-sfx'), a.sfxOn);
+      setChecked($('set-music'), a.musicOn);
+      $('set-sfx-vol').value = Math.round(a.sfxVol * 100);
+      $('set-music-vol').value = Math.round(a.musicVol * 100);
+      $('set-sfx-vol').disabled = !a.sfxOn || Audio.isMuted();
+      $('set-music-vol').disabled = !a.musicOn || Audio.isMuted();
+      syncMute();
+    }
+    // the camera buttons in the top bar can be hidden; the choice is saved (keys and gestures stay on)
+    const CAMUI_KEY = 'kk-camui';
+    function setCamUi(show, save) {
+      document.body.classList.toggle('hide-camui', !show);
+      setChecked($('set-camui'), show);
+      if (save) { try { localStorage.setItem(CAMUI_KEY, show ? '1' : '0'); } catch (e) { /* storage may be blocked */ } }
+    }
+    try { if (localStorage.getItem(CAMUI_KEY) === '0') setCamUi(false, false); } catch (e) { /* ignore */ }
+    $('set-camui').addEventListener('click', () => { Audio.unlock(); setCamUi(document.body.classList.contains('hide-camui'), true); try { Audio.sfx.select(); } catch (e) { /* audio is optional */ } });
+    function openSettings() {
+      Audio.unlock();
+      // opening it mid-battle pauses first, so the screen never covers a live fight
+      if (GameState.state.phase === 'playing' && !GameState.state.paused) GameState.pause();
+      syncSettings();
+      settingsEl.classList.add('show');
+      $('settings-done').focus();
+    }
+    function closeSettings() { settingsEl.classList.remove('show'); }
+    $('settings-btn').addEventListener('click', openSettings);
+    $('title-settings-btn').addEventListener('click', openSettings);
+    $('pause-settings-btn').addEventListener('click', openSettings);
+    $('settings-done').addEventListener('click', closeSettings);
+    settingsEl.addEventListener('pointerdown', (e) => { if (e.target === settingsEl) closeSettings(); });
+    $('set-master').addEventListener('click', () => { Audio.unlock(); Audio.setMuted(!Audio.isMuted()); syncSettings(); });
+    $('set-sfx').addEventListener('click', () => { Audio.unlock(); Audio.setSfxOn(!Audio.getSettings().sfxOn); syncSettings(); if (Audio.getSettings().sfxOn) Audio.sfx.select(); });
+    $('set-music').addEventListener('click', () => { Audio.unlock(); Audio.setMusicOn(!Audio.getSettings().musicOn); syncSettings(); });
+    $('set-sfx-vol').addEventListener('input', (e) => Audio.setSfxVolume(e.target.value / 100));
+    $('set-sfx-vol').addEventListener('change', () => Audio.sfx.select());   // a sample, so the level can be judged
+    $('set-music-vol').addEventListener('input', (e) => Audio.setMusicVolume(e.target.value / 100));
+    // ---- save code: campaign progress as text, to keep or to carry to another device ----
+    const codeEl = $('savecode');
+    const codeMsg = (text, kind) => { const m = $('savecode-msg'); m.textContent = text; m.className = 'sc-msg' + (kind ? ' ' + kind : ''); };
+    function openSaveCode() {
+      Audio.unlock();
+      $('savecode-out').value = Progress.exportCode();
+      $('savecode-in').value = '';
+      codeMsg('');
+      codeEl.classList.add('show');
+      $('savecode-copy').focus();
+    }
+    function closeSaveCode() { codeEl.classList.remove('show'); const b = $('savecode-btn'); if (settingsEl.classList.contains('show') && b) b.focus(); }
+    function copySaveCode() {
+      const out = $('savecode-out'), text = out.value;
+      const fallback = () => {
+        try { out.focus(); out.select(); out.setSelectionRange(0, text.length); return document.execCommand && document.execCommand('copy'); } catch (e) { return false; }
+      };
+      const done = (ok) => codeMsg(ok ? 'Copied. Keep it somewhere safe.' : 'Could not copy. Select the code and copy it by hand.', ok ? 'ok' : 'bad');
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(() => done(true), () => done(fallback()));
+      else done(fallback());
+    }
+    function loadSaveCode() {
+      const r = Progress.importCode($('savecode-in').value);
+      if (!r.ok) {
+        codeMsg({ empty: 'Paste a code first.', format: "That doesn't look like a Knights & Knaves save code.", newer: 'That code comes from a newer version of the game. Update this one, then try again.', check: "That code doesn't match. Check for a typo or a missing character." }[r.reason], 'bad');
+        return;
+      }
+      $('savecode-out').value = Progress.exportCode();
+      $('savecode-in').value = '';
+      if (r.changed) { codeMsg(`Loaded. ${r.changed} ${r.changed === 1 ? 'level' : 'levels'} updated.`, 'ok'); try { Audio.sfx.select(); } catch (e) { /* audio is optional */ } }
+      else codeMsg('That code has nothing new for this device.', 'ok');
+      if ($('worldmap').classList.contains('show')) renderWorldMap();
+    }
+    $('savecode-btn').addEventListener('click', openSaveCode);
+    $('savecode-done').addEventListener('click', closeSaveCode);
+    $('savecode-copy').addEventListener('click', copySaveCode);
+    $('savecode-load').addEventListener('click', loadSaveCode);
+    $('savecode-in').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); loadSaveCode(); } });
+    $('savecode-out').addEventListener('focus', (e) => e.target.select());
+    codeEl.addEventListener('pointerdown', (e) => { if (e.target === codeEl) closeSaveCode(); });
+    window.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      if (codeEl.classList.contains('show')) { e.preventDefault(); e.stopImmediatePropagation(); closeSaveCode(); }
+      else if (settingsEl.classList.contains('show')) { e.preventDefault(); e.stopImmediatePropagation(); closeSettings(); }
+    }, true);
     GameState.on('enemyHit', ({ enemy, amount, armored, x, z }) => floater(x, enemy.boss ? 1.6 : enemy.flying ? 1.2 : 0.7, z, armored ? `${amount} clink` : amount, armored ? 'armored' : ''));
     GameState.on('waveEnded', ({ bonus }) => floater(GameState.gate.x, 1.4, GameState.gate.z, `+${bonus} wave bonus`, 'bonus'));
     GameState.on('earlyBonus', (b) => floater(GameState.gate.x, 1.4, GameState.gate.z, `+${b} for courage`, 'bonus'));
@@ -500,8 +790,9 @@ const UI = (() => {
     });
     GameState.on('enemyKilled', (e) => floater(e.x, 0.9, e.z, `+${e.bounty}`, 'gold'));
     GameState.on('gameWon', () => {
-      firstWin = Progress.starsFor(GameState.currentLevel().id) === 0 ? GameState.currentLevel().id : null;
-      Progress.recordWin(GameState.currentLevel().id, GameState.stars(), GameState.state.lives);
+      celebrateFresh = true;
+      firstWin = Progress.isWon(GameState.currentLevel().id) ? null : GameState.currentLevel().id;
+      Progress.recordWin(GameState.currentLevel().id, GameState.stars(), GameState.state.lives, GameState.state.difficulty);
       // only if the result still stands when the timer fires (a stale
       // timer must never put an end screen over a game that's running)
       setTimeout(() => { if (GameState.state.phase === 'won') showEnd(true); }, 900);
@@ -525,6 +816,9 @@ const UI = (() => {
     GameState.on('placeRejected', (res) => toast(res.reason, true));
     GameState.on('enemyLeaked', (e) => { flash('leak'); toast(`A ${e.name} slipped into ${GameState.currentLevel().endpoint.name}!`, true); });
     GameState.on('waveStarted', (w) => { updateHud(); waveBanner(w); });
+    GameState.on('enemySpawned', (e) => { if (e.boss) bossIntro(e.name); });
+    seedFireflies();
+    if (typeof TitleArt !== 'undefined') TitleArt.init();
     GameState.on('waveEnded', ({ wave }) => { updateHud(); if (wave < GameState.totalWaves()) toast('The road is quiet. Build, upgrade, breathe.'); });
   }
 

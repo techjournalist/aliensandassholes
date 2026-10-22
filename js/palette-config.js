@@ -51,6 +51,7 @@ const PALETTE = {
   goblinDark:   0x5a4430,
   bat:          0x7d7f86,     // gargoyle stone
   batDark:      0x55575e,
+  batWing:      0x6a6c74,     // gargoyle wing membrane
   trickster:    0x7a3f5e,     // cutpurse plum
   tricksterDark: 0x522a3f,
   troll:        0x3f434c,     // black-knight plate
