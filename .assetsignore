@@ -3,3 +3,7 @@
 node_modules
 tools
 AGENTS.md
+ENDLESS-MODE.md
+GRAPHICS-ROADMAP.md
+NEXT-STEPS.md
+wrangler.jsonc

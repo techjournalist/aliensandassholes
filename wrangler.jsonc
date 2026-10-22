@@ -1,0 +1,8 @@
+// Cloudflare Workers static-asset deploy for Knights & Knaves.
+// Serves the repo root as a static site; .assetsignore keeps dev files out.
+// The worker name must match the Cloudflare project name.
+{
+  "name": "knights-and-knaves",
+  "compatibility_date": "2025-09-01",
+  "assets": { "directory": "." }
+}
