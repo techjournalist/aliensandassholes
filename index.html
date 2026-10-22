@@ -4,38 +4,46 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>Briar &amp; Bastion</title>
+<title>Knights &amp; Knaves</title>
 <style>
   :root {
     --ink: #1b1410;
-    --cream: #f6ecd4;
-    --gold: #f2c14e;
-    --moss: #6fae4a;
-    --bark: #8b5a2b;
-    --magic: #c861e0;
-    --panel: rgba(27, 20, 16, 0.82);
+    --cream: #f3e8d0;
+    --gold: #e8b84a;
+    --moss: #7aa652;
+    --bark: #7d5230;
+    --magic: #8a5cd6;
+    --royal: #2f5d9e;
+    --royal-light: #7d9fdc;
+    --baron-red: #d24a3c;
+    --btn: #263354;
+    --panel: rgba(18, 22, 38, 0.86);
+    --serif: "Palatino Linotype", "Book Antiqua", Palatino, "URW Palladio L", Georgia, serif;
     /* world-map art, all straight from PALETTE in js/palette-config.js */
-    --meadow-dark: #5c9a3d;
-    --meadow-light: #86c25c;
-    --path: #c9a46a;
-    --path-edge: #b08a52;
-    --stone: #8e8f86;
-    --stone-dark: #6d6e66;
+    --meadow-dark: #67963f;
+    --meadow-light: #96c466;
+    --path: #c2a174;
+    --path-edge: #a6875a;
+    --stone: #a8a397;
+    --stone-dark: #7c786e;
+    --slate: #5b6170;
+    --ember: #ff8a3d;
     --water: #4fa3c9;
     --foam: #d8f3fb;
-    --straw: #d4a94a;
-    --cap-red: #d9503f;
-    --cap-brown: #b8473a;
-    --hollow: #5a5062;
-    --hollow-earth: #3f3848;
-    --hollow-wood: #4a3f44;
-    --spore: #8a5fc4;
+    --straw: #d8b04e;
+    --cap-red: #c23b32;
+    --cap-brown: #9c4a34;
+    --hollow: #5e564d;
+    --hollow-earth: #3e3833;
+    --hollow-wood: #3b3330;
+    --spore: #d9632a;
     --canvas: #e9dcc0;
+    --baron: #221d24;
   }
   * { box-sizing: border-box; }
   html, body {
     margin: 0; padding: 0; width: 100%; height: 100%;
-    overflow: hidden; background: #2f4a33;
+    overflow: hidden; background: #34452e;
     font-family: "Trebuchet MS", "Segoe UI", system-ui, -apple-system, sans-serif;
     color: var(--cream);
     -webkit-user-select: none; user-select: none;
@@ -106,7 +114,7 @@
     box-shadow: 0 3px 0 rgba(0,0,0,0.35);
   }
   #panel.show { opacity: 1; transform: translate(0, 0); pointer-events: auto; visibility: visible; transition-delay: 0s; }
-  .panel-title { font-size: 15px; font-weight: 800; color: var(--gold); margin: 0 4px 8px; letter-spacing: 0.4px; }
+  .panel-title { font-family: var(--serif); font-size: 16px; font-weight: 800; color: var(--gold); margin: 0 4px 8px; letter-spacing: 0.4px; }
   .panel-title .hint { font-weight: 600; color: var(--cream); opacity: 0.7; font-size: 12px; margin-left: 6px; letter-spacing: 0; }
   .build-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
   .build-grid .build-btn:nth-child(5) { grid-column: 1 / -1; }
@@ -116,28 +124,28 @@
   .actions { display: flex; gap: 8px; }
   .act-btn {
     flex: 1; min-height: 48px; padding: 0 12px; display: flex; align-items: center; justify-content: center; gap: 8px;
-    background: #2f4a33; color: var(--cream); border: 2px solid var(--moss); border-radius: 12px;
+    background: var(--btn); color: var(--cream); border: 2px solid var(--royal-light); border-radius: 12px;
     font: inherit; font-size: 16px; font-weight: 800; cursor: pointer; transition: transform 0.08s ease;
   }
   .act-btn:active { transform: scale(0.96); }
-  .act-btn:disabled { opacity: 0.55; cursor: default; border-color: #6d6e66; }
+  .act-btn:disabled { opacity: 0.55; cursor: default; border-color: #6a6f7e; }
   .act-btn.sell { border-color: #b08a52; flex: 0.8; }
   .branch-label { font-size: 13px; font-weight: 700; color: var(--gold); margin: 0 4px 6px; }
   .branch-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px; }
   .branch-btn {
     display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-height: 64px; padding: 6px 10px;
-    background: #2f4a33; color: var(--cream); border: 2px solid var(--magic); border-radius: 12px;
+    background: var(--btn); color: var(--cream); border: 2px solid var(--magic); border-radius: 12px;
     font: inherit; text-align: left; cursor: pointer; transition: transform 0.08s ease, background 0.1s ease;
   }
   .branch-btn:active { transform: scale(0.97); }
   .branch-btn:disabled { opacity: 0.55; cursor: default; border-color: #6d6e66; }
-  .branch-btn.armed { border-color: var(--gold); background: #3a5a3f; box-shadow: 0 0 0 2px var(--gold); animation: armed 0.9s ease-in-out infinite; }
+  .branch-btn.armed { border-color: var(--gold); background: #33416b; box-shadow: 0 0 0 2px var(--gold); animation: armed 0.9s ease-in-out infinite; }
   .branch-btn.armed .build-blurb { color: var(--gold); font-weight: 800; opacity: 1; }
   .branch-head { display: flex; align-items: center; gap: 6px; }
   .branch-head .build-icon { font-size: 20px; }
   .branch-btn .build-name { font-size: 14px; line-height: 1.15; }
   .branch-btn .build-cost { font-size: 15px; }
-  @keyframes armed { 0%, 100% { box-shadow: 0 0 0 2px var(--gold); } 50% { box-shadow: 0 0 0 4px rgba(242, 193, 78, 0.5); } }
+  @keyframes armed { 0%, 100% { box-shadow: 0 0 0 2px var(--gold); } 50% { box-shadow: 0 0 0 4px rgba(232, 184, 74, 0.5); } }
   @media (max-height: 520px) {
     #panel { max-width: 62vw; width: auto; padding: 8px 10px; }
     #toast { left: auto; right: max(10px, env(safe-area-inset-right)); bottom: max(10px, env(safe-area-inset-bottom)); transform: translate(0, 10px); max-width: 36vw; white-space: normal; text-align: center; font-size: 15px; }
@@ -162,11 +170,11 @@
   .panel-blurb { font-size: 15px; margin: 0 4px 2px; opacity: 0.9; }
   .build-btn {
     display: flex; align-items: center; gap: 12px; width: 100%; min-height: 56px;
-    padding: 6px 12px; background: #2f4a33; color: var(--cream);
-    border: 2px solid var(--moss); border-radius: 12px; font: inherit; text-align: left;
+    padding: 6px 12px; background: var(--btn); color: var(--cream);
+    border: 2px solid var(--royal-light); border-radius: 12px; font: inherit; text-align: left;
     cursor: pointer; transition: transform 0.08s ease, background 0.1s ease;
   }
-  .build-btn:active { transform: scale(0.97); background: #3a5a3f; }
+  .build-btn:active { transform: scale(0.97); background: #33416b; }
   .build-btn:disabled { opacity: 0.55; cursor: default; border-color: #6d6e66; }
   .build-icon { font-size: 26px; line-height: 1; }
   .build-text { display: flex; flex-direction: column; flex: 1; }
@@ -189,7 +197,7 @@
   #debug.show { display: block; }
   .screen {
     position: fixed; inset: 0; display: none; z-index: 15; padding: 24px;
-    background: rgba(27, 20, 16, 0.72); align-items: center; justify-content: center; text-align: center;
+    background: rgba(14, 16, 26, 0.68); align-items: center; justify-content: center; text-align: center;
   }
   .screen.show { display: flex; }
   .screen .card {
@@ -198,9 +206,10 @@
     box-shadow: 0 6px 0 rgba(0,0,0,0.4);
   }
   .screen .card.wide { max-width: 920px; }
-  .screen .eyebrow { font-size: 14px; letter-spacing: 2px; text-transform: uppercase; color: var(--moss); font-weight: 700; }
-  .screen h1 { margin: 6px 0 12px; font-size: clamp(34px, 6vw, 52px); color: var(--gold); line-height: 1.05; }
-  .screen h1 .amp { color: var(--cream); font-weight: 400; }
+  .screen .eyebrow { font-size: 14px; letter-spacing: 2px; text-transform: uppercase; color: var(--royal-light); font-weight: 700; }
+  .screen h1 { margin: 6px 0 12px; font-family: var(--serif); font-size: clamp(34px, 6vw, 54px); color: var(--gold); line-height: 1.05; letter-spacing: 0.5px; text-shadow: 0 3px 0 rgba(0,0,0,0.45); }
+  .screen h1 .amp { color: var(--cream); font-weight: 400; font-style: italic; }
+  .screen .crest { font-size: 34px; line-height: 1; margin-bottom: 2px; color: var(--gold); text-shadow: 0 2px 0 var(--ink); }
   .screen .stakes { margin: 0 auto 18px; max-width: 420px; font-size: 18px; line-height: 1.45; }
   .howto { list-style: none; margin: 0 auto 22px; padding: 0; max-width: 400px; text-align: left; font-size: 16px; line-height: 1.4; }
   .howto li { display: flex; gap: 10px; align-items: flex-start; margin: 8px 0; }
@@ -228,15 +237,15 @@
     width: min(420px, 46vw); display: none; text-align: center;
   }
   #boss-bar.show { display: block; }
-  .boss-name { font-size: 13px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: var(--magic); text-shadow: 0 2px 0 var(--ink); }
+  .boss-name { font-family: var(--serif); font-size: 14px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; color: var(--baron-red); text-shadow: 0 2px 0 var(--ink); }
   .boss-track { height: 12px; border: 2px solid var(--ink); border-radius: 8px; background: rgba(27,20,16,0.7); overflow: hidden; }
-  .boss-fill { height: 100%; width: 100%; background: linear-gradient(90deg, #7a3fd1, var(--magic)); transition: width 0.15s ease; }
+  .boss-fill { height: 100%; width: 100%; background: linear-gradient(90deg, #7a1f1f, var(--baron-red)); transition: width 0.15s ease; }
   #wave-banner {
     position: absolute; left: 50%; top: 22%; transform: translate(-50%, 0); pointer-events: none;
     text-align: center; opacity: 0; display: none;
   }
   #wave-banner.show { display: block; animation: wavebanner 2.6s ease-out forwards; }
-  .wb-title { font-size: clamp(30px, 5vw, 46px); font-weight: 900; color: var(--gold); text-shadow: 0 3px 0 var(--ink), 0 0 18px rgba(0,0,0,0.5); letter-spacing: 1px; }
+  .wb-title { font-family: var(--serif); font-size: clamp(30px, 5vw, 46px); font-weight: 900; color: var(--gold); text-shadow: 0 3px 0 var(--ink), 0 0 18px rgba(0,0,0,0.5); letter-spacing: 1px; }
   .wb-flavor { font-size: 17px; font-weight: 700; color: var(--cream); text-shadow: 0 2px 0 var(--ink), 0 0 12px rgba(0,0,0,0.6); margin-top: 4px; max-width: 520px; }
   @keyframes wavebanner {
     0% { opacity: 0; transform: translate(-50%, 12px) scale(0.9); }
@@ -284,7 +293,7 @@
   }
   #rotate {
     position: fixed; inset: 0; display: none; z-index: 20;
-    background: #2f4a33; color: var(--cream);
+    background: #34452e; color: var(--cream);
     align-items: center; justify-content: center; text-align: center; padding: 24px;
   }
   #rotate.show { display: flex; }
@@ -307,7 +316,7 @@
   }
   #load-error {
     position: fixed; inset: 0; display: none; z-index: 30; padding: 24px;
-    background: #2f4a33; align-items: center; justify-content: center; text-align: center;
+    background: #34452e; align-items: center; justify-content: center; text-align: center;
   }
   #load-error.show { display: flex; }
   #load-error .card { max-width: 420px; font-size: 17px; line-height: 1.45; }
@@ -328,10 +337,13 @@
   .wm-snow { fill: var(--cream); }
   .wm-blight { fill: url(#wm-blight-grad); }
   .wm-crack { fill: none; stroke: var(--spore); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; animation: wm-pulse 3.2s ease-in-out infinite; }
-  .wm-deadtree { stroke: var(--hollow-wood); stroke-width: 2.5; stroke-linecap: round; fill: none; }
-  .wm-heart-stump { fill: var(--hollow-wood); stroke: var(--ink); stroke-width: 2; }
-  .wm-heart-glow { fill: var(--magic); animation: wm-pulse 2.2s ease-in-out infinite; }
-  .wm-heart-label { fill: var(--cream); font-size: 12px; font-style: italic; opacity: 0.85; }
+  .wm-deadtree { stroke: var(--stone-dark); stroke-width: 2.5; stroke-linecap: round; fill: none; }
+  .wm-heart-stump { fill: var(--baron); stroke: var(--ink); stroke-width: 2; stroke-linejoin: round; }
+  .wm-baron-flag { fill: var(--baron-red); stroke: var(--ink); stroke-width: 1.4; stroke-linejoin: round; }
+  .wm-baron-gate { fill: var(--ember); opacity: 0.85; }
+  .wm-field.alt { fill: var(--meadow-light); }
+  .wm-heart-glow { fill: var(--ember); animation: wm-pulse 2.2s ease-in-out infinite; }
+  .wm-heart-label { fill: var(--cream); font-family: var(--serif); font-size: 13px; font-style: italic; opacity: 0.9; }
   .wm-seg { fill: none; stroke-linecap: round; }
   .wm-seg-edge { stroke: var(--path-edge); stroke-width: 11; }
   .wm-seg.claimed { stroke: var(--path); stroke-width: 7; }
@@ -344,10 +356,14 @@
   .wm-glyph .wd { fill: none; stroke: var(--bark); stroke-width: 2; }
   .wm-glyph .wn { fill: var(--gold); }
   .wm-glyph .tn { fill: var(--canvas); stroke: var(--ink); stroke-width: 1.4; }
+  .wm-glyph .rs { fill: var(--slate); stroke: var(--ink); stroke-width: 1.4; }
+  .wm-glyph .ry { fill: var(--royal); stroke: var(--ink); stroke-width: 1.4; }
+  .wm-glyph .fire { fill: var(--ember); }
+  .wm-glyph .pl { fill: var(--cream); stroke: var(--ink); stroke-width: 1.4; }
   .wm-pennant-pole { stroke: var(--bark); stroke-width: 2; }
-  .wm-pennant { fill: var(--gold); stroke: var(--ink); stroke-width: 1; animation: wm-wave 1.6s ease-in-out infinite; transform-box: fill-box; transform-origin: left center; }
+  .wm-pennant { fill: var(--royal-light); stroke: var(--ink); stroke-width: 1; animation: wm-wave 1.6s ease-in-out infinite; transform-box: fill-box; transform-origin: left center; }
   .wm-next-ring { fill: none; stroke: var(--gold); stroke-width: 3; transform-box: fill-box; transform-origin: center; animation: wm-ping 1.6s ease-out infinite; pointer-events: none; }
-  .wm-puff { fill: var(--spore); transform-box: fill-box; transform-origin: center; animation: wm-puff 1s ease-out forwards; pointer-events: none; }
+  .wm-puff { fill: var(--gold); transform-box: fill-box; transform-origin: center; animation: wm-puff 1s ease-out forwards; pointer-events: none; }
   @keyframes wm-flow { to { stroke-dashoffset: -44; } }
   @keyframes wm-march { to { stroke-dashoffset: -26; } }
   @keyframes wm-pulse { 0%, 100% { opacity: 0.45; } 50% { opacity: 0.95; } }
@@ -359,19 +375,19 @@
   }
   .wm-node { cursor: pointer; }
   .wm-node .wm-node-hit { fill: transparent; }
-  .wm-node .wm-node-badge { fill: var(--panel); stroke: var(--moss); stroke-width: 3; transition: stroke 0.15s ease, fill 0.15s ease; }
-  .wm-node.selected .wm-node-badge { stroke: var(--gold); fill: #3a5a3f; }
+  .wm-node .wm-node-badge { fill: var(--panel); stroke: var(--royal-light); stroke-width: 3; transition: stroke 0.15s ease, fill 0.15s ease; }
+  .wm-node.selected .wm-node-badge { stroke: var(--gold); fill: #33416b; }
   .wm-node .wm-node-label, .wm-node .wm-lock-icon { fill: var(--cream); font-size: 18px; font-weight: 800; font-family: inherit; pointer-events: none; }
   .wm-node .wm-star { fill: #4a3f36; stroke: var(--ink); stroke-width: 1; }
   .wm-node .wm-star.lit { fill: var(--gold); }
   .wm-node.locked { opacity: 0.45; cursor: default; }
   .wm-node.locked .wm-node-badge { stroke: #6d6e66; }
   #wm-blurb { min-height: 44px; }
-  #wm-blurb .wm-name { display: block; color: var(--gold); font-weight: 800; }
+  #wm-blurb .wm-name { display: block; color: var(--gold); font-weight: 800; font-family: var(--serif); font-size: 20px; }
 </style>
 </head>
 <body>
-<canvas id="game" aria-label="Briar and Bastion game view"></canvas>
+<canvas id="game" aria-label="Knights and Knaves game view"></canvas>
 <div id="vignette" aria-hidden="true"></div>
 
 <div id="ui">
@@ -384,7 +400,7 @@
     <button id="pause-btn" class="pill iconbtn" type="button" aria-label="Pause" title="Pause"><span class="icon">&#10074;&#10074;</span></button>
   </div>
   <button id="wave-btn" type="button"><span id="wave-btn-main">Send the first wave</span><span id="wave-btn-sub" class="sub"></span></button>
-  <div id="boss-bar"><div id="boss-name" class="boss-name">Shadow-Crow Swarm</div><div class="boss-track"><div class="boss-fill"></div></div></div>
+  <div id="boss-bar"><div id="boss-name" class="boss-name">The Siege Ram</div><div class="boss-track"><div class="boss-fill"></div></div></div>
   <div id="wave-banner"><div class="wb-title"></div><div class="wb-flavor"></div></div>
   <div id="panel"></div>
   <div id="tip"><div class="tip-arrow"></div><div class="tip-text"></div></div>
@@ -396,33 +412,34 @@
 
 <div id="title" class="screen">
   <div class="card">
-    <div class="eyebrow">A woodland tower defense</div>
-    <h1>Briar <span class="amp">&amp;</span> Bastion</h1>
-    <p class="stakes">Corruption is spreading through the valley. Choose your ground, then send it back where it came from.</p>
+    <div class="crest" aria-hidden="true">&#9876;</div>
+    <div class="eyebrow">A medieval tower defense</div>
+    <h1>Knights <span class="amp">&amp;</span> Knaves</h1>
+    <p class="stakes">The Black Baron's knaves are loose upon the realm. Raise your towers, hold the King's road and send the rascals packing.</p>
     <ul class="howto">
-      <li><span class="ico">&#127793;</span>Tap a bright tile beside the road to plant a tower.</li>
-      <li><span class="ico">&#127792;</span>Towers shoot on their own. Every goblin they drop pays gold.</li>
+      <li><span class="ico">&#127984;</span>Tap a bright plot beside the road to raise a tower.</li>
+      <li><span class="ico">&#127993;</span>Towers fight on their own. Every knave they drop pays gold.</li>
       <li><span class="ico">&#9873;</span>Send the next wave when you're ready and hold the line.</li>
     </ul>
-    <button id="start-btn" type="button">Begin the Campaign</button>
+    <button id="start-btn" type="button">Raise the Banners</button>
   </div>
 </div>
 
 <div id="worldmap" class="screen">
   <div class="card wide">
-    <div class="eyebrow">The Kingdom of Briar</div>
-    <h1>Choose your ground</h1>
-    <svg id="wm-svg" viewBox="0 0 800 320" role="img" aria-label="Map of the Briar kingdom and its battle sites">
+    <div class="eyebrow">The Kingdom of Aldermere</div>
+    <h1>Choose your battle</h1>
+    <svg id="wm-svg" viewBox="0 0 800 320" role="img" aria-label="Map of the Kingdom of Aldermere and its battle sites">
       <defs>
         <radialGradient id="wm-soft">
           <stop offset="0" stop-color="#000" stop-opacity="1"></stop>
           <stop offset="0.6" stop-color="#000" stop-opacity="1"></stop>
           <stop offset="1" stop-color="#000" stop-opacity="0"></stop>
         </radialGradient>
-        <linearGradient id="wm-blight-grad" x1="0" y1="0" x2="1" y2="0.6">
-          <stop offset="0" stop-color="#3f3848" stop-opacity="0.96"></stop>
-          <stop offset="0.7" stop-color="#5a5062" stop-opacity="0.86"></stop>
-          <stop offset="1" stop-color="#5a5062" stop-opacity="0.7"></stop>
+        <linearGradient id="wm-blight-grad" x1="0" y1="0" x2="1" y2="0.4">
+          <stop offset="0" stop-color="#2a2226" stop-opacity="0.95"></stop>
+          <stop offset="0.65" stop-color="#4a3c38" stop-opacity="0.84"></stop>
+          <stop offset="1" stop-color="#5e564d" stop-opacity="0.62"></stop>
         </linearGradient>
         <clipPath id="wm-land-clip"><path d="M 60 40 C 150 10, 300 22, 420 18 C 540 14, 660 30, 740 52 C 790 70, 786 140, 772 200 C 760 260, 730 300, 640 304 C 520 310, 380 300, 260 304 C 150 308, 60 296, 34 250 C 12 200, 20 120, 30 80 C 36 58, 44 46, 60 40 Z"></path></clipPath>
         <mask id="wm-reclaim" maskUnits="userSpaceOnUse" x="-20" y="-20" width="840" height="360">
@@ -430,41 +447,42 @@
           <g id="wm-cuts"></g>
         </mask>
       </defs>
-      <!-- the kingdom: home in the south-east, the Hollow's heart in the far north-west -->
+      <!-- the realm: the King's castle in the east, the Baron's hold of Blackmoor in the far west -->
       <path class="wm-coast" d="M 60 40 C 150 10, 300 22, 420 18 C 540 14, 660 30, 740 52 C 790 70, 786 140, 772 200 C 760 260, 730 300, 640 304 C 520 310, 380 300, 260 304 C 150 308, 60 296, 34 250 C 12 200, 20 120, 30 80 C 36 58, 44 46, 60 40 Z"></path>
       <path class="wm-land" d="M 60 40 C 150 10, 300 22, 420 18 C 540 14, 660 30, 740 52 C 790 70, 786 140, 772 200 C 760 260, 730 300, 640 304 C 520 310, 380 300, 260 304 C 150 308, 60 296, 34 250 C 12 200, 20 120, 30 80 C 36 58, 44 46, 60 40 Z"></path>
-      <ellipse class="wm-patch" cx="690" cy="150" rx="60" ry="34"></ellipse>
-      <ellipse class="wm-patch" cx="420" cy="258" rx="70" ry="26"></ellipse>
-      <ellipse class="wm-patch" cx="200" cy="120" rx="80" ry="30"></ellipse>
-      <path class="wm-river" d="M 598 20 C 575 70, 612 118, 572 168 C 542 206, 586 250, 560 306"></path>
-      <path class="wm-river-foam" d="M 598 20 C 575 70, 612 118, 572 168 C 542 206, 586 250, 560 306"></path>
-      <!-- fields around the mill -->
-      <g transform="translate(398 244) rotate(-12)"><rect class="wm-field" x="-30" y="-12" width="60" height="24" rx="3"></rect><path class="wm-field-row" d="M -26 -5 H 26 M -26 2 H 26 M -26 9 H 26"></path></g>
-      <g transform="translate(520 112) rotate(8)"><rect class="wm-field" x="-24" y="-10" width="48" height="20" rx="3"></rect><path class="wm-field-row" d="M -20 -3 H 20 M -20 4 H 20"></path></g>
-      <!-- the mountains of the border, around the Cairnwatch -->
+      <ellipse class="wm-patch" cx="690" cy="230" rx="60" ry="34"></ellipse>
+      <ellipse class="wm-patch" cx="430" cy="270" rx="70" ry="24"></ellipse>
+      <ellipse class="wm-patch" cx="200" cy="140" rx="80" ry="30"></ellipse>
+      <path class="wm-river" d="M 352 18 C 330 70, 296 104, 322 150 C 348 196, 300 244, 326 306"></path>
+      <path class="wm-river-foam" d="M 352 18 C 330 70, 296 104, 322 150 C 348 196, 300 244, 326 306"></path>
+      <!-- the patchwork of royal farmland -->
+      <g transform="translate(600 238) rotate(-10)"><rect class="wm-field" x="-26" y="-11" width="52" height="22" rx="3"></rect><path class="wm-field-row" d="M -22 -4 H 22 M -22 3 H 22"></path></g>
+      <g transform="translate(726 268) rotate(6)"><rect class="wm-field alt" x="-22" y="-10" width="44" height="20" rx="3"></rect><path class="wm-field-row" d="M -18 -3 H 18 M -18 4 H 18"></path></g>
+      <g transform="translate(410 262) rotate(-12)"><rect class="wm-field" x="-30" y="-12" width="60" height="24" rx="3"></rect><path class="wm-field-row" d="M -26 -5 H 26 M -26 2 H 26 M -26 9 H 26"></path></g>
+      <g transform="translate(150 262) rotate(8)"><rect class="wm-field alt" x="-24" y="-10" width="48" height="20" rx="3"></rect><path class="wm-field-row" d="M -20 -3 H 20 M -20 4 H 20"></path></g>
+      <!-- the north hills the Ridge Road and the Pilgrims' Way come down from -->
       <g>
-        <path class="wm-mtn" d="M 236 118 L 266 64 L 298 118 Z"></path><path class="wm-mtn-shade" d="M 266 64 L 298 118 L 272 118 Z"></path><path class="wm-snow" d="M 266 64 L 257 80 L 266 76 L 275 80 Z"></path>
-        <path class="wm-mtn" d="M 280 112 L 318 50 L 358 112 Z"></path><path class="wm-mtn-shade" d="M 318 50 L 358 112 L 326 112 Z"></path><path class="wm-snow" d="M 318 50 L 307 68 L 318 63 L 329 68 Z"></path>
-        <path class="wm-mtn" d="M 350 104 L 376 66 L 402 104 Z"></path><path class="wm-mtn-shade" d="M 376 66 L 402 104 L 382 104 Z"></path><path class="wm-snow" d="M 376 66 L 369 77 L 376 74 L 383 77 Z"></path>
-        <path class="wm-mtn" d="M 150 250 L 172 216 L 196 250 Z"></path><path class="wm-mtn-shade" d="M 172 216 L 196 250 L 178 250 Z"></path>
+        <path class="wm-mtn" d="M 400 104 L 430 56 L 462 104 Z"></path><path class="wm-mtn-shade" d="M 430 56 L 462 104 L 436 104 Z"></path><path class="wm-snow" d="M 430 56 L 421 72 L 430 68 L 439 72 Z"></path>
+        <path class="wm-mtn" d="M 446 100 L 484 42 L 524 100 Z"></path><path class="wm-mtn-shade" d="M 484 42 L 524 100 L 492 100 Z"></path><path class="wm-snow" d="M 484 42 L 473 60 L 484 55 L 495 60 Z"></path>
+        <path class="wm-mtn" d="M 516 96 L 542 60 L 568 96 Z"></path><path class="wm-mtn-shade" d="M 542 60 L 568 96 L 548 96 Z"></path>
       </g>
-      <!-- woods -->
       <g id="wm-trees"></g>
-      <!-- the blight: masked away wherever a battle has been won -->
+      <!-- the Baron's occupation: rolled back wherever a battle is won -->
       <g clip-path="url(#wm-land-clip)"><g mask="url(#wm-reclaim)">
-        <path class="wm-blight" d="M 22 60 C 60 20, 200 14, 330 20 C 420 24, 500 16, 560 30 C 600 60, 572 110, 610 150 C 650 190, 700 200, 712 240 C 722 280, 690 306, 640 306 C 520 312, 330 304, 200 306 C 90 308, 40 296, 26 250 C 12 190, 16 110, 22 60 Z"></path>
-        <path class="wm-crack" d="M 60 70 L 110 96 L 150 90 L 210 132 L 262 150 L 330 176 L 380 170 L 440 214 L 500 222 L 560 250 L 610 262"></path>
-        <path class="wm-crack" d="M 110 96 L 120 150 L 96 200 L 130 250"></path>
-        <path class="wm-crack" d="M 262 150 L 240 200 L 280 260"></path>
-        <path class="wm-crack" d="M 440 214 L 452 170 L 500 140 L 530 90"></path>
+        <path class="wm-blight" d="M 22 60 C 60 20, 200 14, 330 20 C 430 24, 520 20, 560 40 C 590 90, 548 150, 574 200 C 600 250, 560 300, 500 306 C 380 312, 230 304, 150 306 C 80 308, 40 296, 26 250 C 12 190, 16 110, 22 60 Z"></path>
+        <path class="wm-crack" d="M 70 74 L 120 100 L 160 96 L 214 136 L 262 156 L 320 172 L 370 168 L 430 212 L 488 220 L 540 250"></path>
+        <path class="wm-crack" d="M 120 100 L 128 150 L 104 200 L 136 250"></path>
+        <path class="wm-crack" d="M 262 156 L 244 204 L 282 262"></path>
+        <path class="wm-crack" d="M 430 212 L 446 168 L 494 140 L 520 96"></path>
         <g id="wm-deadwood"></g>
       </g></g>
-      <!-- the Heart of the Hollow: where all this comes from -->
-      <g transform="translate(58 58)">
-        <circle class="wm-heart-glow" r="22" opacity="0.5"></circle>
-        <path class="wm-heart-stump" d="M -16 12 L -12 -8 L -6 -2 L -2 -14 L 4 -4 L 10 -12 L 14 10 Z"></path>
-        <path class="wm-crack" d="M -4 10 L 0 -2 L 4 6"></path>
-        <text class="wm-heart-label" x="26" y="-10">the Heart of the Hollow</text>
+      <!-- Blackmoor, the Black Baron's hold: where the knaves march from -->
+      <g transform="translate(62 62)">
+        <circle class="wm-heart-glow" r="24" opacity="0.5"></circle>
+        <path class="wm-heart-stump" d="M -16 12 L -16 -6 L -12 -6 L -12 -2 L -8 -2 L -8 -14 L -4 -14 L -4 -10 L 0 -10 L 0 -14 L 4 -14 L 4 -2 L 8 -2 L 8 -6 L 12 -6 L 12 12 Z"></path>
+        <path class="wm-baron-flag" d="M 2 -14 L 2 -26 L 13 -22 L 2 -18"></path>
+        <rect class="wm-baron-gate" x="-4" y="4" width="6" height="8"></rect>
+        <text class="wm-heart-label" x="26" y="-8">Blackmoor, the Baron's hold</text>
       </g>
       <g id="wm-roads"></g>
       <g id="wm-fx"></g>
@@ -476,11 +494,11 @@
 
 <div id="pause" class="screen">
   <div class="card">
-    <div class="eyebrow">The valley holds its breath</div>
+    <div class="eyebrow">The realm holds its breath</div>
     <h1>Paused</h1>
     <p class="stakes" id="pause-text"></p>
     <div class="row">
-      <button id="resume-btn" type="button">Back to the wall</button>
+      <button id="resume-btn" type="button">Back to the walls</button>
       <button id="pause-restart-btn" type="button" class="secondary">Start over</button>
       <button id="pause-map-btn" type="button" class="secondary">World map</button>
     </div>
@@ -490,7 +508,7 @@
 
 <div id="end" class="screen">
   <div class="card">
-    <h1 id="end-title">The Bastion holds!</h1>
+    <h1 id="end-title">The manor holds!</h1>
     <div id="stars"><span>&#9733;</span><span>&#9733;</span><span>&#9733;</span></div>
     <p id="end-text" class="stakes"></p>
     <div class="row">
@@ -504,27 +522,24 @@
   <div class="card">
     <div class="phone"></div>
     <h1>Turn your device sideways</h1>
-    <p>The valley is wide. Briar &amp; Bastion is played in landscape.</p>
+    <p>The realm is wide. Knights &amp; Knaves is played in landscape.</p>
   </div>
 </div>
 
 <div id="load-error">
   <div class="card">
-    <h1>The valley didn't load</h1>
-    <p>Briar &amp; Bastion needs to fetch one library (three.js) from the web the first time it opens. Check your connection and reload the page.</p>
+    <h1>The realm didn't load</h1>
+    <p>Knights &amp; Knaves needs to fetch one library (three.js) from the web the first time it opens. Check your connection and reload the page.</p>
   </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="js/palette-config.js"></script>
-<script src="js/level1-shadow-hollow.js"></script>
-<script src="js/level2-millbrook-watch.js"></script>
-<script src="js/level3-cairnwatch.js"></script>
-<script src="js/level4-splintered-vale.js"></script>
-<script src="js/level5-elderroot-ward.js"></script>
-<script src="js/level6-sunken-market.js"></script>
-<script src="js/level7-amber-terraces.js"></script>
-<script src="js/level8-frostpine-camp.js"></script>
+<script src="js/level-common.js"></script>
+<script src="js/level1-hollybrook.js"></script>
+<script src="js/level2-ravensford.js"></script>
+<script src="js/level3-st-wendels.js"></script>
+<script src="js/level4-castle-aldermere.js"></script>
 <script src="js/levels.js"></script>
 <script src="js/progress.js"></script>
 <script src="js/game-state.js"></script>

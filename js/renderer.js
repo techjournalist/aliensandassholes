@@ -1,7 +1,7 @@
 // ===================================================================
 // Renderer  (all three.js; reads GameState, never writes it; level-
 // specific set dressing lives in each level's buildScene(), see
-// js/level1-shadow-hollow.js for the pattern)
+// js/level1-hollybrook.js and js/level-common.js for the pattern)
 // ===================================================================
 const Renderer = (() => {
   const border = CONFIG.border, tileHeight = CONFIG.tileHeight;
@@ -123,6 +123,21 @@ const Renderer = (() => {
     GEO.petals = new THREE.ShapeGeometry(petal);
     GEO.petals.rotateX(-Math.PI / 2);
     GEO.circle = new THREE.CircleGeometry(1, 18);
+    // a longbow: a 135-degree arc bulging toward +z, its tips level with the origin's z + 0.38
+    GEO.bow = new THREE.TorusGeometry(1, 0.06, 5, 14, Math.PI * 0.75);
+    GEO.bow.rotateZ(-Math.PI * 0.375);
+    GEO.bow.rotateY(-Math.PI / 2);
+    // a leathery wing with a scalloped trailing edge, spanning +x from the
+    // shoulder (wingR mirrors it), 1 unit thick so a matrix sets its thickness
+    const wingPts = [[0, 0.16], [0.45, 0.34], [1, 0.26], [0.82, -0.08], [0.7, 0.02], [0.5, -0.24], [0.4, -0.08], [0.2, -0.3], [0, -0.2]];
+    for (const [k, sgn] of [['wingL', 1], ['wingR', -1]]) {
+      const pts = wingPts.map(([x, y]) => new THREE.Vector2(x * sgn, y));
+      const g = new THREE.ExtrudeGeometry(new THREE.Shape(sgn > 0 ? pts : pts.reverse()), { depth: 1, bevelEnabled: false });
+      g.rotateX(Math.PI / 2);
+      g.translate(0, 0.5, 0);
+      g.computeVertexNormals();
+      GEO[k] = g;
+    }
     for (const k in GEO) { if (GEO[k].index) GEO[k] = GEO[k].toNonIndexed(); }
     // circle should lie flat on the ground
     GEO.circle.rotateX(-Math.PI / 2);
@@ -522,7 +537,7 @@ const Renderer = (() => {
         .multiply(new THREE.Matrix4().makeScale(0.05, len, 0.05));
       parts.push(P(GEO.cylTaper, PALETTE.hollowWood, m));
     }
-    // a shelf fungus glowing faintly on the trunk
+    // a smoldering ember still glowing in the charred trunk
     if (rng() < 0.6) parts.push(P(GEO.dome, PALETTE.spore, M(Math.sin(lean) * -h * 0.15, h * 0.3, 0.1, { sx: 0.1, sy: 0.04, sz: 0.08 }), false));
     return { parts, radius: 0.25 };
   }
@@ -567,7 +582,7 @@ const Renderer = (() => {
       const a = rng() * 6.28;
       parts.push(P(GEO.rock, hollow ? PALETTE.hollowEarth : PALETTE.stoneDark, M(Math.cos(a) * s * 1.2, s * 0.25, Math.sin(a) * s * 1.1, { sx: s * 0.5, sy: s * 0.38, sz: s * 0.45, ry: a })));
     }
-    parts.push(P(GEO.sphereLo, hollow ? PALETTE.spore : PALETTE.moss, M(-s * 0.15, s * 1.12, 0, { sx: s * 0.85, sy: s * 0.22, sz: s * 0.7, ry }), false));
+    parts.push(P(GEO.sphereLo, hollow ? PALETTE.hollowEarth : PALETTE.moss, M(-s * 0.15, s * 1.12, 0, { sx: s * 0.85, sy: s * 0.22, sz: s * 0.7, ry }), false));
     return { parts, radius: s * 1.2 };
   }
   function flowerParts(rng) {
@@ -583,15 +598,19 @@ const Renderer = (() => {
     parts.push(P(GEO.bead, color === PALETTE.flowerYellow ? PALETTE.acorn : PALETTE.flowerYellow, M(0, h + 0.045, 0.01, { s: 0.028 }), false));
     return { parts, radius: 0 };
   }
-  function acornParts(rng) {
-    const s = 0.14 + rng() * 0.1, tilt = (rng() - 0.5) * 0.6;
-    return {
-      parts: [
-        P(GEO.sphere, PALETTE.acorn, M(0, s * 0.9, 0, { sx: s * 0.75, sy: s, sz: s * 0.75, rz: tilt })),
-        P(GEO.dome, PALETTE.acornCap, M(Math.sin(tilt) * -s * 0.4, s * 1.25, 0, { sx: s * 0.85, sy: s * 0.5, sz: s * 0.85, rz: tilt })),
-        P(GEO.cyl, PALETTE.acornCap, M(Math.sin(tilt) * -s * 0.7, s * 1.75, 0, { sx: s * 0.1, sy: s * 0.35, sz: s * 0.1, rz: tilt }), false),
-      ], radius: s * 0.8,
-    };
+  // a haystack: a domed heap of straw with a darker band and a few loose wisps
+  function hayParts(rng) {
+    const s = 0.22 + rng() * 0.12, ry = rng() * 3;
+    const parts = [
+      P(GEO.dome, PALETTE.straw, M(0, 0, 0, { sx: s * 1.15, sy: s * 1.5, sz: s * 1.05, ry })),
+      P(GEO.ring, shade(PALETTE.straw, 0.22), M(0, s * 0.45, 0, { sx: s * 1.02, sy: s * 0.92, sz: s * 1.02, rx: Math.PI / 2 }), false),
+      P(GEO.cone, shade(PALETTE.straw, 0.1), M(0, s * 1.55, 0, { sx: s * 0.25, sy: s * 0.35, sz: s * 0.25 }), false),
+    ];
+    for (let i = 0; i < 3; i++) {
+      const a = rng() * 6.28;
+      parts.push(P(GEO.box, PALETTE.straw, M(Math.cos(a) * s * 1.3, 0.01, Math.sin(a) * s * 1.2, { sx: 0.12, sy: 0.01, sz: 0.015, ry: a }), false));
+    }
+    return { parts, radius: s * 1.1 };
   }
 
   // -------- scene construction --------
@@ -776,13 +795,13 @@ const Renderer = (() => {
     scene.add(mesh);
   }
 
-  // Ambient motes per level mood: fireflies over healthy meadow, spores
-  // rising out of corruption, plus whatever the level's theme adds
+  // Ambient motes per level mood: fireflies over healthy meadow, embers
+  // rising off the ravaged ground, plus whatever the level's theme adds
   // (leaves, dust, embers).
   function buildMotes() {
     const vt = levelTheme();
     const rng = srand(77);
-    const counts = Object.assign({ fireflies: 26, spores: 28 }, vt.motes);
+    const counts = Object.assign({ fireflies: 26, embers: 22 }, vt.motes);
     for (const kind of Object.keys(counts)) {
       if (!RendererFX.MOTE_KINDS[kind]) continue;
       const n = Math.round(counts[kind] * QUALITY);
@@ -800,7 +819,7 @@ const Renderer = (() => {
   }
 
   // Shared animated water for any level: a stream, a millrace, or (slowed and
-  // recolored) the Cairnwatch's corrupted ooze.
+  // recolored) a slow dark castle moat.
   function water({ x, z = 0, width = 0.98, length, y = -0.12, shallow = PALETTE.water, deep = PALETTE.waterDeep, foam = PALETTE.waterFoam, speed, stripe, foamAmt }) {
     const mat = RendererFX.waterMaterial({ shallow, deep, foam, speed, stripe, foamAmt });
     mat.uniforms.uTime = fxTime;
@@ -825,204 +844,264 @@ const Renderer = (() => {
     return out;
   }
 
-  // Sprout Slinger: a small gnome-knight on a mossy stone pad, holding a
-  // forked slingshot up and ready. Faces +z. Silhouette: the raised fork.
+  // Every tower stands on the same round stone dais, so the five read as one
+  // army; the character on top carries the silhouette.
+  const dais = () => [
+    P(GEO.cyl, PALETTE.stoneDark, M(0, 0.06, 0, { sx: 0.38, sy: 0.12, sz: 0.38 }), true, { name: 'pad' }),
+    P(GEO.cyl, PALETTE.cobble, M(0, 0.125, 0, { sx: 0.34, sy: 0.02, sz: 0.34 }), false),
+    P(GEO.rock, PALETTE.stone, M(0.3, 0.12, -0.18, { s: 0.05 }), false),
+    P(GEO.rock, PALETTE.cobble, M(-0.33, 0.12, 0.08, { s: 0.045 }), false),
+  ];
+  // two eyes with a glint, looking along +z from a head at (x, y, z)
+  const eyes = (y, z, spread = 0.07, s = 0.028) => [
+    P(GEO.bead, PALETTE.outline, M(spread, y, z, { s }), false),
+    P(GEO.bead, PALETTE.outline, M(-spread, y, z, { s }), false),
+    P(GEO.bead, PALETTE.cream, M(spread + 0.008, y + 0.012, z + 0.02, { s: s * 0.38 }), false),
+    P(GEO.bead, PALETTE.cream, M(-spread + 0.008, y + 0.012, z + 0.02, { s: s * 0.38 }), false),
+  ];
+
+  // Javelin Squire: a stout young squire in a wide kettle helm and the
+  // King's tabard, a javelin cocked over his shoulder and a red buckler on
+  // his arm. Faces +z. Silhouette: the helm brim and the raised javelin.
   function slingerParts() {
+    const jx = 0.27, jy = 1.0, jr = Math.PI / 2 - 0.25;
     return [
-      P(GEO.cyl, PALETTE.stoneDark, M(0, 0.06, 0, { sx: 0.38, sy: 0.12, sz: 0.38 }), true, { name: 'pad' }),
-      P(GEO.cyl, PALETTE.moss, M(0, 0.13, 0, { sx: 0.34, sy: 0.04, sz: 0.34 }), false, { name: 'padMoss' }),
-      P(GEO.cone, PALETTE.meadowLight, M(0.3, 0.2, 0.18, { sx: 0.05, sy: 0.12, sz: 0.05, rz: -0.3 }), false),
-      P(GEO.cone, PALETTE.meadowLight, M(-0.28, 0.2, -0.2, { sx: 0.05, sy: 0.1, sz: 0.05, rz: 0.3 }), false),
-      P(GEO.sphereLo, PALETTE.tunic, M(0, 0.42, 0, { sx: 0.25, sy: 0.22, sz: 0.23 }), true, { name: 'body' }),
-      P(GEO.sphereLo, PALETTE.woodLight, M(0.1, 0.18, 0.08, { sx: 0.09, sy: 0.05, sz: 0.11 }), true),
-      P(GEO.sphereLo, PALETTE.woodLight, M(-0.1, 0.18, 0.08, { sx: 0.09, sy: 0.05, sz: 0.11 }), true),
-      P(GEO.sphere, PALETTE.skin, M(0, 0.72, 0, { s: 0.22 }), true, { name: 'head' }),
-      P(GEO.sphereLo, PALETTE.cream, M(0, 0.6, 0.14, { sx: 0.17, sy: 0.15, sz: 0.11 }), true, { name: 'beard' }),
-      P(GEO.sphereLo, 0xf0a98a, M(0, 0.72, 0.21, { s: 0.055 }), false),
-      P(GEO.cyl, PALETTE.capRed, M(0, 0.86, 0, { sx: 0.26, sy: 0.05, sz: 0.26 }), true, { name: 'brim' }),
-      P(GEO.cone, PALETTE.capRed, M(0.02, 1.1, -0.02, { sx: 0.22, sy: 0.52, sz: 0.22, rz: -0.14 }), true, { name: 'hat', live: true }),
-      P(GEO.sphereLo, PALETTE.meadowLight, M(0.09, 1.38, -0.02, { sx: 0.07, sy: 0.04, sz: 0.1, rz: -0.5 }), true, { name: 'sprout', live: true }),
-      // the slingshot: a wooden Y with a dark band, held out to the right
-      P(GEO.cyl, PALETTE.wood, M(0.34, 0.66, 0.12, { sx: 0.045, sy: 0.42, sz: 0.045, rz: -0.12 }), true, { name: 'slingHandle', live: true }),
-      P(GEO.cyl, PALETTE.wood, M(0.24, 1.0, 0.12, { sx: 0.035, sy: 0.34, sz: 0.035, rz: 0.6 }), true, { name: 'prongL', live: true }),
-      P(GEO.cyl, PALETTE.wood, M(0.48, 1.0, 0.12, { sx: 0.035, sy: 0.34, sz: 0.035, rz: -0.6 }), true, { name: 'prongR', live: true }),
-      P(GEO.box, PALETTE.outline, M(0.36, 1.13, 0.12, { sx: 0.3, sy: 0.025, sz: 0.025 }), false, { name: 'band', live: true, unlit: true }),
-      P(GEO.sphereLo, PALETTE.acorn, M(-0.2, 0.36, 0.14, { s: 0.07 }), true, { name: 'pouch' }),
-      // secondary detail: eyes with a glint, rosy cheeks, a buckled belt,
-      // a leaf tucked in the hat brim and a few stones set round the pad
-      P(GEO.bead, PALETTE.outline, M(0.075, 0.77, 0.195, { s: 0.03 }), false),
-      P(GEO.bead, PALETTE.outline, M(-0.075, 0.77, 0.195, { s: 0.03 }), false),
-      P(GEO.bead, PALETTE.cream, M(0.083, 0.782, 0.218, { s: 0.011 }), false),
-      P(GEO.bead, PALETTE.cream, M(-0.067, 0.782, 0.218, { s: 0.011 }), false),
-      P(GEO.sphereLo, 0xf0a98a, M(0.13, 0.69, 0.15, { sx: 0.04, sy: 0.025, sz: 0.02 }), false),
-      P(GEO.sphereLo, 0xf0a98a, M(-0.13, 0.69, 0.15, { sx: 0.04, sy: 0.025, sz: 0.02 }), false),
-      P(GEO.cyl, PALETTE.acornCap, M(0, 0.33, 0, { sx: 0.245, sy: 0.045, sz: 0.225 }), false),
-      P(GEO.box, PALETTE.gold, M(0, 0.33, 0.225, { sx: 0.07, sy: 0.06, sz: 0.02 }), false),
-      P(GEO.sphereLo, PALETTE.meadowLight, M(-0.2, 0.9, 0.08, { sx: 0.09, sy: 0.02, sz: 0.04, ry: 0.5, rz: 0.3 }), false),
-      P(GEO.rock, PALETTE.cobble, M(0.3, 0.12, -0.18, { s: 0.06 }), false),
-      P(GEO.rock, PALETTE.stone, M(-0.34, 0.12, 0.06, { s: 0.05 }), false),
-      P(GEO.rock, PALETTE.cobble, M(0.06, 0.12, 0.35, { s: 0.045 }), false),
+      ...dais(),
+      P(GEO.sphereLo, PALETTE.acornCap, M(0.1, 0.18, 0.06, { sx: 0.09, sy: 0.06, sz: 0.12 }), true),
+      P(GEO.sphereLo, PALETTE.acornCap, M(-0.1, 0.18, 0.06, { sx: 0.09, sy: 0.06, sz: 0.12 }), true),
+      P(GEO.sphereLo, PALETTE.tunic, M(0, 0.42, 0, { sx: 0.25, sy: 0.23, sz: 0.23 }), true, { name: 'body' }),
+      // the white tabard with a red cross, the kingdom's colors at a glance
+      P(GEO.box, PALETTE.heraldWhite, M(0, 0.42, 0.2, { sx: 0.2, sy: 0.26, sz: 0.04 }), false),
+      P(GEO.box, PALETTE.capRed, M(0, 0.43, 0.223, { sx: 0.045, sy: 0.22, sz: 0.01 }), false),
+      P(GEO.box, PALETTE.capRed, M(0, 0.46, 0.223, { sx: 0.17, sy: 0.04, sz: 0.01 }), false),
+      P(GEO.cyl, PALETTE.acornCap, M(0, 0.31, 0, { sx: 0.24, sy: 0.04, sz: 0.22 }), false),
+      P(GEO.box, PALETTE.gold, M(0, 0.31, 0.215, { sx: 0.06, sy: 0.05, sz: 0.02 }), false),
+      P(GEO.sphere, PALETTE.skin, M(0, 0.72, 0.01, { s: 0.2 }), true, { name: 'head' }),
+      ...eyes(0.74, 0.19),
+      P(GEO.bead, 0xe9a283, M(0, 0.7, 0.215, { s: 0.04 }), false),
+      P(GEO.sphereLo, 0xf0a98a, M(0.12, 0.67, 0.14, { sx: 0.04, sy: 0.025, sz: 0.02 }), false),
+      P(GEO.sphereLo, 0xf0a98a, M(-0.12, 0.67, 0.14, { sx: 0.04, sy: 0.025, sz: 0.02 }), false),
+      P(GEO.box, PALETTE.outline, M(0, 0.63, 0.19, { sx: 0.06, sy: 0.012, sz: 0.01 }), false),
+      // the kettle helm: a steel dome and a wide brim
+      P(GEO.dome, PALETTE.steel, M(0, 0.8, 0, { sx: 0.22, sy: 0.17, sz: 0.22 }), true, { name: 'hat', live: true }),
+      P(GEO.cyl, PALETTE.steel, M(0, 0.8, 0, { sx: 0.35, sy: 0.025, sz: 0.35 }), true, { name: 'brim', live: true }),
+      P(GEO.bead, PALETTE.gold, M(0, 0.98, 0, { s: 0.035 }), false, { name: 'helmKnob', live: true }),
+      // the buckler on the off arm
+      P(GEO.sphereLo, PALETTE.skin, M(-0.24, 0.42, 0.08, { s: 0.06 }), true),
+      P(GEO.cyl, PALETTE.capRed, M(-0.3, 0.44, 0.06, { sx: 0.15, sy: 0.03, sz: 0.15, rz: Math.PI / 2 }), true),
+      P(GEO.ring, PALETTE.gold, M(-0.318, 0.44, 0.06, { s: 0.13, ry: Math.PI / 2 }), false),
+      P(GEO.bead, PALETTE.gold, M(-0.322, 0.44, 0.06, { s: 0.035 }), false),
+      // spare javelins in a quiver on the back
+      P(GEO.cyl, PALETTE.acornCap, M(-0.08, 0.5, -0.2, { sx: 0.06, sy: 0.3, sz: 0.06, rz: 0.3 })),
+      P(GEO.cyl, PALETTE.woodLight, M(-0.15, 0.74, -0.2, { sx: 0.014, sy: 0.3, sz: 0.014, rz: 0.3 }), false),
+      P(GEO.cone, PALETTE.steel, M(-0.2, 0.9, -0.2, { sx: 0.025, sy: 0.07, sz: 0.025, rz: 0.3 }), false),
+      // the throwing arm and the javelin, cocked back over the shoulder
+      P(GEO.sphereLo, PALETTE.skin, M(jx, 0.94, 0, { s: 0.065 }), true, { name: 'hand', live: true }),
+      P(GEO.cyl, PALETTE.tunic, M(0.24, 0.72, 0, { sx: 0.06, sy: 0.3, sz: 0.06, rz: 0.15 }), true, { name: 'arm', live: true }),
+      P(GEO.cyl, PALETTE.woodLight, M(jx, jy, 0.06, { sx: 0.03, sy: 0.95, sz: 0.03, rx: jr }), true, { name: 'javelin', live: true }),
+      P(GEO.cone, PALETTE.steel, M(jx, jy + 0.475 * Math.cos(jr) + 0.02, 0.06 + 0.475 * Math.sin(jr) + 0.04, { sx: 0.035, sy: 0.11, sz: 0.035, rx: jr }), true, { name: 'tip', live: true }),
     ];
   }
 
-  // Goblin Grunt: mostly head, huge ears, a carrot nose, a stubby club.
-  // Faces +z. Silhouette: the ears.
+  // Brigand: a squat footpad, mostly head, a hood with a floppy tail, a
+  // black scarf masking his face, and a knobbly cudgel. Faces +z.
+  // Silhouette: the hood tail flopping behind.
   function gruntParts() {
     const g = PALETTE.goblin, gd = PALETTE.goblinDark;
     return [
       P(GEO.sphereLo, g, M(0, 0.2, 0, { sx: 0.2, sy: 0.17, sz: 0.18 }), true, { name: 'body' }),
       P(GEO.box, PALETTE.acornCap, M(0, 0.16, 0, { sx: 0.42, sy: 0.06, sz: 0.38 }), false, { name: 'belt' }),
+      P(GEO.box, PALETTE.steelDark, M(0, 0.16, 0.195, { sx: 0.06, sy: 0.05, sz: 0.02 }), false),
       P(GEO.sphereLo, gd, M(0.1, 0.05, 0.02, { sx: 0.09, sy: 0.05, sz: 0.11 }), true, { name: 'footL', live: true }),
       P(GEO.sphereLo, gd, M(-0.1, 0.05, 0.02, { sx: 0.09, sy: 0.05, sz: 0.11 }), true, { name: 'footR', live: true }),
-      P(GEO.sphere, g, M(0, 0.5, 0, { sx: 0.25, sy: 0.23, sz: 0.24 }), true, { name: 'head' }),
-      P(GEO.cone, g, pivotMatrix(0.2, 0.56, 0, 0, 0, -1.2, 0, 0.13, 0, 0.07, 0.26, 0.05), true, { name: 'earL', live: true }),
-      P(GEO.cone, g, pivotMatrix(-0.2, 0.56, 0, 0, 0, 1.2, 0, 0.13, 0, 0.07, 0.26, 0.05), true, { name: 'earR', live: true }),
-      P(GEO.sphereLo, PALETTE.cream, M(0.09, 0.54, 0.2, { s: 0.055 }), false, { unlit: true }),
-      P(GEO.sphereLo, PALETTE.cream, M(-0.09, 0.54, 0.2, { s: 0.055 }), false, { unlit: true }),
-      P(GEO.bead, PALETTE.outline, M(0.1, 0.54, 0.245, { s: 0.025 }), false, { unlit: true }),
-      P(GEO.bead, PALETTE.outline, M(-0.08, 0.54, 0.245, { s: 0.025 }), false, { unlit: true }),
-      P(GEO.cone, gd, M(0, 0.47, 0.3, { sx: 0.05, sy: 0.18, sz: 0.05, rx: Math.PI / 2 }), true, { name: 'nose' }),
-      P(GEO.box, PALETTE.cream, M(0.05, 0.4, 0.21, { sx: 0.04, sy: 0.05, sz: 0.02 }), false, { unlit: true }),
+      P(GEO.sphere, PALETTE.skin, M(0, 0.5, 0.02, { sx: 0.22, sy: 0.21, sz: 0.21 }), true, { name: 'head' }),
+      // the hood, pulled low, and its long tail
+      P(GEO.sphereLo, gd, M(0, 0.56, -0.02, { sx: 0.25, sy: 0.22, sz: 0.24 }), true, { name: 'hood' }),
+      P(GEO.cone, gd, pivotMatrix(0, 0.66, -0.16, -1.9, 0, 0, 0, 0.14, 0, 0.08, 0.3, 0.06), true, { name: 'earL', live: true }),
+      P(GEO.sphereLo, gd, M(0, 0.4, 0.04, { sx: 0.26, sy: 0.06, sz: 0.22 }), false),
+      // the face: beady eyes over a black scarf, a big red nose poking out
+      P(GEO.sphereLo, PALETTE.cream, M(0.08, 0.53, 0.19, { s: 0.05 }), false, { unlit: true }),
+      P(GEO.sphereLo, PALETTE.cream, M(-0.08, 0.53, 0.19, { s: 0.05 }), false, { unlit: true }),
+      P(GEO.bead, PALETTE.outline, M(0.09, 0.53, 0.232, { s: 0.024 }), false, { unlit: true }),
+      P(GEO.bead, PALETTE.outline, M(-0.07, 0.53, 0.232, { s: 0.024 }), false, { unlit: true }),
+      P(GEO.box, PALETTE.outline, M(0, 0.6, 0.2, { sx: 0.2, sy: 0.025, sz: 0.02, rz: 0.12 }), false),
+      P(GEO.sphereLo, PALETTE.pitch, M(0, 0.43, 0.12, { sx: 0.2, sy: 0.08, sz: 0.13 }), false, { name: 'mask' }),
+      P(GEO.sphereLo, 0xd47a64, M(0, 0.49, 0.24, { sx: 0.05, sy: 0.045, sz: 0.06 }), true, { name: 'nose' }),
       P(GEO.sphereLo, g, M(0.2, 0.26, 0.06, { s: 0.06 }), true, { name: 'armL' }),
       P(GEO.sphereLo, g, M(-0.2, 0.26, 0.06, { s: 0.06 }), true, { name: 'armR' }),
       P(GEO.cyl, PALETTE.wood, pivotMatrix(-0.22, 0.26, 0.06, 0.5, 0, 0.35, 0, 0.14, 0, 0.03, 0.3, 0.03), true, { name: 'club' }),
-      P(GEO.sphereLo, PALETTE.woodLight, pivotMatrix(-0.22, 0.26, 0.06, 0.5, 0, 0.35, 0, 0.3, 0, 0.06, 0.06, 0.06), true, { name: 'clubHead' }),
-      // eye glints, a buckle and loincloth, a leather wrap on the club grip
-      P(GEO.bead, PALETTE.cream, M(0.108, 0.556, 0.262, { s: 0.009 }), false, { unlit: true }),
-      P(GEO.bead, PALETTE.cream, M(-0.072, 0.556, 0.262, { s: 0.009 }), false, { unlit: true }),
-      P(GEO.box, PALETTE.gold, M(0, 0.16, 0.195, { sx: 0.06, sy: 0.05, sz: 0.02 }), false),
-      P(GEO.box, PALETTE.capBrown, M(0.02, 0.1, 0.17, { sx: 0.12, sy: 0.09, sz: 0.02, rz: 0.08 }), false),
-      P(GEO.cyl, PALETTE.capBrown, pivotMatrix(-0.22, 0.26, 0.06, 0.5, 0, 0.35, 0, 0.08, 0, 0.038, 0.06, 0.038), false),
-      P(GEO.cone, PALETTE.cream, pivotMatrix(-0.22, 0.26, 0.06, 0.5, 0, 0.35, 0.05, 0.33, 0, 0.018, 0.05, 0.018), false),
+      P(GEO.sphereLo, PALETTE.woodLight, pivotMatrix(-0.22, 0.26, 0.06, 0.5, 0, 0.35, 0, 0.3, 0, 0.065, 0.065, 0.065), true, { name: 'clubHead' }),
+      P(GEO.cone, PALETTE.steelDark, pivotMatrix(-0.22, 0.26, 0.06, 0.5, 0, 0.35, 0.05, 0.33, 0, 0.018, 0.05, 0.018), false),
+      P(GEO.cone, PALETTE.steelDark, pivotMatrix(-0.22, 0.26, 0.06, 0.5, 0, 0.35, -0.05, 0.3, 0.02, 0.018, 0.05, 0.018), false),
+      // a stolen coin pouch on the belt
+      P(GEO.sphereLo, PALETTE.acorn, M(0.17, 0.12, 0.1, { s: 0.055 }), true),
     ];
   }
 
-  // Bramblecast Warden: a hedge-wizard in a tall hood, staff topped with a
-  // thorn ball, standing in a ring of brambles. Faces +z. Silhouette: hood + staff.
+  // Pitchpot Friar: a round, jolly friar in a brown habit with a tonsure,
+  // swinging a smoking pot of pitch on a long ladle, his own little cauldron
+  // bubbling on a fire beside him. Faces +z. Silhouette: the round belly and
+  // the cauldron.
   function wardenParts() {
-    const cloak = PALETTE.cloak, hood = PALETTE.cloakDark;
+    const h = PALETTE.habit;
     return [
-      P(GEO.cyl, PALETTE.stoneDark, M(0, 0.06, 0, { sx: 0.38, sy: 0.12, sz: 0.38 }), true, { name: 'pad' }),
-      P(GEO.torus, PALETTE.cloakDark, M(0, 0.14, 0, { sx: 0.34, sy: 0.34, sz: 0.34, rx: Math.PI / 2 }), true, { name: 'brambles' }),
-      P(GEO.cone, PALETTE.magic, M(0.3, 0.2, 0.12, { sx: 0.04, sy: 0.12, sz: 0.04, rz: -0.5 }), false),
-      P(GEO.cone, PALETTE.magic, M(-0.26, 0.2, -0.2, { sx: 0.04, sy: 0.1, sz: 0.04, rz: 0.4 }), false),
-      P(GEO.cone, PALETTE.magic, M(-0.1, 0.2, 0.32, { sx: 0.04, sy: 0.11, sz: 0.04, rx: 0.4 }), false),
-      P(GEO.cone, cloak, M(0, 0.5, 0, { sx: 0.3, sy: 0.75, sz: 0.28 }), true, { name: 'body' }),
-      P(GEO.sphere, PALETTE.skin, M(0, 0.78, 0.06, { s: 0.17 }), true, { name: 'head' }),
-      P(GEO.sphereLo, PALETTE.cream, M(0, 0.68, 0.16, { sx: 0.12, sy: 0.14, sz: 0.09 }), true, { name: 'beard' }),
-      P(GEO.sphereLo, 0xf0a98a, M(0, 0.79, 0.22, { s: 0.045 }), false),
-      P(GEO.cone, hood, M(0, 1.02, -0.02, { sx: 0.27, sy: 0.62, sz: 0.27, rx: 0.12 }), true, { name: 'hood' }),
-      P(GEO.sphereLo, hood, M(0, 0.86, 0.04, { sx: 0.26, sy: 0.14, sz: 0.26 }), true, { name: 'hoodRim' }),
-      // eyes glinting under the hood, a rope belt, leaves on the hood rim
-      P(GEO.bead, PALETTE.outline, M(0.06, 0.82, 0.2, { s: 0.024 }), false),
-      P(GEO.bead, PALETTE.outline, M(-0.06, 0.82, 0.2, { s: 0.024 }), false),
-      P(GEO.bead, PALETTE.cream, M(0.066, 0.83, 0.219, { s: 0.009 }), false),
-      P(GEO.bead, PALETTE.cream, M(-0.054, 0.83, 0.219, { s: 0.009 }), false),
-      P(GEO.ring, PALETTE.woodLight, M(0, 0.42, 0, { sx: 0.19, sy: 0.18, sz: 0.19, rx: Math.PI / 2 }), false),
-      P(GEO.bead, PALETTE.woodLight, M(0.06, 0.4, 0.17, { s: 0.03 }), false),
-      P(GEO.cyl, PALETTE.woodLight, M(0.07, 0.33, 0.17, { sx: 0.012, sy: 0.12, sz: 0.012, rz: 0.2 }), false),
-      P(GEO.sphereLo, PALETTE.meadowLight, M(0.2, 0.9, 0.1, { sx: 0.07, sy: 0.02, sz: 0.04, ry: -0.6 }), false),
-      P(GEO.sphereLo, PALETTE.meadow, M(-0.19, 0.92, 0.1, { sx: 0.06, sy: 0.02, sz: 0.035, ry: 0.6 }), false),
-      P(GEO.sphereLo, PALETTE.meadowLight, M(-0.05, 0.93, 0.21, { sx: 0.05, sy: 0.018, sz: 0.03 }), false),
-      P(GEO.cyl, PALETTE.wood, M(0.3, 0.55, 0.16, { sx: 0.035, sy: 0.95, sz: 0.035, rz: -0.1 }), true, { name: 'staff', live: true }),
-      P(GEO.sphereLo, PALETTE.magic, M(0.34, 1.06, 0.16, { s: 0.11 }), true, { name: 'thornBall', live: true }),
-      P(GEO.cone, PALETTE.magic, M(0.34, 1.2, 0.16, { sx: 0.03, sy: 0.1, sz: 0.03 }), false, { name: 'thorn1', live: true }),
-      P(GEO.cone, PALETTE.magic, M(0.44, 1.08, 0.16, { sx: 0.03, sy: 0.1, sz: 0.03, rz: -1.3 }), false, { name: 'thorn2', live: true }),
+      ...dais(),
+      // the cauldron on its fire
+      P(GEO.cylTaper, PALETTE.pitch, M(-0.22, 0.24, 0.18, { sx: 0.13, sy: 0.16, sz: 0.13, rx: Math.PI }), true, { name: 'cauldron' }),
+      P(GEO.torus, PALETTE.steelDark, M(-0.22, 0.32, 0.18, { s: 0.12, rx: Math.PI / 2 }), false),
+      P(GEO.cyl, 0x3a2e26, M(-0.22, 0.31, 0.18, { sx: 0.1, sy: 0.02, sz: 0.1 }), false, { name: 'brew', live: true }),
+      P(GEO.cone, PALETTE.ember, M(-0.22, 0.17, 0.18, { sx: 0.07, sy: 0.12, sz: 0.07 }), false, { name: 'flame', live: true, unlit: true }),
+      P(GEO.cyl, PALETTE.wood, M(-0.16, 0.14, 0.24, { sx: 0.02, sy: 0.16, sz: 0.02, rz: 1.3 }), false),
+      P(GEO.cyl, PALETTE.wood, M(-0.28, 0.14, 0.12, { sx: 0.02, sy: 0.16, sz: 0.02, rx: 1.3 }), false),
+      // the friar: a round habit, a rope belt, sandals
+      P(GEO.sphereLo, h, M(0.04, 0.4, -0.02, { sx: 0.28, sy: 0.3, sz: 0.26 }), true, { name: 'body' }),
+      P(GEO.cylTaper, h, M(0.04, 0.2, -0.02, { sx: 0.25, sy: 0.16, sz: 0.24 }), false),
+      P(GEO.ring, PALETTE.straw, M(0.04, 0.38, -0.02, { sx: 0.27, sy: 0.26, sz: 0.27, rx: Math.PI / 2 }), false),
+      P(GEO.cyl, PALETTE.straw, M(0.12, 0.28, 0.22, { sx: 0.012, sy: 0.16, sz: 0.012 }), false),
+      P(GEO.bead, PALETTE.straw, M(0.12, 0.19, 0.22, { s: 0.022 }), false),
+      P(GEO.sphereLo, PALETTE.acornCap, M(0.04, 0.6, -0.1, { sx: 0.24, sy: 0.08, sz: 0.2 }), false),
+      // round face, rosy cheeks, the tonsure ring of hair
+      P(GEO.sphere, PALETTE.skin, M(0.04, 0.78, 0.02, { s: 0.19 }), true, { name: 'head' }),
+      P(GEO.torus, PALETTE.woodLight, M(0.04, 0.84, 0.02, { sx: 0.17, sy: 0.17, sz: 0.3, rx: Math.PI / 2 }), false),
+      ...eyes(0.8, 0.19, 0.065).map((p) => ({ ...p, m: new THREE.Matrix4().makeTranslation(0.04, 0, 0).multiply(p.m) })),
+      P(GEO.sphereLo, 0xe08c76, M(0.15, 0.73, 0.15, { sx: 0.045, sy: 0.03, sz: 0.02 }), false),
+      P(GEO.sphereLo, 0xe08c76, M(-0.07, 0.73, 0.15, { sx: 0.045, sy: 0.03, sz: 0.02 }), false),
+      P(GEO.bead, 0xe9a283, M(0.04, 0.76, 0.21, { s: 0.042 }), false),
+      P(GEO.box, PALETTE.outline, M(0.04, 0.69, 0.18, { sx: 0.08, sy: 0.014, sz: 0.01, rz: 0 }), false),
+      P(GEO.sphereLo, h, M(0.29, 0.46, 0.08, { s: 0.08 }), true),
+      // the long ladle with its pot of pitch, a wisp of flame on top
+      P(GEO.cyl, PALETTE.wood, M(0.32, 0.72, 0.1, { sx: 0.025, sy: 0.7, sz: 0.025, rz: -0.25 }), true, { name: 'staff', live: true }),
+      P(GEO.sphereLo, PALETTE.pitch, M(0.41, 1.08, 0.1, { s: 0.11 }), true, { name: 'thornBall', live: true }),
+      P(GEO.torus, PALETTE.steelDark, M(0.41, 1.17, 0.1, { s: 0.07, rx: Math.PI / 2 }), false, { name: 'thorn1', live: true }),
+      P(GEO.cone, PALETTE.ember, M(0.41, 1.25, 0.1, { sx: 0.04, sy: 0.1, sz: 0.04 }), false, { name: 'thorn2', live: true, unlit: true }),
     ];
   }
 
-  // Frostmoss Druid: pale robe, mossy antler crown, a frost orb hovering by
-  // one hand. Faces +z. Silhouette: antlers + the floating orb.
+  // Court Magus: a lanky court wizard in a starry purple robe and a tall
+  // blue hat, a long white beard, a crooked staff and a frost orb hovering
+  // by one hand. Faces +z. Silhouette: the tall bent hat and the orb.
   function druidParts() {
     return [
-      P(GEO.cyl, PALETTE.stoneDark, M(0, 0.06, 0, { sx: 0.38, sy: 0.12, sz: 0.38 }), true, { name: 'pad' }),
-      P(GEO.cyl, PALETTE.frost, M(0, 0.13, 0, { sx: 0.34, sy: 0.04, sz: 0.34 }), false, { name: 'padFrost' }),
-      P(GEO.cone, PALETTE.frostRobe, M(0, 0.48, 0, { sx: 0.28, sy: 0.7, sz: 0.26 }), true, { name: 'body' }),
-      P(GEO.sphere, PALETTE.skin, M(0, 0.78, 0.04, { s: 0.18 }), true, { name: 'head' }),
-      P(GEO.sphereLo, PALETTE.moss, M(0, 0.92, -0.02, { sx: 0.2, sy: 0.1, sz: 0.2 }), true, { name: 'mossHair' }),
-      P(GEO.sphereLo, PALETTE.cream, M(0, 0.66, 0.15, { sx: 0.11, sy: 0.16, sz: 0.08 }), true, { name: 'beard' }),
-      P(GEO.sphereLo, 0xf0a98a, M(0, 0.79, 0.21, { s: 0.045 }), false),
-      // antlers
-      P(GEO.bead, PALETTE.outline, M(0.06, 0.82, 0.19, { s: 0.024 }), false),
-      P(GEO.bead, PALETTE.outline, M(-0.06, 0.82, 0.19, { s: 0.024 }), false),
-      P(GEO.bead, PALETTE.cream, M(0.066, 0.83, 0.209, { s: 0.009 }), false),
-      P(GEO.bead, PALETTE.cream, M(-0.054, 0.83, 0.209, { s: 0.009 }), false),
-      // a moss sash, leaves in the moss hair, frost crystals on the pad
-      P(GEO.ring, PALETTE.moss, M(0, 0.4, 0, { sx: 0.18, sy: 0.17, sz: 0.18, rx: Math.PI / 2 }), false),
-      P(GEO.sphereLo, PALETTE.moss, M(-0.08, 0.38, 0.15, { sx: 0.04, sy: 0.06, sz: 0.02 }), false),
-      P(GEO.sphereLo, PALETTE.meadowLight, M(0.12, 0.95, 0.04, { sx: 0.06, sy: 0.018, sz: 0.035, ry: -0.5 }), false),
-      P(GEO.bead, PALETTE.flowerPink, M(-0.1, 0.96, 0.08, { s: 0.028 }), false),
-      P(GEO.cone, PALETTE.frost, M(-0.26, 0.2, 0.14, { sx: 0.035, sy: 0.12, sz: 0.035, rz: 0.3 }), false),
-      P(GEO.cone, PALETTE.frost, M(-0.2, 0.18, 0.22, { sx: 0.025, sy: 0.08, sz: 0.025, rx: 0.4 }), false),
-      P(GEO.cone, PALETTE.frost, M(0.18, 0.18, -0.24, { sx: 0.03, sy: 0.1, sz: 0.03, rx: -0.3 }), false),
-      // antlers: two forked twigs
-      P(GEO.cyl, PALETTE.wood, M(0.12, 1.08, -0.02, { sx: 0.025, sy: 0.3, sz: 0.025, rz: -0.35 }), true, { name: 'antlerL' }),
-      P(GEO.cyl, PALETTE.wood, M(0.2, 1.2, -0.02, { sx: 0.02, sy: 0.16, sz: 0.02, rz: -1.1 }), true),
-      P(GEO.cyl, PALETTE.wood, M(-0.12, 1.08, -0.02, { sx: 0.025, sy: 0.3, sz: 0.025, rz: 0.35 }), true, { name: 'antlerR' }),
-      P(GEO.cyl, PALETTE.wood, M(-0.2, 1.2, -0.02, { sx: 0.02, sy: 0.16, sz: 0.02, rz: 1.1 }), true),
-      P(GEO.sphereLo, PALETTE.frostRobe, M(0.26, 0.5, 0.14, { s: 0.06 }), true, { name: 'hand' }),
-      P(GEO.sphereLo, PALETTE.frost, M(0.3, 0.72, 0.18, { s: 0.1 }), false, { name: 'orb', live: true, unlit: true }),
-      P(GEO.sphereLo, PALETTE.cream, M(0.3, 0.72, 0.18, { s: 0.05 }), false, { name: 'orbCore', live: true, unlit: true }),
+      ...dais(),
+      P(GEO.cyl, PALETTE.frost, M(0, 0.14, 0, { sx: 0.3, sy: 0.012, sz: 0.3 }), false, { name: 'padFrost' }),
+      P(GEO.cone, PALETTE.magic, M(0, 0.48, 0, { sx: 0.28, sy: 0.72, sz: 0.26 }), true, { name: 'body' }),
+      P(GEO.ring, PALETTE.gold, M(0, 0.18, 0, { sx: 0.26, sy: 0.24, sz: 0.26, rx: Math.PI / 2 }), false),
+      P(GEO.bead, PALETTE.gold, M(0.1, 0.32, 0.17, { s: 0.025 }), false),
+      P(GEO.bead, PALETTE.gold, M(-0.12, 0.25, 0.15, { s: 0.02 }), false),
+      P(GEO.bead, PALETTE.gold, M(0.02, 0.5, 0.13, { s: 0.022 }), false),
+      P(GEO.sphere, PALETTE.skin, M(0, 0.8, 0.04, { s: 0.17 }), true, { name: 'head' }),
+      ...eyes(0.83, 0.19, 0.06, 0.024),
+      P(GEO.box, PALETTE.cream, M(0.06, 0.88, 0.18, { sx: 0.07, sy: 0.022, sz: 0.02, rz: -0.25 }), false),
+      P(GEO.box, PALETTE.cream, M(-0.06, 0.88, 0.18, { sx: 0.07, sy: 0.022, sz: 0.02, rz: 0.25 }), false),
+      P(GEO.bead, 0xe9a283, M(0, 0.79, 0.21, { s: 0.04 }), false),
+      // the long beard, past his belt
+      P(GEO.cone, PALETTE.cream, M(0, 0.58, 0.15, { sx: 0.13, sy: 0.36, sz: 0.07, rx: Math.PI + 0.15 }), true, { name: 'beard' }),
+      // the tall hat, bent at the tip, with a gold band and stars
+      P(GEO.cyl, PALETTE.tunic, M(0, 0.92, 0.02, { sx: 0.3, sy: 0.03, sz: 0.3 }), true, { name: 'brim', live: true }),
+      P(GEO.cone, PALETTE.tunic, M(0.03, 1.2, 0.0, { sx: 0.2, sy: 0.58, sz: 0.2, rz: -0.12 }), true, { name: 'hat', live: true }),
+      P(GEO.cone, PALETTE.tunic, M(0.16, 1.5, 0.0, { sx: 0.07, sy: 0.18, sz: 0.07, rz: -0.9 }), true, { name: 'hatTip', live: true }),
+      P(GEO.ring, PALETTE.gold, M(0.0, 0.98, 0.02, { sx: 0.18, sy: 0.18, sz: 0.18, rx: Math.PI / 2 }), false),
+      P(GEO.bead, PALETTE.gold, M(0.05, 1.12, 0.14, { s: 0.03 }), false),
+      P(GEO.bead, PALETTE.gold, M(-0.06, 1.24, 0.1, { s: 0.024 }), false),
+      // the crooked staff in the other hand
+      P(GEO.cyl, PALETTE.wood, M(-0.27, 0.6, 0.12, { sx: 0.028, sy: 1.0, sz: 0.028 }), true),
+      P(GEO.torus, PALETTE.wood, M(-0.21, 1.12, 0.12, { sx: 0.07, sy: 0.07, sz: 0.25 }), false),
+      P(GEO.sphereLo, PALETTE.magic, M(-0.27, 0.62, 0.15, { s: 0.055 }), true),
+      P(GEO.sphereLo, PALETTE.magic, M(0.26, 0.5, 0.14, { s: 0.06 }), true, { name: 'hand' }),
+      P(GEO.sphereLo, PALETTE.frost, M(0.3, 0.74, 0.18, { s: 0.1 }), false, { name: 'orb', live: true, unlit: true }),
+      P(GEO.sphereLo, PALETTE.cream, M(0.3, 0.74, 0.18, { s: 0.05 }), false, { name: 'orbCore', live: true, unlit: true }),
+      P(GEO.cone, PALETTE.frost, M(-0.24, 0.2, 0.2, { sx: 0.03, sy: 0.1, sz: 0.03, rz: 0.3 }), false),
+      P(GEO.cone, PALETTE.frost, M(0.2, 0.18, -0.22, { sx: 0.03, sy: 0.09, sz: 0.03, rx: -0.3 }), false),
     ];
   }
 
-  // Stonebark Golem: a squat boulder-and-bark brute with huge fists and a
-  // tiny head. Faces +z. Silhouette: wide shoulders, fists on the ground.
+  // Hammer Knight: a broad knight in full plate under a royal-blue tabard,
+  // a bucket great-helm with a gold crest, a kite shield slung on his back
+  // and a huge warhammer in both fists. Faces +z. Silhouette: the square
+  // helm, the wide pauldrons and the hammer.
+  // The hammer and fists swing as one piece from a pivot at the shoulders;
+  // hammerPose() places them for any swing angle (0.5 is the ready stance).
+  const HAMMER_PIVOT = [0, 0.62, 0.06];
+  const HAMMER_POSE = {
+    handle: [0, 0.2, 0.3, 0.035, 0.6, 0.035],
+    hammerHead: [0, 0.52, 0.3, 0.3, 0.18, 0.18],
+    fistL: [0.07, 0.0, 0.3, 0.075, 0.075, 0.075],
+    fistR: [-0.07, 0.06, 0.3, 0.075, 0.075, 0.075],
+  };
+  function hammerPose(name, angle, out) {
+    const [ox, oy, oz, sx, sy, sz] = HAMMER_POSE[name];
+    return pivotMatrix(HAMMER_PIVOT[0], HAMMER_PIVOT[1], HAMMER_PIVOT[2], angle, 0, 0, ox, oy, oz, sx, sy, sz, out);
+  }
   function golemParts() {
-    const bark = PALETTE.earth, stone = PALETTE.stone;
+    const st = PALETTE.steel, sd = PALETTE.steelDark;
     return [
-      P(GEO.rock, stone, M(0, 0.36, 0, { sx: 0.34, sy: 0.32, sz: 0.3 }), true, { name: 'body' }),
-      P(GEO.box, bark, M(0, 0.62, 0, { sx: 0.56, sy: 0.2, sz: 0.42, ry: 0.1 }), true, { name: 'shoulders', live: true }),
-      P(GEO.sphereLo, PALETTE.moss, M(-0.2, 0.74, -0.04, { sx: 0.16, sy: 0.07, sz: 0.14 }), false),
-      P(GEO.sphereLo, PALETTE.moss, M(0.16, 0.73, 0.08, { sx: 0.12, sy: 0.06, sz: 0.12 }), false),
-      P(GEO.box, stone, M(0, 0.82, 0.06, { sx: 0.18, sy: 0.16, sz: 0.16 }), true, { name: 'head' }),
-      P(GEO.bead, PALETTE.gold, M(0.05, 0.84, 0.15, { s: 0.03 }), false, { unlit: true }),
-      P(GEO.bead, PALETTE.gold, M(-0.05, 0.84, 0.15, { s: 0.03 }), false, { unlit: true }),
-      P(GEO.cyl, bark, M(0.34, 0.5, 0.08, { sx: 0.08, sy: 0.4, sz: 0.08, rz: -0.35 }), true, { name: 'armL', live: true }),
-      P(GEO.cyl, bark, M(-0.34, 0.5, 0.08, { sx: 0.08, sy: 0.4, sz: 0.08, rz: 0.35 }), true, { name: 'armR', live: true }),
-      P(GEO.rock, stone, M(0.42, 0.22, 0.14, { s: 0.17 }), true, { name: 'fistL', live: true }),
-      P(GEO.rock, stone, M(-0.42, 0.22, 0.14, { s: 0.17 }), true, { name: 'fistR', live: true }),
-      P(GEO.cone, PALETTE.meadowLight, M(0.1, 0.78, -0.12, { sx: 0.04, sy: 0.14, sz: 0.04, rz: -0.3 }), false),
-      // gold seams in the stone, more moss, and a small flower growing on its head
-      P(GEO.box, PALETTE.gold, M(0.1, 0.38, 0.27, { sx: 0.1, sy: 0.018, sz: 0.02, rz: 0.5 }), false),
-      P(GEO.box, PALETTE.gold, M(-0.12, 0.3, 0.26, { sx: 0.08, sy: 0.018, sz: 0.02, rz: -0.4 }), false),
-      P(GEO.sphereLo, PALETTE.moss, M(-0.18, 0.5, 0.18, { sx: 0.1, sy: 0.05, sz: 0.08 }), false),
-      P(GEO.sphereLo, PALETTE.meadowLight, M(0.2, 0.22, 0.2, { sx: 0.08, sy: 0.04, sz: 0.06 }), false),
-      P(GEO.cyl, PALETTE.meadowDark, M(-0.04, 0.95, 0.06, { sx: 0.012, sy: 0.08, sz: 0.012 }), false),
-      P(GEO.sphereLo, PALETTE.flowerYellow, M(-0.04, 1.0, 0.06, { sx: 0.035, sy: 0.02, sz: 0.035 }), false),
-      P(GEO.box, PALETTE.stoneDark, M(0, 0.84, 0.148, { sx: 0.13, sy: 0.02, sz: 0.01 }), false),
+      ...dais(),
+      P(GEO.box, sd, M(0.11, 0.2, 0.04, { sx: 0.13, sy: 0.12, sz: 0.2 }), true),
+      P(GEO.box, sd, M(-0.11, 0.2, 0.04, { sx: 0.13, sy: 0.12, sz: 0.2 }), true),
+      P(GEO.cylTaper, st, M(0, 0.36, 0, { sx: 0.27, sy: 0.24, sz: 0.24, rx: Math.PI }), true),
+      P(GEO.sphereLo, st, M(0, 0.5, -0.01, { sx: 0.3, sy: 0.24, sz: 0.25 }), true, { name: 'body' }),
+      P(GEO.box, PALETTE.tunic, M(0, 0.42, 0.2, { sx: 0.26, sy: 0.3, sz: 0.06 }), false),
+      P(GEO.box, PALETTE.gold, M(0, 0.47, 0.235, { sx: 0.07, sy: 0.07, sz: 0.01, rz: Math.PI / 4 }), false),
+      P(GEO.box, PALETTE.gold, M(0, 0.28, 0.232, { sx: 0.26, sy: 0.025, sz: 0.01 }), false),
+      // pauldrons
+      P(GEO.sphereLo, st, M(0.26, 0.64, 0, { sx: 0.15, sy: 0.11, sz: 0.15 }), true, { name: 'shoulders', live: true }),
+      P(GEO.sphereLo, st, M(-0.26, 0.64, 0, { sx: 0.15, sy: 0.11, sz: 0.15 }), true, { name: 'shoulders2', live: true }),
+      P(GEO.ring, PALETTE.gold, M(0.26, 0.6, 0, { s: 0.14, rx: Math.PI / 2 }), false),
+      P(GEO.ring, PALETTE.gold, M(-0.26, 0.6, 0, { s: 0.14, rx: Math.PI / 2 }), false),
+      // the great helm, eye slit and breaths, a gold crest on top
+      P(GEO.cyl, st, M(0, 0.86, 0.02, { sx: 0.17, sy: 0.27, sz: 0.17 }), true, { name: 'head' }),
+      P(GEO.dome, st, M(0, 0.995, 0.02, { sx: 0.17, sy: 0.06, sz: 0.17 }), false),
+      P(GEO.box, PALETTE.outline, M(0, 0.9, 0.19, { sx: 0.24, sy: 0.03, sz: 0.01 }), false, { unlit: true }),
+      P(GEO.box, PALETTE.outline, M(0, 0.84, 0.19, { sx: 0.012, sy: 0.08, sz: 0.01 }), false, { unlit: true }),
+      P(GEO.bead, PALETTE.gold, M(0.05, 0.79, 0.188, { s: 0.012 }), false),
+      P(GEO.bead, PALETTE.gold, M(-0.05, 0.79, 0.188, { s: 0.012 }), false),
+      P(GEO.box, PALETTE.gold, M(0, 1.06, 0.0, { sx: 0.035, sy: 0.12, sz: 0.24 }), true, { name: 'crest', live: true }),
+      // the kite shield slung on his back
+      P(GEO.box, PALETTE.tunic, M(0, 0.55, -0.27, { sx: 0.32, sy: 0.4, sz: 0.04 })),
+      P(GEO.box, PALETTE.gold, M(0, 0.55, -0.295, { sx: 0.05, sy: 0.36, sz: 0.01 }), false),
+      // arms down to the swinging fists
+      P(GEO.cyl, st, M(0.28, 0.5, 0.12, { sx: 0.065, sy: 0.24, sz: 0.065, rx: 0.9 }), true, { name: 'armL', live: true }),
+      P(GEO.cyl, st, M(-0.28, 0.5, 0.12, { sx: 0.065, sy: 0.24, sz: 0.065, rx: 0.9 }), true, { name: 'armR', live: true }),
+      P(GEO.cyl, PALETTE.wood, hammerPose('handle', 0.5), true, { name: 'handle', live: true }),
+      P(GEO.box, 0x4e535c, hammerPose('hammerHead', 0.5), true, { name: 'hammerHead', live: true }),
+      P(GEO.sphereLo, sd, hammerPose('fistL', 0.5), true, { name: 'fistL', live: true }),
+      P(GEO.sphereLo, sd, hammerPose('fistR', 0.5), true, { name: 'fistR', live: true }),
     ];
   }
 
-  // Acorn Artillery: a log mortar on a wheeled wooden frame with a giant
-  // acorn loaded. Faces +z. Silhouette: the tilted barrel and the wheels.
+  // Longbowman: a hooded yeoman in forest green with a feather in his
+  // hood, a quiver at his hip and a longbow taller than he is. Faces +z.
+  // Silhouette: the tall bow arc.
   function artilleryParts() {
-    const wood = PALETTE.wood, light = PALETTE.woodLight;
+    const c = PALETTE.cloak, cd = PALETTE.cloakDark;
     return [
-      P(GEO.box, wood, M(0, 0.16, 0, { sx: 0.5, sy: 0.1, sz: 0.5 }), true, { name: 'frame' }),
-      P(GEO.cyl, light, M(0.3, 0.16, 0, { sx: 0.17, sy: 0.06, sz: 0.17, rz: Math.PI / 2 }), true, { name: 'wheelL' }),
-      P(GEO.cyl, light, M(-0.3, 0.16, 0, { sx: 0.17, sy: 0.06, sz: 0.17, rz: Math.PI / 2 }), true, { name: 'wheelR' }),
-      P(GEO.box, wood, M(0, 0.3, -0.1, { sx: 0.3, sy: 0.22, sz: 0.2 }), true, { name: 'mount' }),
-      P(GEO.cyl, light, M(0, 0.5, 0.1, { sx: 0.13, sy: 0.62, sz: 0.13, rx: -0.85 }), true, { name: 'barrel', live: true }),
-      P(GEO.cyl, wood, M(0, 0.5, 0.1, { sx: 0.15, sy: 0.12, sz: 0.15, rx: -0.85 }), true, { name: 'band', live: true }),
-      P(GEO.sphereLo, PALETTE.acorn, M(0, 0.72, 0.36, { sx: 0.11, sy: 0.13, sz: 0.11, rx: -0.85 }), true, { name: 'loaded', live: true }),
-      P(GEO.dome, PALETTE.acornCap, M(0, 0.79, 0.4, { sx: 0.12, sy: 0.06, sz: 0.12, rx: -0.85 }), true, { name: 'loadedCap', live: true }),
-      P(GEO.sphereLo, PALETTE.acorn, M(-0.3, 0.3, 0.22, { sx: 0.09, sy: 0.11, sz: 0.09 }), true),
-      P(GEO.sphereLo, PALETTE.acorn, M(-0.2, 0.3, 0.3, { sx: 0.09, sy: 0.11, sz: 0.09 }), true),
-      P(GEO.sphereLo, PALETTE.acorn, M(-0.25, 0.44, 0.26, { sx: 0.09, sy: 0.11, sz: 0.09 }), true),
-      // wheel hubs and spokes, iron straps and rivets on the frame
-      P(GEO.cyl, PALETTE.stoneDark, M(0.34, 0.16, 0, { sx: 0.05, sy: 0.04, sz: 0.05, rz: Math.PI / 2 }), false),
-      P(GEO.cyl, PALETTE.stoneDark, M(-0.34, 0.16, 0, { sx: 0.05, sy: 0.04, sz: 0.05, rz: Math.PI / 2 }), false),
-      P(GEO.box, PALETTE.wood, M(0.335, 0.16, 0, { sx: 0.01, sy: 0.3, sz: 0.03 }), false),
-      P(GEO.box, PALETTE.wood, M(0.335, 0.16, 0, { sx: 0.01, sy: 0.03, sz: 0.3 }), false),
-      P(GEO.box, PALETTE.wood, M(-0.335, 0.16, 0, { sx: 0.01, sy: 0.3, sz: 0.03 }), false),
-      P(GEO.box, PALETTE.wood, M(-0.335, 0.16, 0, { sx: 0.01, sy: 0.03, sz: 0.3 }), false),
-      P(GEO.box, PALETTE.stoneDark, M(0, 0.165, 0.18, { sx: 0.52, sy: 0.11, sz: 0.04 }), false),
-      P(GEO.box, PALETTE.stoneDark, M(0, 0.165, -0.18, { sx: 0.52, sy: 0.11, sz: 0.04 }), false),
-      P(GEO.bead, PALETTE.gold, M(0.2, 0.17, 0.205, { s: 0.018 }), false),
-      P(GEO.bead, PALETTE.gold, M(-0.2, 0.17, 0.205, { s: 0.018 }), false),
-      P(GEO.bead, PALETTE.gold, M(0, 0.17, 0.205, { s: 0.018 }), false),
-      P(GEO.dome, PALETTE.acornCap, M(-0.25, 0.51, 0.26, { sx: 0.09, sy: 0.05, sz: 0.09 }), false),
+      ...dais(),
+      // a barrel of spare arrows at his side
+      P(GEO.cyl, PALETTE.wood, M(-0.25, 0.25, -0.12, { sx: 0.1, sy: 0.24, sz: 0.1 }), true),
+      P(GEO.ring, PALETTE.steelDark, M(-0.25, 0.32, -0.12, { s: 0.1, rx: Math.PI / 2 }), false),
+      ...[0, 1, 2, 3].map((i) => P(GEO.cyl, PALETTE.woodLight, M(-0.25 + (i % 2 - 0.5) * 0.06, 0.48, -0.12 + (i > 1 ? 0.03 : -0.03), { sx: 0.01, sy: 0.24, sz: 0.01, rz: (i - 1.5) * 0.12 }), false)),
+      ...[0, 1, 2].map((i) => P(GEO.box, PALETTE.cream, M(-0.25 + (i - 1) * 0.04, 0.6, -0.12, { sx: 0.03, sy: 0.06, sz: 0.005 }), false)),
+      P(GEO.sphereLo, cd, M(0.09, 0.18, 0.04, { sx: 0.08, sy: 0.06, sz: 0.11 }), true),
+      P(GEO.sphereLo, cd, M(-0.09, 0.18, 0.04, { sx: 0.08, sy: 0.06, sz: 0.11 }), true),
+      P(GEO.cylTaper, c, M(0, 0.32, 0, { sx: 0.22, sy: 0.22, sz: 0.2, rx: Math.PI }), false),
+      P(GEO.sphereLo, c, M(0, 0.46, 0, { sx: 0.22, sy: 0.24, sz: 0.2 }), true, { name: 'body' }),
+      P(GEO.cyl, PALETTE.acornCap, M(0, 0.36, 0, { sx: 0.21, sy: 0.04, sz: 0.19 }), false),
+      P(GEO.box, PALETTE.gold, M(0, 0.36, 0.19, { sx: 0.05, sy: 0.045, sz: 0.02 }), false),
+      // head and the pointed green hood with its feather
+      P(GEO.sphere, PALETTE.skin, M(0, 0.76, 0.04, { s: 0.17 }), true, { name: 'head' }),
+      ...eyes(0.78, 0.19, 0.06, 0.024),
+      P(GEO.bead, 0xe9a283, M(0, 0.74, 0.21, { s: 0.036 }), false),
+      P(GEO.box, PALETTE.acornCap, M(0, 0.68, 0.18, { sx: 0.1, sy: 0.04, sz: 0.02 }), false),
+      P(GEO.sphereLo, c, M(0, 0.82, -0.02, { sx: 0.2, sy: 0.19, sz: 0.2 }), true, { name: 'hood' }),
+      P(GEO.cone, c, M(0, 1.02, -0.1, { sx: 0.13, sy: 0.3, sz: 0.13, rx: -0.55 }), true, { name: 'hat', live: true }),
+      P(GEO.sphereLo, PALETTE.capRed, M(0.14, 0.98, -0.02, { sx: 0.025, sy: 0.16, sz: 0.04, rz: -0.5 }), true, { name: 'feather', live: true }),
+      P(GEO.sphereLo, cd, M(0, 0.66, 0.0, { sx: 0.2, sy: 0.06, sz: 0.19 }), false),
+      P(GEO.sphereLo, c, M(-0.2, 0.52, 0.12, { s: 0.06 }), true),
+      // the longbow, its string and a nocked arrow: all live so they draw and snap
+      P(GEO.bow, PALETTE.woodLight, M(0.16, 0.82, -0.22, { s: 0.58 }), true, { name: 'bow', live: true }),
+      P(GEO.box, PALETTE.cream, M(0.16, 0.82, -0.22 + 0.58 * 0.38, { sx: 0.008, sy: 0.58 * 1.84, sz: 0.008 }), false, { name: 'string', live: true, unlit: true }),
+      P(GEO.cyl, PALETTE.woodLight, M(0.16, 0.82, 0.2, { sx: 0.012, sy: 0.5, sz: 0.012, rx: Math.PI / 2 }), false, { name: 'arrow', live: true }),
+      P(GEO.cone, PALETTE.steel, M(0.16, 0.82, 0.47, { sx: 0.025, sy: 0.06, sz: 0.025, rx: Math.PI / 2 }), false, { name: 'arrowTip', live: true }),
     ];
   }
 
@@ -1031,78 +1110,85 @@ const Renderer = (() => {
   // reads by shape, not just color. All merged into the tower's mesh.
   const ring5 = (n, r, y, fn) => Array.from({ length: n }, (_, i) => { const a = (i / n) * Math.PI * 2; return fn(Math.cos(a) * r, y, Math.sin(a) * r, a, i); });
   const BRANCH_PARTS = {
+    // Huntsman: a red plume on the helm, a boar-spear on the back, a horn at the hip
     marksman: () => [
-      P(GEO.sphereLo, PALETTE.gold, M(-0.21, 1.08, -0.04, { sx: 0.045, sy: 0.22, sz: 0.05, rz: 0.4 })),
-      P(GEO.sphereLo, PALETTE.capRed, M(-0.27, 1.2, -0.05, { sx: 0.03, sy: 0.12, sz: 0.035, rz: 0.6 }), false),
-      P(GEO.ring, PALETTE.gold, M(0.075, 0.77, 0.212, { s: 0.036 }), false),
-      P(GEO.cyl, PALETTE.wood, M(-0.12, 0.5, -0.2, { sx: 0.06, sy: 0.34, sz: 0.06, rz: 0.25 })),
-      P(GEO.cone, PALETTE.cream, M(-0.17, 0.72, -0.2, { sx: 0.03, sy: 0.1, sz: 0.012, rz: 0.25 }), false),
-      P(GEO.cone, PALETTE.cream, M(-0.12, 0.73, -0.24, { sx: 0.03, sy: 0.1, sz: 0.012, rz: 0.2 }), false),
+      P(GEO.sphereLo, PALETTE.capRed, M(0, 1.05, -0.06, { sx: 0.05, sy: 0.14, sz: 0.11, rx: -0.4 })),
+      P(GEO.cyl, PALETTE.wood, M(0.05, 0.7, -0.24, { sx: 0.02, sy: 1.1, sz: 0.02, rz: -0.25 })),
+      P(GEO.cone, PALETTE.steel, M(0.2, 1.28, -0.24, { sx: 0.06, sy: 0.2, sz: 0.02, rz: -0.25 })),
+      P(GEO.box, PALETTE.steelDark, M(0.17, 1.15, -0.24, { sx: 0.14, sy: 0.02, sz: 0.02, rz: -0.25 }), false),
+      P(GEO.cylTaper, PALETTE.cream, M(0.22, 0.28, 0.08, { sx: 0.04, sy: 0.16, sz: 0.04, rz: 1.2 })),
     ],
+    // Skirmisher: a second javelin in the off hand and a full bundle on the back
     bloom: () => [
-      P(GEO.cyl, PALETTE.wood, M(-0.34, 0.66, 0.12, { sx: 0.045, sy: 0.42, sz: 0.045, rz: 0.12 })),
-      P(GEO.cyl, PALETTE.wood, M(-0.24, 1.0, 0.12, { sx: 0.035, sy: 0.34, sz: 0.035, rz: -0.6 })),
-      P(GEO.cyl, PALETTE.wood, M(-0.48, 1.0, 0.12, { sx: 0.035, sy: 0.34, sz: 0.035, rz: 0.6 })),
-      P(GEO.box, PALETTE.outline, M(-0.36, 1.13, 0.12, { sx: 0.3, sy: 0.025, sz: 0.025 }), false),
-      ...ring5(6, 0.24, 0.9, (x, y, z, a, i) => P(GEO.bead, i % 2 ? PALETTE.flowerYellow : PALETTE.flowerPink, M(x, y, z, { s: 0.045 }), false)),
+      P(GEO.cyl, PALETTE.woodLight, M(-0.32, 0.62, 0.14, { sx: 0.02, sy: 0.8, sz: 0.02, rx: 0.2 })),
+      P(GEO.cone, PALETTE.steel, M(-0.32, 1.03, 0.22, { sx: 0.03, sy: 0.09, sz: 0.03, rx: 0.2 }), false),
+      ...[0, 1, 2].map((i) => P(GEO.cyl, PALETTE.woodLight, M(-0.06 + i * 0.06, 0.7, -0.22, { sx: 0.014, sy: 0.6, sz: 0.014, rz: 0.2 - i * 0.2 }), false)),
+      P(GEO.ring, PALETTE.gold, M(0, 0.42, 0, { sx: 0.25, sy: 0.24, sz: 0.25, rx: Math.PI / 2 + 0.4 }), false),
     ],
-    thicket: () => ring5(7, 0.36, 0.2, (x, y, z, a) => P(GEO.cone, PALETTE.cloakDark, M(x, y + 0.08, z, { sx: 0.05, sy: 0.3, sz: 0.05, rz: -Math.cos(a) * 0.35, rx: Math.sin(a) * 0.35 }))),
+    // Tar Abbot: an abbot's mitre and a tar barrel at his feet
+    thicket: () => [
+      P(GEO.cone, PALETTE.cream, M(0.04, 1.04, 0.02, { sx: 0.15, sy: 0.3, sz: 0.1 })),
+      P(GEO.box, PALETTE.gold, M(0.04, 1.02, 0.11, { sx: 0.03, sy: 0.24, sz: 0.01 }), false),
+      P(GEO.cyl, PALETTE.wood, M(0.28, 0.24, -0.2, { sx: 0.12, sy: 0.24, sz: 0.12 })),
+      P(GEO.ring, PALETTE.steelDark, M(0.28, 0.18, -0.2, { s: 0.12, rx: Math.PI / 2 }), false),
+      P(GEO.ring, PALETTE.steelDark, M(0.28, 0.3, -0.2, { s: 0.12, rx: Math.PI / 2 }), false),
+      P(GEO.cyl, PALETTE.pitch, M(0.28, 0.365, -0.2, { sx: 0.1, sy: 0.01, sz: 0.1 }), false),
+    ],
+    // Firepot Friar: three lit pots ready round the dais, and a red scarf
     briarstorm: () => [
-      P(GEO.cone, PALETTE.magic, M(0, 1.42, 0.03, { sx: 0.07, sy: 0.16, sz: 0.07 })),
-      P(GEO.cone, PALETTE.magic, M(0, 1.3, 0.03, { sx: 0.07, sy: 0.1, sz: 0.07, rx: Math.PI }), false),
-      ...ring5(3, 0.25, 0.88, (x, y, z, a) => P(GEO.cone, PALETTE.magic, M(x, y, z, { sx: 0.03, sy: 0.14, sz: 0.03, rz: -Math.cos(a) * 1.2, rx: Math.sin(a) * 1.2 }), false)),
+      ...ring5(3, 0.3, 0.2, (x, y, z, a, i) => P(GEO.sphereLo, PALETTE.pitch, M(x, y, z + (i === 0 ? -0.1 : 0), { s: 0.07 }))),
+      ...ring5(3, 0.3, 0.3, (x, y, z, a, i) => P(GEO.cone, PALETTE.ember, M(x, y, z + (i === 0 ? -0.1 : 0), { sx: 0.03, sy: 0.08, sz: 0.03 }), false, { unlit: true })),
+      P(GEO.torus, PALETTE.capRed, M(0.04, 0.63, 0.0, { sx: 0.16, sy: 0.16, sz: 0.26, rx: Math.PI / 2 }), false),
     ],
+    // Winter Magus: a ring of frost on the ground with icicles around it
     hoarfrost: () => [
       P(GEO.torus, PALETTE.frost, M(0, 0.1, 0, { s: 0.46, rx: Math.PI / 2 }), false),
       ...ring5(6, 0.44, 0.14, (x, y, z, a) => P(GEO.cone, PALETTE.frost, M(x, y, z, { sx: 0.04, sy: 0.18, sz: 0.04, rz: -Math.cos(a) * 0.4, rx: Math.sin(a) * 0.4 }))),
     ],
+    // Star Seer: a crown of gold stars on the hat and a star atop the staff
     seer: () => [
-      ...ring5(5, 0.1, 1.02, (x, y, z, a) => P(GEO.cone, PALETTE.frost, M(x, y, z, { sx: 0.03, sy: 0.22, sz: 0.03, rz: -Math.cos(a) * 0.25, rx: Math.sin(a) * 0.25 }))),
-      P(GEO.cyl, PALETTE.frostRobe, M(-0.3, 0.55, 0.1, { sx: 0.025, sy: 0.9, sz: 0.025 })),
-      P(GEO.cone, PALETTE.frost, M(-0.3, 1.08, 0.1, { sx: 0.05, sy: 0.18, sz: 0.05 })),
+      ...ring5(5, 0.14, 1.04, (x, y, z, a) => P(GEO.cone, PALETTE.gold, M(x, y, z + 0.02, { sx: 0.025, sy: 0.12, sz: 0.025, rz: -Math.cos(a) * 0.5, rx: Math.sin(a) * 0.5 }), false)),
+      P(GEO.petals, PALETTE.gold, M(-0.27, 1.22, 0.12, { s: 0.14, rx: Math.PI / 2 })),
+      P(GEO.bead, PALETTE.cream, M(-0.27, 1.22, 0.13, { s: 0.03 }), false),
     ],
+    // Thunder Knight: the ground cracked into spurs around him, a gold bolt crest
     earthshaker: () => [
       ...ring5(6, 0.46, 0.06, (x, y, z, a, i) => P(GEO.rock, i % 2 ? PALETTE.stoneDark : PALETTE.stone, M(x, y, z, { sx: 0.1, sy: 0.14 + (i % 3) * 0.03, sz: 0.1, ry: a }))),
-      P(GEO.cone, PALETTE.stoneDark, M(0.12, 0.8, -0.22, { sx: 0.06, sy: 0.22, sz: 0.06, rx: -0.4 })),
-      P(GEO.cone, PALETTE.stoneDark, M(-0.12, 0.8, -0.22, { sx: 0.06, sy: 0.22, sz: 0.06, rx: -0.4 })),
+      P(GEO.cone, PALETTE.gold, M(0.1, 1.08, 0.0, { sx: 0.03, sy: 0.16, sz: 0.03, rz: -0.6 }), false),
+      P(GEO.cone, PALETTE.gold, M(-0.1, 1.08, 0.0, { sx: 0.03, sy: 0.16, sz: 0.03, rz: 0.6 }), false),
     ],
+    // Armorbreaker: spiked pauldrons and a gold crown on the helm
     mountainheart: () => [
-      P(GEO.cone, PALETTE.gold, M(0, 0.99, 0.06, { sx: 0.035, sy: 0.12, sz: 0.035 })),
-      P(GEO.cone, PALETTE.gold, M(0.07, 0.96, 0.06, { sx: 0.03, sy: 0.09, sz: 0.03, rz: -0.3 })),
-      P(GEO.cone, PALETTE.gold, M(-0.07, 0.96, 0.06, { sx: 0.03, sy: 0.09, sz: 0.03, rz: 0.3 })),
-      P(GEO.cone, PALETTE.magic, M(0.1, 0.72, -0.22, { sx: 0.06, sy: 0.24, sz: 0.06, rx: -0.3 })),
-      P(GEO.cone, PALETTE.magic, M(-0.08, 0.7, -0.24, { sx: 0.05, sy: 0.18, sz: 0.05, rx: -0.4 })),
+      P(GEO.cone, PALETTE.steelDark, M(0.3, 0.75, 0, { sx: 0.04, sy: 0.16, sz: 0.04, rz: -0.4 })),
+      P(GEO.cone, PALETTE.steelDark, M(-0.3, 0.75, 0, { sx: 0.04, sy: 0.16, sz: 0.04, rz: 0.4 })),
+      P(GEO.cone, PALETTE.steelDark, M(0.34, 0.7, 0.1, { sx: 0.035, sy: 0.12, sz: 0.035, rz: -0.9 })),
+      P(GEO.cone, PALETTE.steelDark, M(-0.34, 0.7, 0.1, { sx: 0.035, sy: 0.12, sz: 0.035, rz: 0.9 })),
+      P(GEO.cyl, PALETTE.gold, M(0, 1.0, 0.02, { sx: 0.18, sy: 0.05, sz: 0.18 }), false),
+      ...ring5(5, 0.17, 1.06, (x, y, z) => P(GEO.cone, PALETTE.gold, M(x, y, z + 0.02, { sx: 0.03, sy: 0.08, sz: 0.03 }), false)),
     ],
+    // Fire Archers: a brazier to light the arrows
     oakfall: () => [
-      P(GEO.sphereLo, PALETTE.acorn, M(0.32, 0.26, 0.2, { sx: 0.1, sy: 0.12, sz: 0.1 })),
-      P(GEO.sphereLo, PALETTE.acorn, M(0.3, 0.26, 0.36, { sx: 0.1, sy: 0.12, sz: 0.1 })),
-      P(GEO.sphereLo, PALETTE.acorn, M(0.44, 0.26, 0.28, { sx: 0.1, sy: 0.12, sz: 0.1 })),
-      P(GEO.sphereLo, PALETTE.acorn, M(0.35, 0.44, 0.28, { sx: 0.11, sy: 0.13, sz: 0.11 })),
-      P(GEO.dome, PALETTE.acornCap, M(0.35, 0.53, 0.28, { sx: 0.11, sy: 0.06, sz: 0.11 }), false),
+      P(GEO.cylTaper, PALETTE.steelDark, M(0.3, 0.22, 0.18, { sx: 0.1, sy: 0.22, sz: 0.1, rx: Math.PI })),
+      P(GEO.cyl, PALETTE.pitch, M(0.3, 0.33, 0.18, { sx: 0.09, sy: 0.02, sz: 0.09 }), false),
+      P(GEO.cone, PALETTE.ember, M(0.3, 0.42, 0.18, { sx: 0.07, sy: 0.18, sz: 0.07 }), false, { unlit: true }),
+      P(GEO.cone, PALETTE.flowerYellow, M(0.3, 0.4, 0.18, { sx: 0.035, sy: 0.1, sz: 0.035 }), false, { unlit: true }),
     ],
+    // Volley Captain: a rack of arrows and a captain's red plume
     squirrel: () => [
-      P(GEO.cyl, PALETTE.woodLight, M(0.17, 0.44, 0.08, { sx: 0.05, sy: 0.3, sz: 0.05, rx: -0.85 })),
-      P(GEO.cyl, PALETTE.woodLight, M(-0.17, 0.44, 0.08, { sx: 0.05, sy: 0.3, sz: 0.05, rx: -0.85 })),
-      // the squirrel gunner, perched on the frame with its tail up
-      P(GEO.sphereLo, PALETTE.capBrown, M(-0.2, 0.42, -0.16, { sx: 0.11, sy: 0.14, sz: 0.1 })),
-      P(GEO.sphereLo, PALETTE.cream, M(-0.2, 0.4, -0.07, { sx: 0.06, sy: 0.09, sz: 0.03 }), false),
-      P(GEO.sphereLo, PALETTE.capBrown, M(-0.2, 0.61, -0.1, { s: 0.09 })),
-      P(GEO.cone, PALETTE.capBrown, M(-0.25, 0.71, -0.1, { sx: 0.03, sy: 0.07, sz: 0.025 })),
-      P(GEO.cone, PALETTE.capBrown, M(-0.15, 0.71, -0.1, { sx: 0.03, sy: 0.07, sz: 0.025 })),
-      P(GEO.bead, PALETTE.outline, M(-0.17, 0.63, -0.02, { s: 0.018 }), false),
-      P(GEO.bead, PALETTE.outline, M(-0.23, 0.63, -0.02, { s: 0.018 }), false),
-      P(GEO.sphereLo, PALETTE.capBrown, M(-0.26, 0.62, -0.3, { sx: 0.1, sy: 0.24, sz: 0.09, rx: 0.35 })),
-      P(GEO.sphereLo, PALETTE.woodLight, M(-0.26, 0.8, -0.26, { sx: 0.08, sy: 0.08, sz: 0.07 })),
+      P(GEO.box, PALETTE.wood, M(0.3, 0.3, -0.12, { sx: 0.05, sy: 0.36, sz: 0.24 })),
+      ...[0, 1, 2, 3, 4].map((i) => P(GEO.cyl, PALETTE.woodLight, M(0.3, 0.5, -0.2 + i * 0.04, { sx: 0.01, sy: 0.3, sz: 0.01 }), false)),
+      ...[0, 1, 2, 3, 4].map((i) => P(GEO.box, PALETTE.cream, M(0.3, 0.64, -0.2 + i * 0.04, { sx: 0.005, sy: 0.06, sz: 0.03 }), false)),
+      P(GEO.sphereLo, PALETTE.capRed, M(-0.05, 1.12, -0.12, { sx: 0.04, sy: 0.16, sz: 0.08, rx: -0.6 })),
     ],
   };
-  const BRANCH_PENNANT = { marksman: PALETTE.capRed, bloom: PALETTE.flowerPink, thicket: PALETTE.cloak, briarstorm: PALETTE.magic,
-    hoarfrost: PALETTE.frost, seer: PALETTE.cream, earthshaker: PALETTE.stoneDark, mountainheart: PALETTE.gold, oakfall: PALETTE.acorn, squirrel: PALETTE.woodLight };
+  const BRANCH_PENNANT = { marksman: PALETTE.capRed, bloom: PALETTE.gold, thicket: PALETTE.pitch, briarstorm: PALETTE.ember,
+    hoarfrost: PALETTE.frost, seer: PALETTE.magic, earthshaker: PALETTE.flowerYellow, mountainheart: PALETTE.steelDark, oakfall: PALETTE.capRed, squirrel: PALETTE.cloak };
   function tierParts(tier, branch) {
     const parts = [];
     if (tier >= 2) {
       parts.push(P(GEO.torus, PALETTE.stone, M(0, 0.05, 0, { sx: 0.42, sy: 0.42, sz: 0.42, rx: Math.PI / 2 }), true, { name: 'tierRing' }));
       parts.push(P(GEO.cyl, PALETTE.wood, M(-0.36, 0.42, -0.3, { sx: 0.02, sy: 0.7, sz: 0.02 }), false, { name: 'pennantPole' }));
-      parts.push(P(GEO.box, PALETTE.gold, M(-0.3, 0.68, -0.3, { sx: 0.14, sy: 0.1, sz: 0.01 }), false, { name: 'pennant', live: true, unlit: true }));
+      parts.push(P(GEO.box, PALETTE.tunic, M(-0.3, 0.68, -0.3, { sx: 0.14, sy: 0.1, sz: 0.01 }), false, { name: 'pennant', live: true, unlit: true }));
     }
     if (tier >= 3) {
       parts.push(P(GEO.torus, PALETTE.gold, M(0, 0.06, 0, { sx: 0.46, sy: 0.46, sz: 0.46, rx: Math.PI / 2 }), false, { name: 'tierRingGold', unlit: true }));
@@ -1115,100 +1201,133 @@ const Renderer = (() => {
 
   const TOWER_RECIPES = { slinger: slingerParts, warden: wardenParts, druid: druidParts, golem: golemParts, artillery: artilleryParts };
 
-  // Bramble Bat: a dark-purple pest with wide membrane wings, stubby ears and
-  // bramble thorns on its back. Flies at height. Silhouette: the wings.
+  // Gargoyle: a hunched stone imp with horns, a toothy grin, ember eyes,
+  // a pointed tail and wide bat wings. Flies at height. Silhouette: the
+  // wings and horns.
   function batParts() {
     const body = PALETTE.bat, dark = PALETTE.batDark;
     return [
-      P(GEO.sphereLo, body, M(0, 0, 0, { sx: 0.17, sy: 0.14, sz: 0.2 }), true, { name: 'body' }),
-      P(GEO.cone, dark, M(0.08, 0.12, -0.02, { sx: 0.05, sy: 0.14, sz: 0.04, rz: -0.4 }), true),
-      P(GEO.cone, dark, M(-0.08, 0.12, -0.02, { sx: 0.05, sy: 0.14, sz: 0.04, rz: 0.4 }), true),
-      P(GEO.cone, PALETTE.magic, M(0, 0.1, -0.08, { sx: 0.03, sy: 0.1, sz: 0.03, rx: -0.6 }), false),
-      P(GEO.cone, PALETTE.magic, M(0.05, 0.09, -0.12, { sx: 0.03, sy: 0.08, sz: 0.03, rx: -0.8 }), false),
-      P(GEO.bead, PALETTE.gold, M(0.06, 0.03, 0.17, { s: 0.035 }), false, { unlit: true }),
-      P(GEO.bead, PALETTE.gold, M(-0.06, 0.03, 0.17, { s: 0.035 }), false, { unlit: true }),
-      P(GEO.box, PALETTE.cream, M(0.03, -0.05, 0.18, { sx: 0.03, sy: 0.05, sz: 0.02 }), false, { unlit: true }),
-      P(GEO.sphereLo, PALETTE.bat, M(0, -0.06, 0.08, { sx: 0.1, sy: 0.08, sz: 0.1 }), false),
-      P(GEO.bead, PALETTE.outline, M(0.065, 0.035, 0.195, { s: 0.015 }), false, { unlit: true }),
-      P(GEO.bead, PALETTE.outline, M(-0.055, 0.035, 0.195, { s: 0.015 }), false, { unlit: true }),
-      P(GEO.box, dark, pivotMatrix(0.12, 0.02, 0, 0, 0, 0, 0.26, 0, 0, 0.52, 0.02, 0.3), true, { name: 'wingL', live: true }),
-      P(GEO.box, dark, pivotMatrix(-0.12, 0.02, 0, 0, 0, 0, -0.26, 0, 0, 0.52, 0.02, 0.3), true, { name: 'wingR', live: true }),
+      P(GEO.sphereLo, body, M(0, 0, 0, { sx: 0.17, sy: 0.15, sz: 0.2 }), true, { name: 'body' }),
+      P(GEO.sphereLo, body, M(0, 0.08, 0.13, { sx: 0.13, sy: 0.12, sz: 0.11 }), true),
+      P(GEO.cone, dark, M(0.07, 0.2, 0.1, { sx: 0.035, sy: 0.12, sz: 0.035, rz: -0.5, rx: -0.3 }), true),
+      P(GEO.cone, dark, M(-0.07, 0.2, 0.1, { sx: 0.035, sy: 0.12, sz: 0.035, rz: 0.5, rx: -0.3 }), true),
+      P(GEO.bead, PALETTE.spore, M(0.05, 0.1, 0.23, { s: 0.03 }), false, { unlit: true }),
+      P(GEO.bead, PALETTE.spore, M(-0.05, 0.1, 0.23, { s: 0.03 }), false, { unlit: true }),
+      P(GEO.box, PALETTE.cream, M(0, 0.02, 0.235, { sx: 0.09, sy: 0.025, sz: 0.01 }), false, { unlit: true }),
+      P(GEO.box, PALETTE.outline, M(0, 0.035, 0.238, { sx: 0.1, sy: 0.008, sz: 0.008 }), false, { unlit: true }),
+      P(GEO.cone, dark, M(0, -0.02, -0.26, { sx: 0.03, sy: 0.2, sz: 0.03, rx: -Math.PI / 2 - 0.3 }), false),
+      P(GEO.cone, dark, M(0, -0.07, -0.37, { sx: 0.05, sy: 0.07, sz: 0.015, rx: -Math.PI / 2 }), false),
+      P(GEO.sphereLo, dark, M(0.08, -0.12, 0.06, { sx: 0.05, sy: 0.04, sz: 0.06 }), false),
+      P(GEO.sphereLo, dark, M(-0.08, -0.12, 0.06, { sx: 0.05, sy: 0.04, sz: 0.06 }), false),
+      P(GEO.wingL, dark, pivotMatrix(0.12, 0.02, 0, 0, 0, 0, 0, 0, 0, 0.5, 0.03, 0.5), true, { name: 'wingL', live: true }),
+      P(GEO.wingR, dark, pivotMatrix(-0.12, 0.02, 0, 0, 0, 0, 0, 0, 0, 0.5, 0.03, 0.5), true, { name: 'wingR', live: true }),
     ];
   }
 
-  // Bog-Trickster: lanky, teal, a leaf cap and a long nose, all feet and
-  // elbows. Faces +z. Silhouette: tall thin with a big leaf on top.
+  // Cutpurse: a lanky pickpocket in a plum doublet, a jaunty cap with a
+  // long feather, a pointy nose and a bulging sack of loot over one
+  // shoulder. Faces +z. Silhouette: tall and thin with the sack and feather.
   function tricksterParts() {
     const g = PALETTE.trickster, gd = PALETTE.tricksterDark;
     return [
-      P(GEO.sphereLo, g, M(0, 0.28, 0, { sx: 0.12, sy: 0.2, sz: 0.11 }), true, { name: 'body' }),
-      P(GEO.sphereLo, gd, M(0.09, 0.05, 0.04, { sx: 0.1, sy: 0.04, sz: 0.15 }), true, { name: 'footL', live: true }),
-      P(GEO.sphereLo, gd, M(-0.09, 0.05, 0.04, { sx: 0.1, sy: 0.04, sz: 0.15 }), true, { name: 'footR', live: true }),
-      P(GEO.cyl, g, M(0.08, 0.14, 0.02, { sx: 0.03, sy: 0.16, sz: 0.03 }), false),
-      P(GEO.cyl, g, M(-0.08, 0.14, 0.02, { sx: 0.03, sy: 0.16, sz: 0.03 }), false),
-      P(GEO.sphere, g, M(0, 0.56, 0, { sx: 0.17, sy: 0.19, sz: 0.16 }), true, { name: 'head' }),
-      P(GEO.cone, g, pivotMatrix(0.13, 0.62, 0, 0, 0, -1.4, 0, 0.12, 0, 0.05, 0.24, 0.04), true, { name: 'earL', live: true }),
-      P(GEO.cone, g, pivotMatrix(-0.13, 0.62, 0, 0, 0, 1.4, 0, 0.12, 0, 0.05, 0.24, 0.04), true, { name: 'earR', live: true }),
-      P(GEO.sphereLo, PALETTE.cream, M(0.07, 0.6, 0.13, { s: 0.045 }), false, { unlit: true }),
-      P(GEO.sphereLo, PALETTE.cream, M(-0.07, 0.6, 0.13, { s: 0.045 }), false, { unlit: true }),
-      P(GEO.bead, PALETTE.outline, M(0.08, 0.6, 0.17, { s: 0.02 }), false, { unlit: true }),
-      P(GEO.bead, PALETTE.outline, M(-0.06, 0.6, 0.17, { s: 0.02 }), false, { unlit: true }),
-      P(GEO.cone, gd, M(0, 0.54, 0.3, { sx: 0.035, sy: 0.3, sz: 0.035, rx: Math.PI / 2 }), true, { name: 'nose' }),
-      P(GEO.sphereLo, PALETTE.meadowLight, M(0.04, 0.78, -0.04, { sx: 0.16, sy: 0.05, sz: 0.24, rz: -0.3, ry: 0.4 }), true, { name: 'leaf', live: true }),
-      P(GEO.cyl, PALETTE.meadowDark, M(0, 0.74, 0, { sx: 0.02, sy: 0.1, sz: 0.02 }), false),
-      // eye glints, freckle spots on its back, a pale belly
-      P(GEO.bead, PALETTE.cream, M(0.086, 0.605, 0.184, { s: 0.008 }), false, { unlit: true }),
-      P(GEO.bead, PALETTE.cream, M(-0.054, 0.605, 0.184, { s: 0.008 }), false, { unlit: true }),
-      P(GEO.sphereLo, gd, M(0.06, 0.34, -0.1, { sx: 0.035, sy: 0.035, sz: 0.015 }), false),
-      P(GEO.sphereLo, gd, M(-0.05, 0.26, -0.1, { sx: 0.03, sy: 0.03, sz: 0.015 }), false),
-      P(GEO.sphereLo, gd, M(0.02, 0.2, -0.1, { sx: 0.025, sy: 0.025, sz: 0.012 }), false),
-      P(GEO.sphereLo, PALETTE.meadowLight, M(0, 0.26, 0.065, { sx: 0.075, sy: 0.12, sz: 0.05 }), false),
+      P(GEO.sphereLo, g, M(0, 0.3, 0, { sx: 0.12, sy: 0.19, sz: 0.11 }), true, { name: 'body' }),
+      P(GEO.sphereLo, gd, M(0.09, 0.05, 0.05, { sx: 0.08, sy: 0.04, sz: 0.15 }), true, { name: 'footL', live: true }),
+      P(GEO.sphereLo, gd, M(-0.09, 0.05, 0.05, { sx: 0.08, sy: 0.04, sz: 0.15 }), true, { name: 'footR', live: true }),
+      P(GEO.cyl, PALETTE.acornCap, M(0.07, 0.14, 0.02, { sx: 0.03, sy: 0.16, sz: 0.03 }), false),
+      P(GEO.cyl, PALETTE.acornCap, M(-0.07, 0.14, 0.02, { sx: 0.03, sy: 0.16, sz: 0.03 }), false),
+      P(GEO.cyl, PALETTE.acornCap, M(0, 0.26, 0, { sx: 0.12, sy: 0.03, sz: 0.11 }), false),
+      P(GEO.sphere, PALETTE.skin, M(0, 0.58, 0.01, { sx: 0.15, sy: 0.16, sz: 0.14 }), true, { name: 'head' }),
+      P(GEO.bead, PALETTE.outline, M(0.06, 0.61, 0.135, { s: 0.022 }), false, { unlit: true }),
+      P(GEO.bead, PALETTE.outline, M(-0.06, 0.61, 0.135, { s: 0.022 }), false, { unlit: true }),
+      P(GEO.bead, PALETTE.cream, M(0.066, 0.618, 0.153, { s: 0.008 }), false, { unlit: true }),
+      P(GEO.bead, PALETTE.cream, M(-0.054, 0.618, 0.153, { s: 0.008 }), false, { unlit: true }),
+      P(GEO.cone, 0xe9a283, M(0, 0.56, 0.24, { sx: 0.03, sy: 0.2, sz: 0.03, rx: Math.PI / 2 - 0.2 }), true, { name: 'nose' }),
+      P(GEO.box, PALETTE.outline, M(0.02, 0.5, 0.13, { sx: 0.07, sy: 0.012, sz: 0.01, rz: -0.25 }), false),
+      // the cap, cocked, and its feather
+      P(GEO.sphereLo, gd, M(0.02, 0.72, -0.01, { sx: 0.17, sy: 0.07, sz: 0.16, rz: -0.2 }), true, { name: 'cap' }),
+      P(GEO.sphereLo, PALETTE.flowerYellow, M(-0.04, 0.82, -0.08, { sx: 0.025, sy: 0.17, sz: 0.04, rx: -0.6, rz: 0.5 }), true, { name: 'leaf', live: true }),
+      // the bulging loot sack over the shoulder, a gold coin peeking out
+      P(GEO.sphereLo, PALETTE.canvas, M(0.12, 0.5, -0.12, { sx: 0.13, sy: 0.14, sz: 0.12 }), true, { name: 'earL', live: true }),
+      P(GEO.bead, PALETTE.gold, M(0.12, 0.64, -0.08, { s: 0.035 }), false, { name: 'earR', live: true }),
+      P(GEO.sphereLo, g, M(0.12, 0.42, 0.04, { s: 0.045 }), true),
+      P(GEO.sphereLo, g, M(-0.12, 0.3, 0.04, { s: 0.045 }), true),
     ];
   }
 
-  // Moss Troll: a hunched boulder of a beast, mossy back, tusks and
-  // knuckles on the ground. Faces +z. Silhouette: wide hump, low head.
+  // Black Knight: a hulking renegade knight in black plate, a bucket helm
+  // with glowing red eye-slits and a blood-red plume, a black kite shield
+  // and a spiked mace. Faces +z. Silhouette: wide, low, plume and shield.
   function trollParts() {
     const t = PALETTE.troll, td = PALETTE.trollDark;
     return [
-      P(GEO.sphereLo, t, M(0, 0.42, -0.04, { sx: 0.4, sy: 0.4, sz: 0.36 }), true, { name: 'body' }),
-      P(GEO.sphereLo, PALETTE.moss, M(0, 0.68, -0.12, { sx: 0.34, sy: 0.16, sz: 0.28 }), true, { name: 'mossBack' }),
-      P(GEO.sphereLo, PALETTE.meadowLight, M(0.14, 0.78, -0.16, { sx: 0.08, sy: 0.05, sz: 0.08 }), false),
-      P(GEO.cone, PALETTE.capRed, M(-0.12, 0.84, -0.1, { sx: 0.06, sy: 0.1, sz: 0.06 }), false),
-      P(GEO.sphereLo, t, M(0, 0.5, 0.3, { sx: 0.24, sy: 0.2, sz: 0.2 }), true, { name: 'head' }),
-      P(GEO.sphereLo, td, M(0, 0.44, 0.44, { sx: 0.12, sy: 0.07, sz: 0.1 }), true, { name: 'snout' }),
-      P(GEO.cone, PALETTE.cream, M(0.09, 0.42, 0.44, { sx: 0.03, sy: 0.1, sz: 0.03 }), false, { unlit: true }),
-      P(GEO.cone, PALETTE.cream, M(-0.09, 0.42, 0.44, { sx: 0.03, sy: 0.1, sz: 0.03 }), false, { unlit: true }),
-      P(GEO.sphereLo, PALETTE.cream, M(0.08, 0.56, 0.46, { s: 0.04 }), false, { unlit: true }),
-      P(GEO.sphereLo, PALETTE.cream, M(-0.08, 0.56, 0.46, { s: 0.04 }), false, { unlit: true }),
-      P(GEO.bead, PALETTE.outline, M(0.08, 0.56, 0.49, { s: 0.02 }), false, { unlit: true }),
-      P(GEO.bead, PALETTE.outline, M(-0.08, 0.56, 0.49, { s: 0.02 }), false, { unlit: true }),
-      P(GEO.cyl, t, M(0.36, 0.3, 0.14, { sx: 0.1, sy: 0.4, sz: 0.1, rz: -0.25 }), true, { name: 'armL', live: true }),
-      P(GEO.cyl, t, M(-0.36, 0.3, 0.14, { sx: 0.1, sy: 0.4, sz: 0.1, rz: 0.25 }), true, { name: 'armR', live: true }),
-      P(GEO.sphereLo, td, M(0.42, 0.08, 0.2, { sx: 0.14, sy: 0.09, sz: 0.14 }), true, { name: 'fistL', live: true }),
-      P(GEO.sphereLo, td, M(-0.42, 0.08, 0.2, { sx: 0.14, sy: 0.09, sz: 0.14 }), true, { name: 'fistR', live: true }),
-      P(GEO.sphereLo, td, M(0.14, 0.06, -0.02, { sx: 0.13, sy: 0.07, sz: 0.16 }), true, { name: 'footL', live: true }),
-      P(GEO.sphereLo, td, M(-0.14, 0.06, -0.02, { sx: 0.13, sy: 0.07, sz: 0.16 }), true, { name: 'footR', live: true }),
-      // eye glints, a lichen-crusted rock and a second toadstool on its back, brow ridge
-      P(GEO.bead, PALETTE.cream, M(0.088, 0.568, 0.505, { s: 0.009 }), false, { unlit: true }),
-      P(GEO.bead, PALETTE.cream, M(-0.072, 0.568, 0.505, { s: 0.009 }), false, { unlit: true }),
-      P(GEO.box, td, M(0, 0.62, 0.44, { sx: 0.24, sy: 0.04, sz: 0.06, rx: 0.2 }), false),
-      P(GEO.rock, PALETTE.stone, M(0.18, 0.72, -0.2, { s: 0.08 }), false),
-      P(GEO.sphereLo, PALETTE.flowerYellow, M(0.18, 0.79, -0.2, { sx: 0.05, sy: 0.02, sz: 0.05 }), false),
-      P(GEO.cyl, PALETTE.cream, M(-0.2, 0.78, -0.02, { sx: 0.02, sy: 0.08, sz: 0.02 }), false),
-      P(GEO.dome, PALETTE.capRed, M(-0.2, 0.82, -0.02, { sx: 0.06, sy: 0.045, sz: 0.06 }), false),
-      P(GEO.bead, PALETTE.cream, M(-0.21, 0.86, 0.0, { s: 0.012 }), false),
+      P(GEO.sphereLo, t, M(0, 0.44, -0.02, { sx: 0.36, sy: 0.34, sz: 0.32 }), true, { name: 'body' }),
+      P(GEO.cylTaper, td, M(0, 0.22, -0.02, { sx: 0.32, sy: 0.2, sz: 0.3, rx: Math.PI }), false),
+      P(GEO.sphereLo, t, M(0.32, 0.64, 0, { sx: 0.17, sy: 0.12, sz: 0.17 }), true),
+      P(GEO.sphereLo, t, M(-0.32, 0.64, 0, { sx: 0.17, sy: 0.12, sz: 0.17 }), true),
+      P(GEO.ring, PALETTE.baronRed, M(0.32, 0.6, 0, { s: 0.16, rx: Math.PI / 2 }), false),
+      P(GEO.ring, PALETTE.baronRed, M(-0.32, 0.6, 0, { s: 0.16, rx: Math.PI / 2 }), false),
+      // the helm, eye slit glowing red
+      P(GEO.cyl, t, M(0, 0.86, 0.05, { sx: 0.19, sy: 0.3, sz: 0.19 }), true, { name: 'head' }),
+      P(GEO.dome, t, M(0, 1.01, 0.05, { sx: 0.19, sy: 0.07, sz: 0.19 }), false),
+      P(GEO.box, PALETTE.baronRed, M(0, 0.9, 0.24, { sx: 0.26, sy: 0.035, sz: 0.01 }), false, { unlit: true }),
+      P(GEO.box, td, M(0, 0.82, 0.24, { sx: 0.012, sy: 0.1, sz: 0.01 }), false),
+      P(GEO.sphereLo, PALETTE.baronRed, M(0, 1.1, -0.02, { sx: 0.06, sy: 0.12, sz: 0.2, rx: 0.3 }), true, { name: 'plume', live: true }),
+      // the kite shield on the left arm
+      P(GEO.box, PALETTE.baron, M(0.34, 0.42, 0.24, { sx: 0.06, sy: 0.44, sz: 0.3, ry: -0.5 }), true, { name: 'shield' }),
+      P(GEO.box, PALETTE.baronRed, M(0.37, 0.44, 0.255, { sx: 0.012, sy: 0.4, sz: 0.06, ry: -0.5 }), false),
+      // arms, the mace hand and the mace
+      P(GEO.cyl, t, M(-0.36, 0.38, 0.14, { sx: 0.09, sy: 0.32, sz: 0.09, rz: 0.25 }), true, { name: 'armR', live: true }),
+      P(GEO.sphereLo, td, M(-0.42, 0.2, 0.2, { sx: 0.1, sy: 0.09, sz: 0.1 }), true, { name: 'fistR', live: true }),
+      P(GEO.cyl, PALETTE.wood, M(-0.42, 0.32, 0.3, { sx: 0.025, sy: 0.3, sz: 0.025, rx: 0.7 }), false, { name: 'maceHandle', live: true }),
+      P(GEO.sphereLo, PALETTE.steelDark, M(-0.42, 0.42, 0.42, { s: 0.09 }), true, { name: 'maceHead', live: true }),
+      P(GEO.sphereLo, td, M(0.14, 0.06, -0.02, { sx: 0.13, sy: 0.07, sz: 0.17 }), true, { name: 'footL', live: true }),
+      P(GEO.sphereLo, td, M(-0.14, 0.06, -0.02, { sx: 0.13, sy: 0.07, sz: 0.17 }), true, { name: 'footR', live: true }),
+      P(GEO.box, PALETTE.baronRed, M(0, 0.44, 0.31, { sx: 0.16, sy: 0.22, sz: 0.02 }), false),
+      P(GEO.box, PALETTE.baron, M(0, 0.47, 0.322, { sx: 0.05, sy: 0.12, sz: 0.01 }), false),
     ];
   }
 
-  // Boss silhouette: a churning core with small creatures wheeling around
-  // it, peeling away as it weakens. All four bosses (the original
-  // Shadow-Crow Swarm plus Levels 6-8's finales) share this one animated
-  // rig (see updateBossView) — only makeBossParts' shape/color inputs
-  // differ, so every boss reads as a genuinely different creature (a
-  // round bird-swarm vs. a flat eel-churn vs. a plump stinging swarm vs.
-  // a pale spiked shard-cloud) while reusing the exact same proven
-  // orbit/rotation math, not new per-boss animation code.
+  // Siege Ram (ground boss): a timber frame on four wheels under a peaked
+  // roof of hides, swinging an iron-headed ram log, the Baron's banner on a
+  // pole at the back. Faces +z. Silhouette: the long low house on wheels.
+  function ramParts() {
+    const w = PALETTE.wood, wl = PALETTE.woodLight;
+    const parts = [
+      P(GEO.box, w, M(0, 0.24, 0, { sx: 0.7, sy: 0.08, sz: 1.2 }), true, { name: 'body' }),
+      ...[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([sx, sz]) => P(GEO.cyl, w, M(sx * 0.33, 0.6, sz * 0.52, { sx: 0.04, sy: 0.72, sz: 0.04 }), true)),
+      // the gabled roof of hides, a ridge pole and lashings
+      P(GEO.box, PALETTE.acorn, M(0.19, 1.05, 0, { sx: 0.48, sy: 0.04, sz: 1.32, rz: -0.72 }), true),
+      P(GEO.box, PALETTE.acornCap, M(-0.19, 1.05, 0, { sx: 0.48, sy: 0.04, sz: 1.32, rz: 0.72 }), true),
+      P(GEO.cyl, w, M(0, 1.22, 0, { sx: 0.035, sy: 1.4, sz: 0.035, rx: Math.PI / 2 }), false),
+      ...[-0.4, 0, 0.4].map((z) => P(GEO.box, PALETTE.straw, M(0, 1.06, z, { sx: 0.68, sy: 0.02, sz: 0.03 }), false)),
+      // iron straps and studs
+      P(GEO.box, PALETTE.steelDark, M(0, 0.29, 0.6, { sx: 0.72, sy: 0.06, sz: 0.03 }), false),
+      P(GEO.bead, PALETTE.gold, M(0.25, 0.29, 0.62, { s: 0.02 }), false),
+      P(GEO.bead, PALETTE.gold, M(-0.25, 0.29, 0.62, { s: 0.02 }), false),
+      // the Baron's black banner at the back
+      P(GEO.cyl, w, M(0, 1.5, -0.56, { sx: 0.02, sy: 0.7, sz: 0.02 }), false),
+      P(GEO.box, PALETTE.baron, M(0.14, 1.66, -0.56, { sx: 0.28, sy: 0.2, sz: 0.01 }), true, { name: 'flag', live: true }),
+      P(GEO.box, PALETTE.baronRed, M(0.14, 1.66, -0.555, { sx: 0.28, sy: 0.05, sz: 0.01 }), false, { name: 'flagStripe', live: true }),
+      // the ram log hung on chains, with its iron head
+      P(GEO.cyl, wl, M(0, 0.62, 0.1, { sx: 0.1, sy: 1.25, sz: 0.1, rx: Math.PI / 2 }), true, { name: 'ram', live: true }),
+      P(GEO.cylTaper, PALETTE.steelDark, M(0, 0.62, 0.8, { sx: 0.13, sy: 0.2, sz: 0.13, rx: Math.PI / 2 }), true, { name: 'ramHead', live: true }),
+      P(GEO.cyl, PALETTE.steelDark, M(0, 0.85, -0.2, { sx: 0.01, sy: 0.4, sz: 0.01 }), false),
+      P(GEO.cyl, PALETTE.steelDark, M(0, 0.85, 0.4, { sx: 0.01, sy: 0.4, sz: 0.01 }), false),
+      // the brigands' boots shuffling underneath
+      P(GEO.sphereLo, PALETTE.goblinDark, M(0.18, 0.06, -0.3, { sx: 0.08, sy: 0.05, sz: 0.11 }), true, { name: 'footL', live: true }),
+      P(GEO.sphereLo, PALETTE.goblinDark, M(-0.18, 0.06, 0.1, { sx: 0.08, sy: 0.05, sz: 0.11 }), true, { name: 'footR', live: true }),
+    ];
+    for (let i = 0; i < 4; i++) {
+      const sx = i % 2 ? 1 : -1, sz = i < 2 ? -0.42 : 0.42;
+      parts.push(P(GEO.cyl, wl, M(sx * 0.38, 0.2, sz, { sx: 0.2, sy: 0.07, sz: 0.2, rz: Math.PI / 2 }), true, { name: `wheel${i}`, live: true }));
+      parts.push(P(GEO.cyl, PALETTE.steelDark, M(sx * 0.42, 0.2, sz, { sx: 0.05, sy: 0.04, sz: 0.05, rz: Math.PI / 2 }), false));
+    }
+    return parts;
+  }
+
+  // Swarm-rig boss: a churning core with small creatures wheeling around
+  // it, peeling away as it weakens (see updateBossView). The Gargoyle Lord
+  // uses it: a great horned lump of abbey stone, its brood of imps around it.
   const BOSS_CROWS = 7;
   function makeBossParts(cfg) {
     const {
@@ -1219,7 +1338,7 @@ const Renderer = (() => {
       beakScale = { sx: 0.03, sy: 0.08, sz: 0.03 }, beakColor,
     } = cfg;
     const parts = [
-      P(GEO.sphereLo, coreColor, M(0, 0, 0, coreScale), true, { name: 'core', live: true }),
+      P(GEO.rock, coreColor, M(0, 0, 0, coreScale), true, { name: 'core', live: true }),
       P(GEO.sphereLo, heartColor, M(0, 0, 0, heartScale), false, { name: 'heart', live: true, unlit: true }),
       P(GEO.sphereLo, accentColor, M(0.12, 0.08, 0.32, { s: 0.05 }), false, { unlit: true }),
       P(GEO.sphereLo, accentColor, M(-0.12, 0.08, 0.32, { s: 0.05 }), false, { unlit: true }),
@@ -1232,67 +1351,64 @@ const Renderer = (() => {
     }
     return parts;
   }
-  // Shadow-Crow Swarm (Level 1 / Level 5 reprise): a dark churning core
-  // with crows wheeling around it. Silhouette: a big dark ball with
-  // wings all round it. Unchanged from before makeBossParts existed.
-  function bossParts() {
-    return makeBossParts({ coreColor: PALETTE.batDark, accentColor: PALETTE.gold, orbitColor: PALETTE.batDark, wingColor: PALETTE.batDark, beakColor: PALETTE.gold });
-  }
-  // The Drowned Swarm (Level 6 finale): a flattened whirlpool core
-  // ringed by foam, darting eel-shapes orbiting instead of birds.
-  // Silhouette: a flat wide disc with a churning ring, not a round ball.
-  function tidewormParts() {
+  function stonelordParts() {
     return makeBossParts({
-      coreColor: PALETTE.waterDeep, coreScale: { sx: 0.42, sy: 0.26, sz: 0.42 }, accentColor: PALETTE.waterFoam,
+      coreColor: PALETTE.bat, coreScale: { sx: 0.4, sy: 0.36, sz: 0.38 }, heartColor: PALETTE.spore, heartScale: { s: 0.16 }, accentColor: PALETTE.spore,
       extra: [
-        P(GEO.torus, PALETTE.waterFoam, M(0, 0.02, 0, { sx: 0.5, sy: 0.5, sz: 0.06, rx: Math.PI / 2 }), false),
-        P(GEO.torus, PALETTE.water, M(0, 0.1, 0, { sx: 0.34, sy: 0.34, sz: 0.045, rx: Math.PI / 2 }), false),
+        P(GEO.cone, PALETTE.batDark, M(0.18, 0.36, 0.1, { sx: 0.07, sy: 0.26, sz: 0.07, rz: -0.5 })),
+        P(GEO.cone, PALETTE.batDark, M(-0.18, 0.36, 0.1, { sx: 0.07, sy: 0.26, sz: 0.07, rz: 0.5 })),
+        P(GEO.box, PALETTE.batDark, M(0.55, 0.12, -0.08, { sx: 0.6, sy: 0.025, sz: 0.36, rz: 0.35 })),
+        P(GEO.box, PALETTE.batDark, M(-0.55, 0.12, -0.08, { sx: 0.6, sy: 0.025, sz: 0.36, rz: -0.35 })),
+        P(GEO.box, PALETTE.cream, M(0, -0.02, 0.36, { sx: 0.2, sy: 0.04, sz: 0.02 }), false, { unlit: true }),
       ],
-      orbitScale: { sx: 0.06, sy: 0.06, sz: 0.26 }, orbitColor: PALETTE.streamBed,
-      wingScale: { sx: 0.02, sy: 0.1, sz: 0.08 }, wingColor: PALETTE.water,
-      beakScale: { sx: 0.02, sy: 0.05, sz: 0.02 }, beakColor: PALETTE.waterFoam,
+      orbitScale: { sx: 0.08, sy: 0.08, sz: 0.1 }, orbitColor: PALETTE.bat,
+      wingScale: { sx: 0.34, sy: 0.015, sz: 0.12 }, wingColor: PALETTE.batDark,
+      beakScale: { sx: 0.02, sy: 0.05, sz: 0.02 }, beakColor: PALETTE.spore,
     });
   }
-  // The Hive Matriarch (Level 7 finale): a plump amber-black abdomen with
-  // two big wings and a stinger of her own, drone wasps orbiting.
-  // Silhouette: a fat oval body with wings and a tail spike, not a
-  // smooth ball.
-  function matriarchParts() {
-    return makeBossParts({
-      coreColor: PALETTE.hollowWood, coreScale: { sx: 0.3, sy: 0.32, sz: 0.44 }, accentColor: PALETTE.gold,
-      extra: [
-        P(GEO.box, PALETTE.cream, M(0.26, 0.06, -0.05, { sx: 0.28, sy: 0.01, sz: 0.16, ry: 0.5 }), false),
-        P(GEO.box, PALETTE.cream, M(-0.26, 0.06, -0.05, { sx: 0.28, sy: 0.01, sz: 0.16, ry: -0.5 }), false),
-        P(GEO.cone, PALETTE.hollowWood, M(0, 0, -0.5, { sx: 0.05, sy: 0.16, sz: 0.05, rx: -Math.PI / 2 }), false),
-      ],
-      orbitScale: { sx: 0.09, sy: 0.09, sz: 0.16 }, orbitColor: PALETTE.gold,
-      wingScale: { sx: 0.32, sy: 0.015, sz: 0.12 }, wingColor: PALETTE.cream,
-      beakScale: { sx: 0.025, sy: 0.06, sz: 0.025 }, beakColor: PALETTE.hollowWood,
-    });
-  }
-  // The Rime Swarm (Level 8 finale): a pale spiky ice-crystal core,
-  // slivers of frost orbiting instead of birds. Silhouette: a spiked
-  // pale burst, not a smooth dark ball.
-  function rimeParts() {
-    const spikes = [];
-    for (let i = 0; i < 5; i++) {
-      const a = i * 1.257, len = 0.18 + (i % 2) * 0.06;
-      spikes.push(P(GEO.cone, PALETTE.frost, M(Math.cos(a) * 0.2, Math.sin(a) * 0.12, Math.sin(a) * 0.2, { sx: 0.05, sy: len, sz: 0.05, rz: Math.cos(a), rx: -Math.sin(a) }), false));
-    }
-    return makeBossParts({
-      coreColor: PALETTE.frostRobe, coreScale: { s: 0.32 }, accentColor: PALETTE.snow, extra: spikes,
-      orbitScale: { sx: 0.05, sy: 0.05, sz: 0.24 }, orbitColor: PALETTE.frost,
-      wingScale: { sx: 0.015, sy: 0.1, sz: 0.05 }, wingColor: PALETTE.frostRobe,
-      beakScale: { sx: 0.02, sy: 0.05, sz: 0.02 }, beakColor: PALETTE.snow,
-    });
+
+  // The Black Dragon (final boss): a long-necked wyrm with ember eyes, a
+  // ridge of red spines, a spade-tipped tail and vast leathery wings.
+  // Faces +z. Silhouette: the wingspan and the neck.
+  function dragonParts() {
+    const d = PALETTE.dragon, dw = PALETTE.dragonWing;
+    const parts = [
+      P(GEO.sphereLo, d, M(0, 0, 0, { sx: 0.3, sy: 0.27, sz: 0.5 }), true, { name: 'core' }),
+      P(GEO.sphereLo, PALETTE.dragonBelly, M(0, -0.1, 0.04, { sx: 0.22, sy: 0.15, sz: 0.42 }), false),
+      // neck, head, snout, horns and eyes
+      P(GEO.cylTaper, d, M(0, 0.18, 0.46, { sx: 0.11, sy: 0.42, sz: 0.11, rx: 0.9 }), true),
+      P(GEO.sphereLo, d, M(0, 0.36, 0.68, { sx: 0.15, sy: 0.13, sz: 0.17 }), true, { name: 'head' }),
+      P(GEO.box, d, M(0, 0.32, 0.84, { sx: 0.14, sy: 0.08, sz: 0.2 }), true),
+      P(GEO.box, PALETTE.dragonBelly, M(0, 0.26, 0.82, { sx: 0.12, sy: 0.04, sz: 0.18 }), true, { name: 'jaw', live: true }),
+      P(GEO.cone, PALETTE.cream, M(0.08, 0.48, 0.62, { sx: 0.03, sy: 0.16, sz: 0.03, rx: -0.9 }), false),
+      P(GEO.cone, PALETTE.cream, M(-0.08, 0.48, 0.62, { sx: 0.03, sy: 0.16, sz: 0.03, rx: -0.9 }), false),
+      P(GEO.bead, PALETTE.spore, M(0.09, 0.4, 0.78, { s: 0.03 }), false, { unlit: true }),
+      P(GEO.bead, PALETTE.spore, M(-0.09, 0.4, 0.78, { s: 0.03 }), false, { unlit: true }),
+      P(GEO.bead, PALETTE.outline, M(0.04, 0.35, 0.94, { s: 0.015 }), false),
+      P(GEO.bead, PALETTE.outline, M(-0.04, 0.35, 0.94, { s: 0.015 }), false),
+      // the tail and its spade
+      P(GEO.cone, d, M(0, -0.02, -0.66, { sx: 0.12, sy: 0.5, sz: 0.12, rx: -Math.PI / 2 - 0.15 }), true, { name: 'tail' }),
+      P(GEO.cone, PALETTE.baronRed, M(0, -0.06, -0.96, { sx: 0.1, sy: 0.12, sz: 0.02, rx: -Math.PI / 2 }), false),
+      // little legs tucked up
+      P(GEO.sphereLo, d, M(0.18, -0.2, 0.18, { sx: 0.07, sy: 0.06, sz: 0.09 }), false),
+      P(GEO.sphereLo, d, M(-0.18, -0.2, 0.18, { sx: 0.07, sy: 0.06, sz: 0.09 }), false),
+      P(GEO.sphereLo, d, M(0.16, -0.2, -0.22, { sx: 0.07, sy: 0.06, sz: 0.09 }), false),
+      P(GEO.sphereLo, d, M(-0.16, -0.2, -0.22, { sx: 0.07, sy: 0.06, sz: 0.09 }), false),
+      // the wings: a leathery membrane and a bony leading edge, each flapping from the shoulder
+      P(GEO.wingL, dw, pivotMatrix(0.2, 0.14, 0.1, 0, 0, 0, 0, 0, 0, 1.15, 0.035, 1.0), true, { name: 'wingL', live: true }),
+      P(GEO.wingR, dw, pivotMatrix(-0.2, 0.14, 0.1, 0, 0, 0, 0, 0, 0, 1.15, 0.035, 1.0), true, { name: 'wingR', live: true }),
+    ];
+    for (let i = 0; i < 5; i++) parts.push(P(GEO.cone, PALETTE.baronRed, M(0, 0.25 - i * 0.02, 0.28 - i * 0.18, { sx: 0.04, sy: 0.12, sz: 0.06, rx: -0.3 }), false));
+    return parts;
   }
 
   const WALK = {
     grunt:     { freq: 7.5, bounce: 0.09, lean: 0.1, sway: 0.08 },
     trickster: { freq: 12,  bounce: 0.15, lean: 0.25, sway: 0.16 },
-    troll:     { freq: 3.6, bounce: 0.05, lean: 0.06, sway: 0.05 },
+    troll:     { freq: 3.6, bounce: 0.05, lean: 0.04, sway: 0.06 },
+    ram:       { freq: 2.4, bounce: 0.02, lean: 0, sway: 0.025 },
   };
-  const ENEMY_RECIPES = { grunt: gruntParts, trickster: tricksterParts, troll: trollParts, bat: batParts, boss: bossParts, tideworm: tidewormParts, matriarch: matriarchParts, rime: rimeParts };
+  const ENEMY_RECIPES = { grunt: gruntParts, trickster: tricksterParts, troll: trollParts, bat: batParts, ram: ramParts, stonelord: stonelordParts, dragon: dragonParts };
 
   // -------- particles: a pooled dust puff --------
   // The whole pool is one Points draw call: each puff is a flat round
@@ -1366,72 +1482,98 @@ const Renderer = (() => {
     }
   }
 
-  // -------- projectile views: pooled acorns flying in a small arc --------
+  // -------- projectile views: pooled javelins, pots, bolts, hammers, arrows --------
+  // Javelins and arrows fly point-first along their arc (AIMED); the rest tumble.
   const projPools = {};
   const projViews = new Map();
+  const shaft = (len, r, color, tipColor, z = 0, x = 0, y = 0) => {
+    const g = new THREE.Group();
+    const s = new THREE.Mesh(GEO.cyl, toon(color));
+    s.scale.set(r, len, r); s.rotation.x = Math.PI / 2; s.position.set(x, y, z);
+    const tip = new THREE.Mesh(GEO.cone, toon(tipColor));
+    tip.scale.set(r * 2.2, len * 0.22, r * 2.2); tip.rotation.x = Math.PI / 2; tip.position.set(x, y, z + len * 0.55);
+    g.add(s, tip);
+    return { g, s };
+  };
   const PROJ_MAKERS = {
-    acorn() {
-      const g = new THREE.Group();
-      const body = new THREE.Mesh(GEO.sphereLo, toon(PALETTE.acorn));
-      body.scale.set(0.07, 0.09, 0.07); addOutline(body);
-      const cap = new THREE.Mesh(GEO.dome, toon(PALETTE.acornCap));
-      cap.scale.set(0.08, 0.05, 0.08); cap.position.y = 0.04;
-      g.add(body, cap);
+    acorn() {   // a javelin
+      const { g, s } = shaft(0.5, 0.02, PALETTE.woodLight, PALETTE.steel);
+      addOutline(s);
       return g;
     },
-    bigacorn() {
-      const g = PROJ_MAKERS.acorn();
-      g.scale.setScalar(2.1);
-      return g;
-    },
-    thorn() {
+    bigacorn() {   // a volley of three arrows with white fletching
       const g = new THREE.Group();
-      const ball = new THREE.Mesh(GEO.sphereLo, toon(PALETTE.magic));
-      ball.scale.setScalar(0.1); addOutline(ball);
-      g.add(ball);
-      for (let i = 0; i < 4; i++) {
-        const c = new THREE.Mesh(GEO.cone, toon(PALETTE.cloakDark));
-        c.scale.set(0.03, 0.1, 0.03);
-        c.position.set(Math.cos(i * 1.6) * 0.1, Math.sin(i * 1.6) * 0.1, 0);
-        c.rotation.z = -i * 1.6 + Math.PI / 2;
-        g.add(c);
+      for (const [x, y, z] of [[0, 0.06, 0.05], [-0.1, -0.03, -0.04], [0.1, -0.02, 0]]) {
+        const a = shaft(0.42, 0.014, PALETTE.woodLight, PALETTE.steel, z, x, y);
+        const f = new THREE.Mesh(GEO.box, toon(PALETTE.cream));
+        f.scale.set(0.05, 0.005, 0.08); f.position.set(x, y, z - 0.17);
+        a.g.add(f);
+        g.add(a.g);
       }
       return g;
     },
-    wisp() {
+    thorn() {   // a clay pot of pitch with a lit rag
+      const g = new THREE.Group();
+      const pot = new THREE.Mesh(GEO.sphereLo, toon(PALETTE.pitch));
+      pot.scale.set(0.1, 0.09, 0.1); addOutline(pot);
+      const rim = new THREE.Mesh(GEO.torus, toon(PALETTE.steelDark));
+      rim.scale.setScalar(0.06); rim.rotation.x = Math.PI / 2; rim.position.y = 0.08;
+      const flame = new THREE.Mesh(GEO.cone, unlit(PALETTE.ember));
+      flame.scale.set(0.04, 0.1, 0.04); flame.position.y = 0.14;
+      g.add(pot, rim, flame);
+      return g;
+    },
+    wisp() {   // a frost bolt
       const g = new THREE.Group();
       const core = new THREE.Mesh(GEO.sphereLo, unlit(PALETTE.cream));
       core.scale.setScalar(0.05);
       const halo = new THREE.Mesh(GEO.sphereLo, unlit(PALETTE.frost, { opacity: 0.6, depthWrite: false }));
       halo.scale.setScalar(0.1);
       g.add(core, halo);
+      for (let i = 0; i < 3; i++) {
+        const c = new THREE.Mesh(GEO.cone, unlit(PALETTE.frost));
+        c.scale.set(0.02, 0.09, 0.02); c.rotation.z = i * 2.1; c.position.set(Math.sin(i * 2.1) * -0.06, Math.cos(i * 2.1) * 0.06, 0);
+        g.add(c);
+      }
       return g;
     },
-    boulder() {
+    boulder() {   // a thrown warhammer, end over end
       const g = new THREE.Group();
-      const rock = new THREE.Mesh(GEO.rock, toon(PALETTE.stone));
-      rock.scale.set(0.14, 0.12, 0.13); addOutline(rock);
-      g.add(rock);
+      const h = new THREE.Mesh(GEO.cyl, toon(PALETTE.wood));
+      h.scale.set(0.03, 0.4, 0.03);
+      const head = new THREE.Mesh(GEO.box, toon(PALETTE.steelDark));
+      head.scale.set(0.22, 0.13, 0.13); head.position.y = 0.2; addOutline(head);
+      g.add(h, head);
       return g;
     },
   };
+  const AIMED = { acorn: true, bigacorn: true };
   const PROJ_ARC = { acorn: 0.45, bigacorn: 1.6, thorn: 0.7, wisp: 0.15, boulder: 0.3 };
+  const _aim = new THREE.Vector3();
   function updateProjectileViews() {
     const live = new Set();
     for (const p of GameState.state.projectiles) {
       live.add(p.id);
       let g = projViews.get(p.id);
+      let fresh = false;
       if (!g) {
         const pool = projPools[p.kind] || (projPools[p.kind] = []);
         g = pool.pop();
         if (!g) { g = PROJ_MAKERS[p.kind](); g.userData.kind = p.kind; scene.add(g); }
         g.visible = true;
         projViews.set(p.id, g);
+        fresh = true;
       }
       const targetY = p.targetBoss ? BOSS_HEIGHT : BAT_HEIGHT;
       const baseY = p.targetFlying ? 0.75 + p.t * (targetY - 0.75) : 0.75;
+      const px = g.position.x, py = g.position.y, pz = g.position.z;
       g.position.set(p.x, baseY + Math.sin(p.t * Math.PI) * PROJ_ARC[p.kind], p.z);
-      g.rotation.x += 0.4; g.rotation.z += 0.25;
+      if (AIMED[p.kind]) {
+        if (!fresh && (px !== g.position.x || pz !== g.position.z)) {
+          _aim.set(g.position.x * 2 - px, g.position.y * 2 - py, g.position.z * 2 - pz);
+          g.lookAt(_aim);
+        }
+      } else { g.rotation.x += 0.4; g.rotation.z += 0.25; }
     }
     for (const [id, g] of projViews) {
       if (live.has(id)) continue;
@@ -1475,28 +1617,39 @@ const Renderer = (() => {
   // Per-type anticipation and recoil: pull is 0..1 through the wind-up,
   // recoil is 1 right after the shot and decays.
   const TOWER_ANIM = {
+    // the squire cocks the javelin back, then throws: his hand snaps
+    // forward empty and a fresh javelin is in it a beat later
     slinger(v, pull, recoil, t) {
-      const back = pull * 0.16 - recoil * 0.1;
-      for (const n of ['slingHandle', 'prongL', 'prongR', 'band']) {
+      const back = pull * 0.18 - recoil * 0.2;
+      for (const n of ['hand', 'javelin', 'tip']) {
         v.live[n].position.z = v.base[n].p.z - back;
-        v.live[n].position.y = v.base[n].p.y - pull * 0.05;
+        v.live[n].position.y = v.base[n].p.y + pull * 0.06;
       }
-      v.live.hat.rotation.z = v.base.hat.r.z + Math.sin(t * 2.2 + v.tower.id + 0.5) * 0.05;
-      v.live.sprout.rotation.z = -0.5 + Math.sin(t * 3 + v.tower.id) * 0.25;
-      v.group.rotation.x = -pull * 0.12 + recoil * 0.18;
+      v.live.arm.rotation.x = v.base.arm.r.x + back * 1.6;
+      v.live.javelin.visible = v.live.tip.visible = recoil < 0.45;
+      const wob = Math.sin(t * 2.2 + v.tower.id + 0.5) * 0.05;
+      for (const n of ['hat', 'brim', 'helmKnob']) v.live[n].rotation.z = v.base[n].r.z + wob;
+      v.group.rotation.x = -pull * 0.1 + recoil * 0.16;
     },
+    // the friar heaves the pot up and back on its ladle, then lobs it; the
+    // cauldron bubbles and its fire licks the whole time
     warden(v, pull, recoil, t) {
       const raise = pull * 0.9 - recoil * 0.5;
       for (const n of ['staff', 'thornBall', 'thorn1', 'thorn2']) {
         const b = v.base[n];
         v.live[n].position.y = b.p.y + raise * 0.22;
-        v.live[n].position.z = b.p.z - raise * 0.12;
+        v.live[n].position.z = b.p.z - raise * 0.14;
         v.live[n].rotation.x = b.r.x - raise * 0.5;
       }
-      const grow = 1 + pull * 0.6 + Math.sin(t * 6) * 0.06;
-      v.live.thornBall.scale.setScalar(v.base.thornBall.s.x * grow);
+      const thrown = recoil > 0.5;
+      v.live.thornBall.visible = v.live.thorn1.visible = v.live.thorn2.visible = !thrown;
+      v.live.thorn2.scale.set(v.base.thorn2.s.x, v.base.thorn2.s.y * (0.8 + 0.4 * Math.abs(Math.sin(t * 14 + v.tower.id))), v.base.thorn2.s.z);
+      v.live.brew.position.y = v.base.brew.p.y + Math.abs(Math.sin(t * 5 + v.tower.id)) * 0.012;
+      const fl = 0.75 + 0.35 * Math.abs(Math.sin(t * 11 + v.tower.id) * Math.sin(t * 4.3));
+      v.live.flame.scale.set(v.base.flame.s.x * (1.6 - fl * 0.6), v.base.flame.s.y * fl, v.base.flame.s.z * (1.6 - fl * 0.6));
       v.group.rotation.x = -pull * 0.08 + recoil * 0.12;
     },
+    // the magus's orb swells as he gathers frost, then lurches as it fires
     druid(v, pull, recoil, t) {
       const hover = Math.sin(t * 3 + v.tower.id) * 0.03;
       const rise = pull * 0.25 - recoil * 0.12;
@@ -1507,32 +1660,33 @@ const Renderer = (() => {
       }
       v.live.orb.scale.setScalar(v.base.orb.s.x * (1 + pull * 0.5 + Math.sin(t * 8) * 0.08));
       v.live.orb.rotation.y = t * 3;
+      v.live.hatTip.rotation.z = v.base.hatTip.r.z + Math.sin(t * 1.8 + v.tower.id) * 0.12 + pull * 0.2;
       v.group.rotation.x = recoil * 0.08;
     },
+    // the knight swings the hammer back over his helm, then hurls it down
+    // the road; a new one is in his fists as he comes back to guard
     golem(v, pull, recoil, t) {
-      // fists rise high overhead, then slam down
-      const lift = pull * 0.75 - recoil * 0.35;
-      for (const side of ['L', 'R']) {
-        const fist = v.live['fist' + side], arm = v.live['arm' + side];
-        fist.position.y = v.base['fist' + side].p.y + lift;
-        fist.position.z = v.base['fist' + side].p.z - lift * 0.1 + recoil * 0.2;
-        arm.rotation.z = v.base['arm' + side].r.z * (1 - pull * 0.9) + (side === 'L' ? -1 : 1) * pull * 0.1;
-        arm.position.y = v.base['arm' + side].p.y + lift * 0.4;
+      const ang = 0.5 - pull * 2.2 + recoil * 1.0;
+      for (const n of ['handle', 'hammerHead', 'fistL', 'fistR']) {
+        v.live[n].matrixAutoUpdate = false;
+        hammerPose(n, ang, v.live[n].matrix);
       }
-      const breathe = 1 + Math.sin(t * 1.4 + v.tower.id) * 0.02;
-      v.live.shoulders.scale.set(v.base.shoulders.s.x * breathe, v.base.shoulders.s.y, v.base.shoulders.s.z * breathe);
+      v.live.handle.visible = v.live.hammerHead.visible = recoil < 0.35;
+      for (const side of ['L', 'R']) v.live['arm' + side].rotation.x = v.base['arm' + side].r.x + (ang - 0.5) * 0.9;
+      const breathe = 1 + Math.sin(t * 1.4 + v.tower.id) * 0.03;
+      for (const n of ['shoulders', 'shoulders2']) v.live[n].scale.set(v.base[n].s.x * breathe, v.base[n].s.y, v.base[n].s.z * breathe);
+      v.live.crest.rotation.x = Math.sin(t * 2 + v.tower.id) * 0.06 - pull * 0.2;
       v.group.rotation.x = -pull * 0.06 + recoil * 0.14;
     },
+    // the yeoman aims high, draws the string back, and looses
     artillery(v, pull, recoil, t) {
-      const dip = pull * 0.35, kick = recoil * 0.3;
-      for (const n of ['barrel', 'band']) {
-        v.live[n].rotation.x = v.base[n].r.x + dip - kick;
-        v.live[n].position.z = v.base[n].p.z - kick * 0.2;
-      }
-      const shown = pull > 0 || recoil < 0.2;
-      v.live.loaded.visible = v.live.loadedCap.visible = shown;
-      v.live.loaded.rotation.x = v.live.loadedCap.rotation.x = v.base.loaded.r.x + dip - kick;
-      v.group.rotation.x = recoil * 0.1;
+      const draw = pull * 0.13 - recoil * 0.04;
+      for (const n of ['string', 'arrow', 'arrowTip']) v.live[n].position.z = v.base[n].p.z - draw;
+      v.live.arrow.visible = v.live.arrowTip.visible = recoil < 0.25;
+      v.live.bow.scale.set(v.base.bow.s.x, v.base.bow.s.y * (1 - pull * 0.05), v.base.bow.s.z * (1 - pull * 0.08));
+      v.live.feather.rotation.z = v.base.feather.r.z + Math.sin(t * 2.6 + v.tower.id) * 0.18;
+      v.live.hat.rotation.x = v.base.hat.r.x + Math.sin(t * 1.7 + v.tower.id) * 0.06;
+      v.group.rotation.x = -pull * 0.16 + recoil * 0.1;
     },
   };
   function updateTowerViews(t, dt) {
@@ -1571,22 +1725,24 @@ const Renderer = (() => {
   function addEnemyView(e) {
     const g = liveProp(ENEMY_RECIPES[e.type](), e.x, 0, e.z, { ao: !e.flying });
     g.name = `enemy-${e.id}`;
-    const v = { group: g, e, decal: decal(0, 0, e.type === 'troll' ? 0.45 : 0.3, g), pop: 0, live: {} };
+    const big = e.type === 'troll' ? 0.45 : e.type === 'ram' ? 0.85 : 0.3;
+    const v = { group: g, e, decal: decal(0, 0, big, g), decalR: big, pop: 0, live: {} };
     g.traverse((o) => { if (o.name && o !== g) v.live[o.name] = o; });
-    if (e.boss) {
-      v.decal.scale.setScalar(0.7);
-    } else if (e.flying) {
+    if (e.flying) {
       v.wingL = v.live.wingL; v.wingR = v.live.wingR;
-      v.wingL.matrixAutoUpdate = false; v.wingR.matrixAutoUpdate = false;
-      v.decal.scale.setScalar(0.22);
+      if (v.wingL) { v.wingL.matrixAutoUpdate = false; v.wingR.matrixAutoUpdate = false; }
+      v.decal.scale.setScalar(e.boss ? 0.7 : 0.22);
+      v.breath = 2 + Math.random() * 2;
     } else {
       v.earL = v.live.earL; v.earR = v.live.earR;
       v.footL = v.live.footL; v.footR = v.live.footR;
-      if (v.earL) { v.earL.matrixAutoUpdate = false; v.earR.matrixAutoUpdate = false; }
+      if (e.type === 'grunt') v.earL.matrixAutoUpdate = false;
       v.baseFootY = v.footL.position.y;
       v.walk = WALK[e.type];
+      v.base = {};
+      for (const k in v.live) v.base[k] = { p: v.live[k].position.clone(), r: v.live[k].rotation.clone() };
     }
-    // status effect dressing: frost crystals when chilled, a thorn ring when rooted
+    // status dressing: frost crystals when chilled, a puddle of pitch when stuck
     v.frost = new THREE.Group();
     for (let i = 0; i < 3; i++) {
       const c = new THREE.Mesh(GEO.cone, unlit(PALETTE.frost));
@@ -1596,11 +1752,18 @@ const Renderer = (() => {
       v.frost.add(c);
     }
     v.frost.visible = false; g.add(v.frost);
-    v.roots = new THREE.Mesh(GEO.torus, toon(PALETTE.cloakDark));
-    v.roots.rotation.x = Math.PI / 2; v.roots.position.y = 0.05; v.roots.scale.setScalar(0.28);
+    v.roots = new THREE.Group();
+    const pool = new THREE.Mesh(GEO.circle, toon(PALETTE.pitch));
+    pool.position.y = 0.02; pool.scale.setScalar(0.34);
+    v.roots.add(pool);
+    for (let i = 0; i < 3; i++) {
+      const b = new THREE.Mesh(GEO.bead, toon(PALETTE.pitch));
+      b.position.set(Math.cos(i * 2.3) * 0.22, 0.04, Math.sin(i * 2.3) * 0.2); b.scale.set(0.06, 0.04, 0.06);
+      v.roots.add(b);
+    }
     v.roots.visible = false; g.add(v.roots);
     enemyViews.set(e.id, v);
-    puff(e.x, e.flying ? BAT_HEIGHT : 0.3, e.z, { count: e.boss ? 24 : 7, color: PALETTE.spore, speed: e.boss ? 2 : 0.8, size: e.boss ? 0.16 : 0.09, up: 1.2 });
+    puff(e.x, e.flying ? BAT_HEIGHT : 0.3, e.z, { count: e.boss ? 24 : 7, color: e.flying ? PALETTE.batDark : 0x8c847a, speed: e.boss ? 2 : 0.8, size: e.boss ? 0.16 : 0.09, up: 1.2 });
     return v;
   }
   function updateEnemyViews(t, dt) {
@@ -1609,42 +1772,55 @@ const Renderer = (() => {
       v.frost.visible = !!e.chilled;
       v.roots.visible = !!e.rooted;
       if (e.chilled) v.frost.rotation.y = t * 2;
-      if (e.boss) { updateBossView(v, t, dt); continue; }
+      if (e.type === 'dragon') { updateDragonView(v, t, dt); continue; }
+      if (e.boss && e.flying) { updateBossView(v, t, dt); continue; }
       if (e.flying) { updateBatView(v, t, dt); continue; }
       const w = v.walk;
       const cycle = e.dist * w.freq;
       const bounce = e.rooted ? 0 : Math.abs(Math.sin(cycle));
       const struggle = e.rooted ? Math.sin(t * 30) * 0.03 : 0;
-      const born = Math.min(1, e.age / 0.35);   // pop out of the crack
+      const born = Math.min(1, e.age / 0.35);   // stride out of the camp
       g.position.set(e.x + struggle, w.bounce * bounce, e.z);
       g.rotation.y = Math.atan2(e.dirX, e.dirZ);
       g.rotation.x = w.lean;
       g.rotation.z = Math.sin(cycle) * w.sway + struggle * 4;
       const stretch = 0.9 + 0.22 * bounce;
       v.pop = Math.max(0, v.pop - dt * 5);
-      const popK = Math.sin(Math.min(1, v.pop) * Math.PI) * 0.35;   // scale-pop when hit
+      const popK = Math.sin(Math.min(1, v.pop) * Math.PI) * (e.boss ? 0.15 : 0.35);   // scale-pop when hit
       const s = born * (1 - (1 - born) * 0.5);
-      g.scale.set(s * (1.06 - 0.1 * bounce + popK), s * (stretch - popK * 0.6), s * (1.06 - 0.1 * bounce + popK));
+      const sq = e.boss ? 0.3 : 1;
+      g.scale.set(s * (1 + (0.06 - 0.1 * bounce) * sq + popK), s * (1 + (stretch - 1) * sq - popK * 0.6), s * (1 + (0.06 - 0.1 * bounce) * sq + popK));
       const flap = 0.35 + 0.45 * bounce;
       if (e.type === 'grunt') {
-        pivotMatrix(0.2, 0.56, 0, 0, 0, -1.2 + flap, 0, 0.13, 0, 0.07, 0.26, 0.05, v.earL.matrix);
-        pivotMatrix(-0.2, 0.56, 0, 0, 0, 1.2 - flap, 0, 0.13, 0, 0.07, 0.26, 0.05, v.earR.matrix);
+        // the hood tail flops behind with every step
+        pivotMatrix(0, 0.66, -0.16, -1.9 + flap * 0.7, 0, Math.sin(cycle) * 0.3, 0, 0.14, 0, 0.08, 0.3, 0.06, v.earL.matrix);
       } else if (e.type === 'trickster') {
-        pivotMatrix(0.13, 0.62, 0, 0, 0, -1.4 + flap * 0.8, 0, 0.12, 0, 0.05, 0.24, 0.04, v.earL.matrix);
-        pivotMatrix(-0.13, 0.62, 0, 0, 0, 1.4 - flap * 0.8, 0, 0.12, 0, 0.05, 0.24, 0.04, v.earR.matrix);
-        v.live.leaf.rotation.z = -0.3 + Math.sin(cycle) * 0.2;
+        // the loot sack bounces on his shoulder, the feather whips about
+        v.earL.position.y = v.base.earL.p.y + bounce * 0.05;
+        v.earR.position.y = v.base.earR.p.y + bounce * 0.07;
+        v.live.leaf.rotation.z = v.base.leaf.r.z + Math.sin(cycle) * 0.35;
       } else if (e.type === 'troll') {
-        // knuckle-walk: fists swing opposite the feet
-        v.live.fistL.position.z = 0.2 - Math.sin(cycle) * 0.16;
-        v.live.fistR.position.z = 0.2 + Math.sin(cycle) * 0.16;
-        v.live.armL.rotation.x = -Math.sin(cycle) * 0.3; v.live.armR.rotation.x = Math.sin(cycle) * 0.3;
+        // a heavy stomp: the mace swings, the plume bobs
+        v.live.armR.rotation.x = -Math.sin(cycle) * 0.3;
+        v.live.fistR.position.z = v.base.fistR.p.z + Math.sin(cycle) * 0.08;
+        v.live.maceHandle.position.z = v.base.maceHandle.p.z + Math.sin(cycle) * 0.08;
+        v.live.maceHead.position.z = v.base.maceHead.p.z + Math.sin(cycle) * 0.1;
+        v.live.plume.rotation.x = v.base.plume.r.x + bounce * 0.3;
+      } else if (e.type === 'ram') {
+        // wheels roll with the distance covered, the ram log swings on its chains
+        for (let i = 0; i < 4; i++) v.live[`wheel${i}`].rotation.x = -e.dist * 4.5;
+        const swing = Math.sin(t * 2.4) * 0.12;
+        v.live.ram.position.z = v.base.ram.p.z + swing;
+        v.live.ramHead.position.z = v.base.ramHead.p.z + swing;
+        v.live.flag.rotation.y = Math.sin(t * 5) * 0.4;
+        v.live.flagStripe.rotation.y = v.live.flag.rotation.y;
       }
       const stride = e.type === 'troll' ? 0.1 : 0.12;
-      v.footL.position.z = 0.02 + Math.sin(cycle) * stride;
-      v.footR.position.z = 0.02 - Math.sin(cycle) * stride;
+      v.footL.position.z = v.base.footL.p.z + Math.sin(cycle) * stride;
+      v.footR.position.z = v.base.footR.p.z - Math.sin(cycle) * stride;
       v.footL.position.y = v.baseFootY + Math.max(0, Math.sin(cycle)) * 0.06 - w.bounce * bounce;
       v.footR.position.y = v.baseFootY + Math.max(0, -Math.sin(cycle)) * 0.06 - w.bounce * bounce;
-      v.decal.scale.setScalar((e.type === 'troll' ? 0.45 : 0.3) * (1 - 0.3 * bounce));
+      v.decal.scale.setScalar(v.decalR * (1 - 0.3 * bounce));
       v.decal.position.y = 0.012 - w.bounce * bounce;   // keep the shadow flat on the ground while the body hops
     }
     for (let i = dying.length - 1; i >= 0; i--) {
@@ -1664,13 +1840,13 @@ const Renderer = (() => {
     g.position.set(e.x, BOSS_HEIGHT + bob, e.z);
     g.rotation.y = Math.atan2(e.dirX, e.dirZ);
     g.scale.setScalar(born * (1 + popK));
-    v.live.heart.scale.setScalar(0.2 + Math.sin(t * 9) * 0.04 + popK);
-    v.live.core.rotation.y = t * 0.8; v.live.core.rotation.x = Math.sin(t) * 0.3;
+    v.live.heart.scale.setScalar(0.16 + Math.sin(t * 9) * 0.04 + popK);
+    v.live.core.rotation.y = Math.sin(t * 0.8) * 0.4; v.live.core.rotation.x = Math.sin(t) * 0.15;
     const alive = Math.max(1, Math.ceil(BOSS_CROWS * e.hp / e.maxHp));
     for (let i = 0; i < BOSS_CROWS; i++) {
       const show = i < alive;
       const a = t * 2.2 + i * (Math.PI * 2 / BOSS_CROWS);
-      const r = 0.55 + Math.sin(t * 3 + i) * 0.08, y = Math.sin(t * 4 + i * 1.3) * 0.16;
+      const r = 0.7 + Math.sin(t * 3 + i) * 0.08, y = Math.sin(t * 4 + i * 1.3) * 0.16;
       const body = v.live[`crow${i}`], wing = v.live[`crowWing${i}`], beak = v.live[`crowBeak${i}`];
       body.visible = wing.visible = beak.visible = show;
       if (!show) continue;
@@ -1678,11 +1854,39 @@ const Renderer = (() => {
       body.rotation.y = -a;   // nose along the orbit
       wing.position.copy(body.position);
       wing.rotation.y = -a; wing.rotation.z = Math.sin(t * 20 + i) * 0.7;
-      beak.position.set(Math.cos(a) * r - Math.sin(a) * 0.14, y, Math.sin(a) * r + Math.cos(a) * 0.14);
+      beak.position.set(Math.cos(a) * r - Math.sin(a) * 0.1, y + 0.03, Math.sin(a) * r + Math.cos(a) * 0.1);
       beak.rotation.set(Math.PI / 2, 0, 0); beak.rotation.y = -a;
     }
     v.decal.position.y = -(BOSS_HEIGHT + bob) + 0.012;
     v.decal.scale.setScalar(0.7 - bob * 0.5);
+  }
+  // The dragon glides with slow heavy wingbeats, its body rising on each
+  // downstroke, and every few seconds it opens its jaws and breathes embers.
+  function updateDragonView(v, t, dt) {
+    const e = v.e, g = v.group;
+    const born = Math.min(1, e.age / 0.8);
+    v.pop = Math.max(0, v.pop - dt * 5);
+    const popK = Math.sin(Math.min(1, v.pop) * Math.PI) * 0.12;
+    const beat = Math.sin(t * 6.5);
+    const bob = -beat * 0.08 + Math.sin(t * 1.3) * 0.06;
+    g.position.set(e.x, BOSS_HEIGHT + 0.15 + bob, e.z);
+    g.rotation.y = Math.atan2(e.dirX, e.dirZ);
+    g.rotation.x = beat * 0.05;
+    g.scale.set(born * (1 + popK), born * (1 - popK * 0.5), born * (1 + popK));
+    const flap = beat * 0.7 + 0.1;
+    pivotMatrix(0.2, 0.14, 0.1, 0, 0, flap, 0, 0, 0, 1.15, 0.035, 1.0, v.wingL.matrix);
+    pivotMatrix(-0.2, 0.14, 0.1, 0, 0, -flap, 0, 0, 0, 1.15, 0.035, 1.0, v.wingR.matrix);
+    v.breath -= dt;
+    const open = v.breath < 0.6 ? Math.sin(Math.max(0, v.breath) / 0.6 * Math.PI) : 0;
+    v.live.jaw.position.y = 0.26 - open * 0.08;
+    v.live.jaw.rotation.x = open * 0.5;
+    if (v.breath < 0.45 && v.breath > 0 && Math.random() < 0.6) {
+      const fx = Math.sin(g.rotation.y), fz = Math.cos(g.rotation.y);
+      puff(e.x + fx * 1.0, g.position.y + 0.25, e.z + fz * 1.0, { count: 2, color: Math.random() < 0.5 ? PALETTE.ember : PALETTE.flowerYellow, speed: 0.9, size: 0.1, up: 0.4, ttl: 0.5 });
+    }
+    if (v.breath <= 0) v.breath = 2.5 + Math.random() * 1.5;
+    v.decal.position.y = -(g.position.y) + 0.012;
+    v.decal.scale.setScalar(0.8 - bob * 0.5);
   }
   function updateBatView(v, t, dt) {
     const e = v.e, g = v.group;
@@ -1695,8 +1899,8 @@ const Renderer = (() => {
     g.rotation.y = Math.atan2(e.dirX, e.dirZ);
     g.rotation.z = Math.sin(t * 2.5 + e.id) * 0.15;
     g.scale.set(born * (1 + popK), born * (1 - popK * 0.5), born * (1 + popK));
-    pivotMatrix(0.12, 0.02, 0, 0, 0, flap, 0.26, 0, 0, 0.52, 0.02, 0.3, v.wingL.matrix);
-    pivotMatrix(-0.12, 0.02, 0, 0, 0, -flap, -0.26, 0, 0, 0.52, 0.02, 0.3, v.wingR.matrix);
+    pivotMatrix(0.12, 0.02, 0, 0, 0, flap, 0, 0, 0, 0.5, 0.03, 0.5, v.wingL.matrix);
+    pivotMatrix(-0.12, 0.02, 0, 0, 0, -flap, 0, 0, 0, 0.5, 0.03, 0.5, v.wingR.matrix);
     v.decal.position.y = -(BAT_HEIGHT + bob) + 0.012;   // shadow stays on the ground
   }
   // Exit animations are capped: if more than this many are playing at once
@@ -1729,13 +1933,13 @@ const Renderer = (() => {
           const big = v.e.boss ? 3 : 1;
           puff(g.position.x, 0.45, g.position.z, { count: 12 * big, color: PALETTE.cream, speed: 1.6 * big, size: 0.13, up: 1.2, ttl: 0.7 });
           puff(g.position.x, 0.4, g.position.z, { count: 6 * big, color: v.e.flying ? PALETTE.batDark : PALETTE.goblin, speed: 2.2, size: 0.08, up: 2.2, ttl: 0.6 });
-          if (v.e.boss) { puff(g.position.x, 0.6, g.position.z, { count: 16, color: PALETTE.magic, speed: 3, size: 0.1, up: 2.5, ttl: 0.9 }); shakeCamera(0.16, 0.6); }
+          if (v.e.boss) { puff(g.position.x, 0.6, g.position.z, { count: 16, color: PALETTE.gold, speed: 3, size: 0.1, up: 2.5, ttl: 0.9 }); shakeCamera(0.16, 0.6); }
         }
       },
     });
   }
 
-  // Leak: the goblin squeezes through the gate with a spin and a puff.
+  // Leak: the knave barges through the gate with a spin and a puff.
   function leakExit(v) {
     const g = v.group;
     const x0 = g.position.x, z0 = g.position.z;
@@ -1848,17 +2052,19 @@ const Renderer = (() => {
     GameState.on('projectileHit', ({ projectile: p, x, z, flying }) => {
       const y = flying ? BAT_HEIGHT : 0.45;
       if (p.kind === 'thorn') {
-        puff(x, 0.2, z, { count: 14, color: PALETTE.magic, speed: 2.4, size: 0.08, up: 0.9, ttl: 0.5 });
-        puff(x, 0.2, z, { count: 8, color: PALETTE.cloak, speed: 1.6, size: 0.1, up: 1.4, ttl: 0.6 });
+        // the pot bursts: a splat of black pitch and a lick of flame
+        puff(x, 0.2, z, { count: 14, color: PALETTE.pitch, speed: 2.2, size: 0.09, up: 0.9, ttl: 0.55 });
+        puff(x, 0.25, z, { count: 6, color: PALETTE.ember, speed: 1.4, size: 0.08, up: 1.6, ttl: 0.45 });
       } else if (p.kind === 'wisp') {
         puff(x, y, z, { count: 6, color: PALETTE.frost, speed: 1.2, size: 0.07, up: 0.6, ttl: 0.45 });
       } else if (p.kind === 'boulder') {
-        puff(x, 0.2, z, { count: 12, color: PALETTE.stone, speed: 2.0, size: 0.11, up: 1.6, ttl: 0.6 });
+        puff(x, 0.2, z, { count: 12, color: PALETTE.path, speed: 2.0, size: 0.11, up: 1.6, ttl: 0.6 });
+        puff(x, 0.4, z, { count: 5, color: PALETTE.flowerYellow, speed: 2.6, size: 0.06, up: 1.4, ttl: 0.35 });
         shakeCamera(0.1, 0.3);
       } else if (p.kind === 'bigacorn') {
-        puff(x, y, z, { count: 12, color: PALETTE.acorn, speed: 2.6, size: 0.1, up: 1.8, ttl: 0.6 });
+        puff(x, y, z, { count: 10, color: PALETTE.woodLight, speed: 2.4, size: 0.08, up: 1.8, ttl: 0.55 });
         puff(x, y, z, { count: 8, color: PALETTE.cream, speed: 1.4, size: 0.12, up: 1.0, ttl: 0.7 });
-        shakeCamera(0.06, 0.25);
+        shakeCamera(0.05, 0.22);
       }
     });
   }
@@ -1934,7 +2140,7 @@ const Renderer = (() => {
     return {
       P, M, GEO, PALETTE, batchPart, batchDecal, liveProp, decal, colored,
       toon, unlit, addOutline, srand, lerpColor, shakeCamera, puff,
-      treeParts, deadTreeParts, rockParts, mushroomParts, tuftParts, flowerParts, acornParts,
+      treeParts, deadTreeParts, rockParts, mushroomParts, tuftParts, flowerParts, hayParts, pivotMatrix,
       water, masonry, towerCourses, roofCourses, windowDress, glow, setGlow, bannerGeo, shade,
       worldX, worldZ, cols, rows, border,
       scene, animated,

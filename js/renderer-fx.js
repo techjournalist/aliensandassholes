@@ -33,7 +33,8 @@ const RendererFX = (() => {
   // ground keeps the same stepped lighting as everything standing on it.
   // Blight: the level's corruption falloff is re-evaluated per pixel (same
   // formula as GameState.zoneFalloff, but continuous instead of per tile),
-  // and where it's strong the ground splits into dark, faintly pulsing cracks.
+  // and where it's strong the ground splits into dark cracks that smolder
+  // with a faint ember glow (the Baron's war camps burn what they cross).
   function patchGround(material, zone, timeUniform) {
     material.onBeforeCompile = (shader) => {
       shader.uniforms.uTime = timeUniform;
@@ -58,7 +59,7 @@ const RendererFX = (() => {
           float fxCore = (1.0 - smoothstep(0.0, 0.03, fxCr)) * smoothstep(0.3, 0.75, fxH);
           diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 0.4, fxCrack);`)
         .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
-          totalEmissiveRadiance += vec3(0.62, 0.3, 0.95) * (fxCrack * 0.25 + fxCore * 0.6) * (0.55 + 0.45 * sin(uTime * 1.7 + vFxWorld.x * 1.3 + vFxWorld.z));`);
+          totalEmissiveRadiance += vec3(1.0, 0.42, 0.12) * (fxCrack * 0.25 + fxCore * 0.6) * (0.55 + 0.45 * sin(uTime * 1.7 + vFxWorld.x * 1.3 + vFxWorld.z));`);
     };
     material.customProgramCacheKey = () => 'fx-ground';
     return material;
@@ -66,7 +67,7 @@ const RendererFX = (() => {
 
   // Water: toon-banded current streaks drifting downstream (+z), a lighter
   // shallow band near each bank and a wobbling foam line at the edge.
-  // The same shader, slowed and recolored, is the Cairnwatch's ooze.
+  // The same shader, slowed and darkened, is Castle Aldermere's moat.
   function waterMaterial({ shallow, deep, foam, speed = 0.7, stripe = 0.74, foamAmt = 0.55 }) {
     return new THREE.ShaderMaterial({
       uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, {

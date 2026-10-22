@@ -8,13 +8,19 @@ const GameState = (() => {
   let routes = [], cobbleCells = new Set(), spawnCells = new Set();
   let pathCells = [], pathIndex = new Map(), gate = { x: 0, z: 0 };
 
-  // Every tower is a character with a job.
+  // Every tower is a character with a job. The ids are the engine's role
+  // names, kept from the original game so its tests and tooling carry over:
+  //   slinger   = Javelin Squire   (fast, cheap, single target, ground only)
+  //   warden    = Pitchpot Friar   (sticky splash that roots, ground only)
+  //   druid     = Court Magus      (chilling frost, reaches flyers)
+  //   golem     = Hammer Knight    (one huge slow hit, ground only)
+  //   artillery = Longbowman       (long arcing volleys, splash, reaches flyers)
   const TOWER_TYPES = {
-    slinger:   { id: 'slinger',   name: 'Sprout Slinger',     cost: 70,  range: 2.6, damage: 8,  cooldown: 0.62, windup: 0.16, projectileSpeed: 7.5, projectile: 'acorn',   splash: 0,   hitsFlying: false, icon: '&#127793;', blurb: 'Quick acorn shots. Cheap. Ground only.' },
-    warden:    { id: 'warden',    name: 'Bramblecast Warden', cost: 110, range: 2.3, damage: 16, cooldown: 1.5,  windup: 0.3,  projectileSpeed: 5.5, projectile: 'thorn',   splash: 0.9, hitsFlying: false, icon: '&#127807;', blurb: 'Thorn bursts hit a crowd and root it. Ground only.', effect: { root: 0.9 } },
-    druid:     { id: 'druid',     name: 'Frostmoss Druid',    cost: 90,  range: 2.9, damage: 5,  cooldown: 0.8,  windup: 0.2,  projectileSpeed: 9,   projectile: 'wisp',    splash: 0,   hitsFlying: true,  icon: '&#10052;',  blurb: 'Light frost that chills. Reaches flyers.', effect: { chill: 2.2, chillMul: 0.55 } },
-    golem:     { id: 'golem',     name: 'Stonebark Golem',    cost: 130, range: 2.2, damage: 46, cooldown: 2.4,  windup: 0.45, projectileSpeed: 8,   projectile: 'boulder', splash: 0,   hitsFlying: false, icon: '&#129704;', blurb: 'One huge hit, slow to wind up. Ground only.' },
-    artillery: { id: 'artillery', name: 'Acorn Artillery',    cost: 120, range: 4.2, minRange: 1.4, damage: 15, cooldown: 2.4, windup: 0.35, projectileSpeed: 5, projectile: 'bigacorn', splash: 0.7, hitsFlying: true, icon: '&#127792;', blurb: 'Lobs a huge acorn far, not near. Splashes. Reaches flyers.' },
+    slinger:   { id: 'slinger',   name: 'Javelin Squire',  cost: 70,  range: 2.6, damage: 8,  cooldown: 0.62, windup: 0.16, projectileSpeed: 7.5, projectile: 'acorn',   splash: 0,   hitsFlying: false, icon: '&#128481;', blurb: 'Quick javelins. Cheap. Ground only.' },
+    warden:    { id: 'warden',    name: 'Pitchpot Friar',  cost: 110, range: 2.3, damage: 16, cooldown: 1.5,  windup: 0.3,  projectileSpeed: 5.5, projectile: 'thorn',   splash: 0.9, hitsFlying: false, icon: '&#127855;', blurb: 'Pots of sticky pitch glue a crowd in place. Ground only.', effect: { root: 0.9 } },
+    druid:     { id: 'druid',     name: 'Court Magus',     cost: 90,  range: 2.9, damage: 5,  cooldown: 0.8,  windup: 0.2,  projectileSpeed: 9,   projectile: 'wisp',    splash: 0,   hitsFlying: true,  icon: '&#10052;',  blurb: 'Frost bolts that chill. Reaches flyers.', effect: { chill: 2.2, chillMul: 0.55 } },
+    golem:     { id: 'golem',     name: 'Hammer Knight',   cost: 130, range: 2.2, damage: 46, cooldown: 2.4,  windup: 0.45, projectileSpeed: 8,   projectile: 'boulder', splash: 0,   hitsFlying: false, icon: '&#128296;', blurb: 'Hurls one huge hammer, slow to wind up. Ground only.' },
+    artillery: { id: 'artillery', name: 'Longbowman',      cost: 120, range: 4.2, minRange: 1.4, damage: 15, cooldown: 2.4, windup: 0.35, projectileSpeed: 5, projectile: 'bigacorn', splash: 0.7, hitsFlying: true, icon: '&#127993;', blurb: 'Arcing volleys, far but not near. Splashes. Reaches flyers.' },
   };
   const TOWER_ORDER = ['slinger', 'warden', 'druid', 'golem', 'artillery'];
   // Tier 3 is a permanent choice between two specializations. Each is about
@@ -23,27 +29,28 @@ const GameState = (() => {
   // damage/cooldown multiply the base type, range adds; splash and effect
   // replace the base values when given. shots: targets per volley.
   // pierce: ignores armor. groundSplash: the blast lands on the ground, so
-  // flyers other than the one aimed at are untouched.
+  // flyers other than the one aimed at are untouched. (Branch ids are the
+  // original engine's too; only names and blurbs are this game's.)
   const BRANCHES = {
     slinger: {
-      marksman: { name: 'Thornshot Marksman', icon: '&#127919;', blurb: 'One slow, huge shot that pierces armor.', damage: 5, cooldown: 1.7, range: 1.1, pierce: true },
-      bloom:    { name: 'Rapid Bloom',        icon: '&#127804;', blurb: 'Fast shots at two targets. Weak vs armor.', damage: 1.25, cooldown: 0.6, range: 0.3, shots: 2 },
+      marksman: { name: 'Huntsman',     icon: '&#127919;', blurb: 'One slow, heavy spear that pierces armor.', damage: 5, cooldown: 1.7, range: 1.1, pierce: true },
+      bloom:    { name: 'Skirmisher',   icon: '&#9876;',   blurb: 'Fast throws at two targets. Weak vs armor.', damage: 1.25, cooldown: 0.6, range: 0.3, shots: 2 },
     },
     warden: {
-      thicket: { name: 'Thicket Keeper', icon: '&#127795;', blurb: 'Wide thorns that root a crowd for long.', damage: 1.3, cooldown: 1.0, range: 0.3, splash: 1.2, effect: { root: 1.4 } },
-      briarstorm: { name: 'Briarstorm',     icon: '&#127786;', blurb: 'Big thorn blasts. Roots only briefly.', damage: 3.4, cooldown: 0.8, range: 0.3, splash: 1.15, effect: { root: 0.4 } },
+      thicket: { name: 'Tar Abbot',      icon: '&#9962;',   blurb: 'Wide pitch pools that glue a crowd for long.', damage: 1.3, cooldown: 1.0, range: 0.3, splash: 1.2, effect: { root: 1.4 } },
+      briarstorm: { name: 'Firepot Friar', icon: '&#128293;', blurb: 'Burning pitch blasts. Sticks only briefly.', damage: 3.4, cooldown: 0.8, range: 0.3, splash: 1.15, effect: { root: 0.4 } },
     },
     druid: {
-      hoarfrost: { name: 'Hoarfrost Circle', icon: '&#10052;', blurb: 'Frost bursts that slow a whole crowd.', damage: 1.2, cooldown: 0.95, range: 0.2, splash: 1.0, groundSplash: true, effect: { chill: 2.2, chillMul: 0.45 } },
-      seer: { name: 'Icicle Seer', icon: '&#128142;', blurb: 'Sharp icicles, long reach. Kills flyers.', damage: 5, cooldown: 0.7, range: 0.8, effect: { chill: 1.0, chillMul: 0.75 } },
+      hoarfrost: { name: 'Winter Magus', icon: '&#10052;', blurb: 'Frost bursts that slow a whole crowd.', damage: 1.2, cooldown: 0.95, range: 0.2, splash: 1.0, groundSplash: true, effect: { chill: 2.2, chillMul: 0.45 } },
+      seer: { name: 'Star Seer', icon: '&#10024;', blurb: 'Sharp star-bolts, long reach. Kills flyers.', damage: 5, cooldown: 0.7, range: 0.8, effect: { chill: 1.0, chillMul: 0.75 } },
     },
     golem: {
-      earthshaker: { name: 'Earthshaker', icon: '&#127755;', blurb: 'The slam cracks the ground and roots a crowd.', damage: 1.5, cooldown: 1, range: 0.3, splash: 1.0, effect: { root: 0.4 } },
-      mountainheart: { name: 'Mountainheart', icon: '&#128081;', blurb: 'A crushing blow that ignores armor.', damage: 4.2, cooldown: 1.0, range: 0.3, pierce: true },
+      earthshaker: { name: 'Thunder Knight', icon: '&#9889;', blurb: 'The hammer quakes the ground and staggers a crowd.', damage: 1.5, cooldown: 1, range: 0.3, splash: 1.0, effect: { root: 0.4 } },
+      mountainheart: { name: 'Armorbreaker', icon: '&#128737;', blurb: 'A crushing blow that ignores armor.', damage: 4.2, cooldown: 1.0, range: 0.3, pierce: true },
     },
     artillery: {
-      oakfall: { name: 'Oakfall Mortar', icon: '&#128165;', blurb: 'A giant acorn with a huge blast. Slow.', damage: 3.2, cooldown: 1.2, range: 1.0, splash: 1.4, groundSplash: true },
-      squirrel: { name: 'Squirrel Battery', icon: '&#128063;', blurb: 'Three acorns at three targets. Small blasts.', damage: 1.3, cooldown: 0.75, range: 0.5, splash: 0.35, shots: 3 },
+      oakfall: { name: 'Fire Archers', icon: '&#9732;', blurb: 'A flaming volley with a huge blast. Slow.', damage: 3.2, cooldown: 1.2, range: 1.0, splash: 1.4, groundSplash: true },
+      squirrel: { name: 'Volley Captain', icon: '&#127993;', blurb: 'Three volleys at three targets. Small blasts.', damage: 1.3, cooldown: 0.75, range: 0.5, splash: 0.35, shots: 3 },
     },
   };
   // Tier progression. Tier 2 is a flat step up. Tier 3's stats here are only a
@@ -55,18 +62,17 @@ const GameState = (() => {
     { damage: 2.25, cooldown: 0.84, range: 0.5,  costMul: 1.3 },
   ];
   const SELL_REFUND = 0.6;
+  // The knaves. Role ids as above: grunt = Brigand, trickster = Cutpurse,
+  // troll = Black Knight, bat = Gargoyle. Three bosses close the campaign's
+  // acts: a ground boss the whole tower roster can hit, then two flyers.
   const ENEMY_TYPES = {
-    grunt:     { id: 'grunt',     name: 'Goblin Grunt',      hp: 30,  speed: 1.25, bounty: 8,   flying: false, armor: 0 },
-    trickster: { id: 'trickster', name: 'Bog-Trickster',     hp: 16,  speed: 2.3,  bounty: 6,   flying: false, armor: 0, wobble: true },
-    troll:     { id: 'troll',     name: 'Moss Troll',        hp: 170, speed: 0.72, bounty: 25,  flying: false, armor: 4 },
-    bat:       { id: 'bat',       name: 'Bramble Bat',       hp: 22,  speed: 1.75, bounty: 10,  flying: true,  armor: 0 },
-    boss:      { id: 'boss',      name: 'Shadow-Crow Swarm', hp: 640, speed: 0.78, bounty: 150, flying: true,  armor: 1, boss: true },
-    // three new finale bosses, one each for Levels 6-8 (previously boss-less).
-    // fast+armored, fast+soft and slow+heavily-armored respectively, so each
-    // demands a genuinely different anti-air answer, not just a reskin.
-    tideworm:  { id: 'tideworm',  name: 'The Drowned Swarm', hp: 580, speed: 0.85, bounty: 160, flying: true,  armor: 1, boss: true },
-    matriarch: { id: 'matriarch', name: 'The Hive Matriarch', hp: 600, speed: 0.9,  bounty: 160, flying: true,  armor: 0, boss: true },
-    rime:      { id: 'rime',      name: 'The Rime Swarm',    hp: 620, speed: 0.75, bounty: 160, flying: true,  armor: 1, boss: true },
+    grunt:     { id: 'grunt',     name: 'Brigand',          hp: 30,  speed: 1.25, bounty: 8,   flying: false, armor: 0 },
+    trickster: { id: 'trickster', name: 'Cutpurse',         hp: 16,  speed: 2.3,  bounty: 6,   flying: false, armor: 0, wobble: true },
+    troll:     { id: 'troll',     name: 'Black Knight',     hp: 170, speed: 0.72, bounty: 25,  flying: false, armor: 4 },
+    bat:       { id: 'bat',       name: 'Gargoyle',         hp: 22,  speed: 1.75, bounty: 10,  flying: true,  armor: 0 },
+    ram:       { id: 'ram',       name: 'The Siege Ram',    hp: 1300, speed: 0.5,  bounty: 150, flying: false, armor: 5, boss: true },
+    stonelord: { id: 'stonelord', name: 'The Gargoyle Lord', hp: 520, speed: 0.78, bounty: 150, flying: true, armor: 1, boss: true },
+    dragon:    { id: 'dragon',    name: 'The Black Dragon', hp: 700, speed: 0.72, bounty: 200, flying: true,  armor: 2, boss: true },
   };
 
   const listeners = {};
@@ -259,8 +265,8 @@ const GameState = (() => {
       return { ok: true, c, r, tower };
     }
     let reason = null;
-    if (isPath(c, r)) reason = "Can't build on the road, the goblins walk there.";
-    else if (isStream(c, r)) reason = "Can't build in the stream.";
+    if (isPath(c, r)) reason = "Can't build on the road, the knaves march there.";
+    else if (isStream(c, r)) reason = "Can't build in the water.";
     else if (isBastion(c, r)) reason = `That's ${level.endpoint.name}. Build around it.`;
     else if (isSpawn(c, r)) reason = level.spawnBlockedText;
     else if (!isBuildable(c, r)) reason = 'Too far from the road. A tower needs a road to watch.';

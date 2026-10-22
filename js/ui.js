@@ -17,7 +17,7 @@ const UI = (() => {
     let main, sub = '';
     if (s.waveActive) main = `${GameState.enemiesLeft()} coming`;
     else if (s.wave === 0) main = 'Send the first wave';
-    else if (s.wave >= total) main = 'The valley is quiet';
+    else if (s.wave >= total) main = 'The realm is quiet';
     else if (s.prep > 0) { main = `Send wave ${s.wave + 1}`; sub = `auto in ${Math.ceil(s.prep)}s · now for +${Math.round(s.prep * 1.5)} gold`; }
     else main = `Send wave ${s.wave + 1}`;
     // Written to two persistent child spans via textContent, never btn.innerHTML:
@@ -153,7 +153,7 @@ const UI = (() => {
       const sel = GameState.state.selected;
       const tipTile = GameState.currentLevel().tipTile;
       const p = Renderer.worldToScreen(GameState.worldX(tipTile[0]), 0, GameState.worldZ(tipTile[1]));
-      const text = sel && sel.kind === 'tile' ? 'Now pick a tower to plant' : 'Tap here to plant a tower';
+      const text = sel && sel.kind === 'tile' ? 'Now pick a tower to raise' : 'Tap here to raise a tower';
       if (sel && sel.kind === 'tile') {
         const bb = $('panel').getBoundingClientRect();
         tip.classList.add('up');
@@ -215,9 +215,9 @@ const UI = (() => {
   }
 
   // -------- world map: pick a level, see stars/locks, commit --------
-  // Static art (land, river, mountains, the blight and the Hollow's heart)
+  // Static art (land, river, hills, the Baron's occupation and Blackmoor)
   // lives in index.html. This draws what depends on progress: roads, the
-  // ground each won battle has reclaimed from the blight, and the nodes.
+  // ground each won battle has taken back from the Baron, and the nodes.
   const SVGNS = 'http://www.w3.org/2000/svg';
   const svgEl = (tag, attrs = {}, cls) => {
     const el = document.createElementNS(SVGNS, tag);
@@ -233,25 +233,20 @@ const UI = (() => {
   }
   // tiny landmarks matching each level's real endpoint
   const GLYPHS = {
-    keep: '<rect class="st" x="-9" y="-6" width="18" height="12"></rect><rect class="st" x="-12" y="-12" width="7" height="18"></rect><rect class="st" x="5" y="-12" width="7" height="18"></rect>'
-      + '<path class="rf" d="M -13 -12 A 4.5 4.5 0 0 1 -4 -12 Z"></path><path class="rf" d="M 4 -12 A 4.5 4.5 0 0 1 13 -12 Z"></path><rect class="wn" x="-2" y="-2" width="4" height="5"></rect>',
-    mill: '<rect class="st" x="-10" y="-5" width="15" height="11"></rect><path class="rb" d="M -12 -5 L -2.5 -13 L 7 -5 Z"></path>'
-      + '<circle class="wd" cx="9" cy="2" r="6"></circle><path class="wd" d="M 3 2 H 15 M 9 -4 V 8"></path>',
-    camp: '<path class="st" d="M -13 7 L -13 -3 M -9 7 L -9 -4 M 9 7 L 9 -4 M 13 7 L 13 -3" style="fill:none;stroke:var(--bark);stroke-width:2.2"></path>'
-      + '<path class="tn" d="M -7 6 L 0 -10 L 7 6 Z"></path><path class="wd" d="M 0 -10 V -15"></path><path class="rf" d="M 0 -15 L 6 -13 L 0 -11 Z"></path><rect class="wn" x="-1.5" y="1" width="3" height="5"></rect>',
-    elderroot: '<circle class="er-ring" cx="0" cy="4" r="15" style="fill:none;stroke:var(--magic);stroke-width:2;opacity:0.75"></circle>'
-      + '<path class="wd" d="M -6 8 L -4 -2 L -1 3 L 1 -6 L 4 1 L 7 -4 L 9 8 Z" style="fill:var(--bark);stroke:var(--ink);stroke-width:1.4"></path>'
-      + '<circle class="wn" cx="1" cy="-1" r="2.4" style="fill:var(--magic)"></circle>',
-    tower: '<rect class="st" x="-5" y="-10" width="10" height="17"></rect><path class="rb" d="M -7 -10 L 0 -20 L 7 -10 Z"></path><rect class="wn" x="-1.5" y="-5" width="3" height="4"></rect>',
-    market: '<path class="wd" d="M -13 6 L -13 -4 M 13 6 L 13 -4" style="fill:none;stroke:var(--bark);stroke-width:2.2"></path>'
-      + '<path class="rf" d="M -15 -4 L 0 -12 L 15 -4 Z"></path><path class="rf" d="M -15 -4 L -8 -1 L -8 -8 Z" style="fill:var(--gold);opacity:0.8"></path>'
-      + '<rect class="wn" x="-9" y="0" width="18" height="6" style="fill:var(--water)"></rect>',
-    apiary: '<rect class="st" x="-6" y="-2" width="12" height="14"></rect>'
-      + '<path class="rf" d="M -6 -2 A 6 5 0 0 1 6 -2 Z" style="fill:var(--gold)"></path>'
-      + '<rect class="wn" x="-2" y="4" width="4" height="5"></rect>',
+    manor: '<rect class="pl" x="-11" y="-4" width="16" height="11"></rect><path class="rf" d="M -13 -4 L -3 -13 L 7 -4 Z"></path>'
+      + '<rect class="st" x="6" y="-12" width="7" height="19"></rect><path class="rs" d="M 5 -12 L 9.5 -21 L 14 -12 Z"></path><rect class="wn" x="-5" y="0" width="4" height="7"></rect>',
+    watchtower: '<rect class="st" x="-6" y="-15" width="12" height="22"></rect><path class="rs" d="M -8 -15 L 0 -22 L 8 -15 Z"></path>'
+      + '<circle class="fire" cx="9" cy="-21" r="3.2"></circle><rect class="wn" x="-1.5" y="-9" width="3" height="4"></rect><rect class="pl" x="-11" y="1" width="9" height="6"></rect>',
+    abbey: '<rect class="st" x="-12" y="-4" width="15" height="11"></rect><path class="rs" d="M -14 -4 L -4.5 -12 L 5 -4 Z"></path>'
+      + '<rect class="st" x="4" y="-10" width="7" height="17"></rect><path class="rs" d="M 3 -10 L 7.5 -22 L 12 -10 Z"></path><circle class="wn" cx="-4.5" cy="1" r="2.6"></circle>',
+    castle: '<rect class="st" x="-12" y="-5" width="24" height="12"></rect><rect class="st" x="-5" y="-14" width="10" height="10"></rect>'
+      + '<rect class="st" x="-15" y="-10" width="6" height="17"></rect><rect class="st" x="9" y="-10" width="6" height="17"></rect>'
+      + '<path class="ry" d="M -16 -10 L -12 -18 L -8 -10 Z"></path><path class="ry" d="M 8 -10 L 12 -18 L 16 -10 Z"></path><path class="ry" d="M -6 -14 L 0 -22 L 6 -14 Z"></path>'
+      + '<rect class="wn" x="-2.5" y="1" width="5" height="6"></rect>',
   };
-  const HOME_TREES = [[720, 108], [742, 160], [700, 88], [738, 226], [714, 268], [668, 68], [750, 118], [690, 290]];
-  const DEADWOOD = [[150, 160], [92, 228], [204, 268], [380, 282], [462, 118], [250, 212], [520, 272], [176, 70], [412, 60]];
+  // woods and farmsteads of the King's own lands, and the burnt stumps the Baron leaves behind
+  const HOME_TREES = [[730, 100], [752, 150], [712, 84], [748, 214], [700, 272], [612, 80], [758, 116], [640, 284], [258, 280], [284, 266], [236, 292], [470, 150]];
+  const DEADWOOD = [[150, 168], [96, 226], [212, 262], [380, 282], [452, 120], [250, 208], [520, 270], [176, 74], [408, 64], [560, 180]];
   let artDrawn = false;
   function drawMapArt() {
     if (artDrawn) return;
@@ -332,8 +327,8 @@ const UI = (() => {
       : phase === 'playing' ? `Return to ${sel.name}`
       : `Play ${sel.name} again`;
   }
-  // The payoff for a first win: the blight visibly pulls back from the
-  // battlefield, with a burst of spores and a chime.
+  // The payoff for a first win: the Baron's occupation visibly pulls back
+  // from the battlefield, with a burst of gold and a chime.
   function playReclaim(id) {
     const cut = $('wm-cuts').querySelector(`[data-level="${id}"]`);
     if (!cut || reducedMotion()) return;
@@ -384,8 +379,8 @@ const UI = (() => {
     // this level once, so the reload should drop them straight into play,
     // not replay the title screen and world map a second time.
     try {
-      sessionStorage.setItem('bb-active-level', id);
-      sessionStorage.setItem('bb-enter-play', '1');
+      sessionStorage.setItem('kk-active-level', id);
+      sessionStorage.setItem('kk-enter-play', '1');
     } catch (e) { /* ignore */ }
     location.reload();
   }
@@ -420,7 +415,7 @@ const UI = (() => {
     });
     $('wave-btn').addEventListener('click', () => { Audio.unlock(); GameState.sendWave(); });
     let skipToPlay = false;
-    try { skipToPlay = sessionStorage.getItem('bb-enter-play') === '1'; sessionStorage.removeItem('bb-enter-play'); } catch (e) { /* ignore */ }
+    try { skipToPlay = sessionStorage.getItem('kk-enter-play') === '1'; sessionStorage.removeItem('kk-enter-play'); } catch (e) { /* ignore */ }
     if (skipToPlay) GameState.startGame(); else $('title').classList.add('show');
     $('start-btn').addEventListener('click', () => { Audio.unlock(); $('title').classList.remove('show'); enterWorldMap(); });
     const pickNode = (e) => {
@@ -494,7 +489,7 @@ const UI = (() => {
     });
     const syncMute = () => { const m = Audio.isMuted(); $('mute-btn').classList.toggle('muted', m); $('mute-btn').querySelector('.icon').innerHTML = m ? '&#128263;' : '&#128266;'; $('mute-btn').setAttribute('aria-label', m ? 'Sound off' : 'Sound on'); };
     $('mute-btn').addEventListener('click', () => { Audio.unlock(); Audio.setMuted(!Audio.isMuted()); syncMute(); });
-    try { if (localStorage.getItem('bb-muted') === '1') { Audio.setMuted(true); } } catch (e) { /* ignore */ }
+    try { if (localStorage.getItem('kk-muted') === '1') { Audio.setMuted(true); } } catch (e) { /* ignore */ }
     syncMute();
     GameState.on('enemyHit', ({ enemy, amount, armored, x, z }) => floater(x, enemy.boss ? 1.6 : enemy.flying ? 1.2 : 0.7, z, armored ? `${amount} clink` : amount, armored ? 'armored' : ''));
     GameState.on('waveEnded', ({ bonus }) => floater(GameState.gate.x, 1.4, GameState.gate.z, `+${bonus} wave bonus`, 'bonus'));
@@ -525,7 +520,7 @@ const UI = (() => {
     GameState.on('towerSold', ({ value }) => toast(`Sold for ${value} gold.`));
     GameState.on('towerUpgraded', (tw) => toast(tw.branch
       ? `${GameState.TOWER_TYPES[tw.type].name} becomes a ${GameState.BRANCHES[tw.type][tw.branch].name}!`
-      : `${GameState.TOWER_TYPES[tw.type].name} grows to tier ${tw.tier}!`));
+      : `${GameState.TOWER_TYPES[tw.type].name} rises to tier ${tw.tier}!`));
     GameState.on('tileRejected', (res) => { renderPanel(); toast(res.reason, true); });
     GameState.on('placeRejected', (res) => toast(res.reason, true));
     GameState.on('enemyLeaked', (e) => { flash('leak'); toast(`A ${e.name} slipped into ${GameState.currentLevel().endpoint.name}!`, true); });

@@ -7,7 +7,7 @@
     return;
   }
   let activeId = null;
-  try { activeId = sessionStorage.getItem('bb-active-level'); } catch (e) { /* storage may be blocked */ }
+  try { activeId = sessionStorage.getItem('kk-active-level'); } catch (e) { /* storage may be blocked */ }
   const level = LEVELS.find((l) => l.id === activeId) || LEVELS[0];
   GameState.loadLevel(level);
 

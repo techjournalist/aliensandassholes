@@ -24,7 +24,7 @@ const Audio = (() => {
       if (!AC) return;
       ctx = new AC();
       buildGraph(ctx);
-      try { muted = localStorage.getItem('bb-muted') === '1'; } catch (e) { /* storage may be blocked */ }
+      try { muted = localStorage.getItem('kk-muted') === '1'; } catch (e) { /* storage may be blocked */ }
       master.gain.value = muted ? 0 : 0.6;
       startAmbience();
     }
@@ -33,14 +33,14 @@ const Audio = (() => {
 
   function setMuted(m) {
     muted = m;
-    try { localStorage.setItem('bb-muted', m ? '1' : '0'); } catch (e) { /* ignore */ }
+    try { localStorage.setItem('kk-muted', m ? '1' : '0'); } catch (e) { /* ignore */ }
     if (master) master.gain.setTargetAtTime(m ? 0 : 0.6, ctx.currentTime, 0.02);
     return muted;
   }
   function isMuted() { return muted; }
 
   // Crowd ducking: many voices inside 120ms get quieter, so a volley of
-  // twenty acorn hits is a patter and not a wall.
+  // twenty javelin hits is a patter and not a wall.
   function duck(t0) {
     if (rendering) return 1;
     while (recent.length && recent[0] < t0 - 0.12) recent.shift();
@@ -143,12 +143,12 @@ const Audio = (() => {
       voice({ type: 'square', freq: 140, to: 95, dur: 0.12, vol: 0.1, cutoff: 500, delay: 0.09 });
       noise({ dur: 0.08, vol: 0.14, freq: 500, filter: 'lowpass' });
     },
-    place() {    // a soft thump into the soil, then a springy "boing" as it sprouts
+    place() {    // a stone thud on the dais, two quick mallet taps, then a bright "ta-da"
       noise({ dur: 0.14, vol: 0.4, freq: 320, filter: 'lowpass' });
       voice({ type: 'triangle', freq: 150, to: 80, dur: 0.14, vol: 0.45, cutoff: 700 });
-      voice({ type: 'sine', freq: 280, to: 760, dur: 0.24, vol: 0.3, cutoff: 2600, delay: 0.08 });
-      voice({ type: 'sine', freq: 1040, to: 1180, dur: 0.12, vol: 0.12, cutoff: 3600, delay: 0.26 });
-      noise({ dur: 0.18, vol: 0.08, freq: 5000, q: 0.6, delay: 0.24 });
+      [0.1, 0.19].forEach((d) => { voice({ type: 'square', freq: 1500, to: 1300, dur: 0.03, vol: 0.08, cutoff: 5000, delay: d }); noise({ dur: 0.03, vol: 0.12, freq: 3500, q: 3, delay: d }); });
+      voice({ type: 'triangle', freq: 523, to: 523, dur: 0.1, vol: 0.18, cutoff: 3000, delay: 0.3, jitter: 0 });
+      voice({ type: 'triangle', freq: 784, to: 784, dur: 0.2, vol: 0.18, cutoff: 3000, delay: 0.4, jitter: 0 });
     },
     upgrade() {
       [523, 659, 784].forEach((f, i) => voice({ type: 'triangle', freq: f, to: f, dur: 0.14, vol: 0.2, cutoff: 3200, delay: i * 0.09, jitter: 0 }));
@@ -198,55 +198,71 @@ const Audio = (() => {
       noise({ dur: 1.2, vol: 0.12, freq: 200, filter: 'lowpass', delay: 0.8 });
     },
     // ---- enemies arriving ----
-    spawn() {    // a wet little goblin "blib-blub"
-      voice({ type: 'square', freq: 210, to: 320, dur: 0.09, vol: 0.1, cutoff: 1100, key: 'spawn', gap: 0.08 });
-      voice({ type: 'square', freq: 330, to: 240, dur: 0.12, vol: 0.09, cutoff: 1100, delay: 0.1 });
-      noise({ dur: 0.08, vol: 0.06, freq: 900, q: 1, delay: 0.02 });
+    spawn() {    // a gruff little brigand "oi-oi!"
+      voice({ type: 'sawtooth', freq: 170, to: 240, dur: 0.1, vol: 0.12, cutoff: 900, key: 'spawn', gap: 0.08 });
+      voice({ type: 'sawtooth', freq: 230, to: 180, dur: 0.13, vol: 0.11, cutoff: 900, delay: 0.13 });
+      noise({ dur: 0.06, vol: 0.05, freq: 700, q: 1, delay: 0.02 });
     },
-    trickster() {   // a quick giggle
+    trickster() {   // a quick snicker
       [700, 880, 760, 990].forEach((f, i) => voice({ type: 'square', freq: f, to: f * 1.1, dur: 0.05, vol: 0.11, cutoff: 2500, delay: i * 0.06, jitter: 0.08 }));
     },
-    troll() {    // a slow heavy grunt and a footfall
-      voice({ type: 'sawtooth', freq: 110, to: 70, dur: 0.4, vol: 0.26, cutoff: 500 });
-      voice({ type: 'triangle', freq: 60, to: 45, dur: 0.3, vol: 0.36, cutoff: 400, delay: 0.05 });
-      noise({ dur: 0.18, vol: 0.3, freq: 180, filter: 'lowpass', delay: 0.1 });
+    troll() {    // a black knight on the march: two clanking steps of plate and a low grunt
+      [0, 0.32].forEach((d) => {
+        noise({ dur: 0.07, vol: 0.2, freq: 3200, q: 4, delay: d, key: d ? null : 'troll', gap: 0.2 });
+        voice({ type: 'triangle', freq: 70, to: 45, dur: 0.18, vol: 0.32, cutoff: 400, delay: d });
+      });
+      voice({ type: 'sawtooth', freq: 110, to: 80, dur: 0.3, vol: 0.14, cutoff: 500, delay: 0.12 });
     },
-    bat() {      // squeaks and a flutter
-      voice({ type: 'square', freq: 1400, to: 1900, dur: 0.06, vol: 0.09, cutoff: 4000, key: 'bat', gap: 0.1 });
-      voice({ type: 'square', freq: 1600, to: 1200, dur: 0.07, vol: 0.09, cutoff: 4000, delay: 0.08 });
-      [0, 0.07, 0.14].forEach((d) => noise({ dur: 0.05, vol: 0.12, freq: 2600, q: 1.2, delay: d }));
+    bat() {      // a gargoyle: a grind of stone, a screech and a flap
+      noise({ dur: 0.12, vol: 0.14, freq: 260, filter: 'lowpass', key: 'bat', gap: 0.1 });
+      voice({ type: 'square', freq: 1100, to: 1500, dur: 0.08, vol: 0.08, cutoff: 3000, delay: 0.08 });
+      [0.1, 0.18].forEach((d) => noise({ dur: 0.05, vol: 0.12, freq: 1800, q: 1.2, delay: d }));
     },
-    bossArrive() {   // a dark chord, a rumble and two rasping caws
+    bossArrive(type) {   // a dark chord and a rumble, then each boss's own voice
       [110, 131, 165].forEach((f) => voice({ type: 'sawtooth', freq: f, to: f * 0.98, dur: 1.4, vol: 0.14, cutoff: 700, jitter: 0.005 }));
       noise({ dur: 1.4, vol: 0.18, freq: 150, filter: 'lowpass' });
-      voice({ type: 'sawtooth', freq: 620, to: 380, dur: 0.3, vol: 0.14, cutoff: 1800, delay: 0.5 });
-      voice({ type: 'sawtooth', freq: 560, to: 340, dur: 0.35, vol: 0.14, cutoff: 1800, delay: 0.85 });
+      if (type === 'ram') {
+        // war drums: three heavy beats and a creak of timber
+        [0.4, 0.75, 1.1].forEach((d) => { voice({ type: 'triangle', freq: 70, to: 40, dur: 0.25, vol: 0.5, cutoff: 400, delay: d }); noise({ dur: 0.12, vol: 0.3, freq: 300, filter: 'lowpass', delay: d }); });
+        voice({ type: 'square', freq: 180, to: 140, dur: 0.4, vol: 0.06, cutoff: 700, delay: 1.3 });
+      } else if (type === 'dragon') {
+        // a long roar with a crackle of flame
+        voice({ type: 'sawtooth', freq: 240, to: 85, dur: 1.1, vol: 0.22, cutoff: 1200, delay: 0.35 });
+        voice({ type: 'sawtooth', freq: 180, to: 70, dur: 1.1, vol: 0.16, cutoff: 900, delay: 0.38 });
+        noise({ dur: 0.9, vol: 0.22, freq: 900, to: 300, q: 0.6, delay: 0.45 });
+      } else {
+        // grinding stone and two rasping screeches
+        noise({ dur: 0.5, vol: 0.2, freq: 220, filter: 'lowpass', delay: 0.3 });
+        voice({ type: 'sawtooth', freq: 620, to: 380, dur: 0.3, vol: 0.14, cutoff: 1800, delay: 0.5 });
+        voice({ type: 'sawtooth', freq: 560, to: 340, dur: 0.35, vol: 0.14, cutoff: 1800, delay: 0.85 });
+      }
     },
     // ---- towers firing ----
-    shoot() {    // slingshot: elastic thwip
-      noise({ dur: 0.05, vol: 0.2, freq: 2600, q: 1, key: 'shoot', gap: 0.04 });
-      voice({ type: 'triangle', freq: 900, to: 380, dur: 0.07, vol: 0.18, cutoff: 3200 });
-      voice({ type: 'sine', freq: 240, to: 520, dur: 0.06, vol: 0.1, cutoff: 1800 });
+    shoot() {    // a javelin: a grunt of effort and a quick whoosh
+      noise({ dur: 0.1, vol: 0.2, freq: 2200, to: 900, q: 1, key: 'shoot', gap: 0.04 });
+      voice({ type: 'triangle', freq: 260, to: 200, dur: 0.05, vol: 0.12, cutoff: 1400 });
+      voice({ type: 'sine', freq: 700, to: 420, dur: 0.08, vol: 0.08, cutoff: 2400, delay: 0.02 });
     },
-    shootWarden() {   // a rustling whoosh and a thump as the thorn ball leaves the staff
-      noise({ dur: 0.22, vol: 0.22, freq: 1400, to: 300, q: 0.7, key: 'warden', gap: 0.08 });
-      voice({ type: 'sawtooth', freq: 700, to: 180, dur: 0.18, vol: 0.12, cutoff: 1600 });
-      voice({ type: 'triangle', freq: 160, to: 90, dur: 0.14, vol: 0.28, cutoff: 800, delay: 0.04 });
+    shootWarden() {   // the pot leaves the ladle: a gloopy glug and a lobbing whoosh
+      voice({ type: 'sine', freq: 320, to: 150, dur: 0.12, vol: 0.22, cutoff: 900, key: 'warden', gap: 0.08 });
+      voice({ type: 'sine', freq: 260, to: 120, dur: 0.1, vol: 0.16, cutoff: 900, delay: 0.08 });
+      noise({ dur: 0.22, vol: 0.18, freq: 1200, to: 300, q: 0.7, delay: 0.05 });
     },
     shootDruid() {    // a crystalline ting with a cold breath
       voice({ type: 'sine', freq: 1760, to: 2200, dur: 0.12, vol: 0.15, cutoff: 6000, key: 'druid', gap: 0.06 });
       voice({ type: 'sine', freq: 2637, to: 2500, dur: 0.2, vol: 0.07, cutoff: 6000, delay: 0.05 });
       noise({ dur: 0.12, vol: 0.08, freq: 5000, q: 0.6 });
     },
-    shootGolem() {    // a deep ground thump and a crunch
-      voice({ type: 'triangle', freq: 75, to: 40, dur: 0.32, vol: 0.55, cutoff: 500, key: 'golem', gap: 0.1 });
-      noise({ dur: 0.16, vol: 0.32, freq: 400, filter: 'lowpass' });
-      voice({ type: 'square', freq: 200, to: 90, dur: 0.06, vol: 0.1, cutoff: 900 });
+    shootGolem() {    // the hammer flies: a heavy whoosh and a ringing clang of steel
+      noise({ dur: 0.2, vol: 0.3, freq: 600, to: 200, filter: 'lowpass', key: 'golem', gap: 0.1 });
+      voice({ type: 'triangle', freq: 75, to: 40, dur: 0.3, vol: 0.45, cutoff: 500 });
+      voice({ type: 'square', freq: 660, to: 640, dur: 0.05, vol: 0.08, cutoff: 3000, delay: 0.02 });
+      voice({ type: 'sine', freq: 1320, to: 1300, dur: 0.4, vol: 0.06, cutoff: 5000, delay: 0.02 });
     },
-    shootArtillery() {   // a hollow thoomp then a rising whistle
-      voice({ type: 'sine', freq: 150, to: 60, dur: 0.22, vol: 0.45, cutoff: 700, key: 'artillery', gap: 0.1 });
-      noise({ dur: 0.2, vol: 0.28, freq: 500, filter: 'lowpass' });
-      voice({ type: 'sine', freq: 500, to: 1100, dur: 0.45, vol: 0.07, cutoff: 3000, delay: 0.1 });
+    shootArtillery() {   // a longbow: a deep string twang, then a hiss of arrows overhead
+      voice({ type: 'triangle', freq: 196, to: 180, dur: 0.16, vol: 0.4, cutoff: 1400, key: 'artillery', gap: 0.1 });
+      voice({ type: 'sawtooth', freq: 392, to: 370, dur: 0.08, vol: 0.06, cutoff: 1800 });
+      noise({ dur: 0.45, vol: 0.12, freq: 3200, to: 1800, q: 0.8, delay: 0.08 });
     },
     // ---- hits and effects ----
     hit() {      // a woody tok
@@ -266,9 +282,9 @@ const Audio = (() => {
       voice({ type: 'sine', freq: 3200, to: 3600, dur: 0.06, vol: 0.06, cutoff: 8000, key: 'chill', gap: 0.15 });
       voice({ type: 'sine', freq: 4100, to: 3900, dur: 0.09, vol: 0.05, cutoff: 8000, delay: 0.05 });
     },
-    root() {     // brambles snapping shut
-      noise({ dur: 0.05, vol: 0.2, freq: 1200, q: 1.5, key: 'root', gap: 0.12 });
-      voice({ type: 'triangle', freq: 220, to: 110, dur: 0.1, vol: 0.18, cutoff: 900, delay: 0.02 });
+    root() {     // stuck in pitch: a sticky splorch
+      noise({ dur: 0.1, vol: 0.2, freq: 450, filter: 'lowpass', key: 'root', gap: 0.12 });
+      voice({ type: 'sine', freq: 220, to: 90, dur: 0.14, vol: 0.2, cutoff: 700, delay: 0.02 });
     },
     death() {    // a surprised bwoop sliding down, then a soft pop
       voice({ type: 'square', freq: 520, to: 160, dur: 0.28, vol: 0.14, cutoff: 1500, key: 'death', gap: 0.06 });
@@ -326,7 +342,7 @@ const Audio = (() => {
     GameState.on('waveEnded', () => { sfx.waveEnd(); sfx.bonus(); });
     GameState.on('earlyBonus', () => sfx.bonus());
     GameState.on('prepTick', (n) => (n === 1 ? sfx.tickLast() : sfx.tick()));
-    GameState.on('enemySpawned', (e) => { if (e.boss) sfx.bossArrive(); else if (e.flying) sfx.bat(); else if (e.type === 'troll') sfx.troll(); else if (e.type === 'trickster') sfx.trickster(); else sfx.spawn(); });
+    GameState.on('enemySpawned', (e) => { if (e.boss) sfx.bossArrive(e.type); else if (e.flying) sfx.bat(); else if (e.type === 'troll') sfx.troll(); else if (e.type === 'trickster') sfx.trickster(); else sfx.spawn(); });
     const shootBy = { slinger: () => sfx.shoot(), warden: () => sfx.shootWarden(), druid: () => sfx.shootDruid(), golem: () => sfx.shootGolem(), artillery: () => sfx.shootArtillery() };
     GameState.on('towerFired', ({ tower }) => shootBy[tower.type]());
     GameState.on('projectileHit', ({ projectile }) => { if (projectile.splash > 0) sfx.splash(); });

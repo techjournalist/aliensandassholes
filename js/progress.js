@@ -2,7 +2,7 @@
 // Progress  (localStorage: unlocked levels + best star rating per level)
 // ===================================================================
 const Progress = (() => {
-  const KEY = 'bb-progress';
+  const KEY = 'kk-progress';
 
   function defaults() {
     const levels = {};
