@@ -96,35 +96,53 @@ const Progress = (() => {
   }
 
   // ---- save code: your campaign progress as a short piece of text ----
-  // "BB1-" then, per level in order, two characters (0 locked, 1 open, 2 to 4 for
-  // one to three stars; then best lives in base 36), then two check characters,
-  // all in groups of four. Loading a code only ever adds, like every other merge.
-  const CODE = 'BB1';
+  // "BB2-" then, per level in LEVELS order, three base-36 characters, then two
+  // check characters, all uppercase in groups of four:
+  //   1. the level's state and its Bramble stars together: meadow * 4 + bramble,
+  //      where meadow is 0 locked, 1 open, 2 to 4 for one to three Meadow stars
+  //      and bramble is 0 to 3 Bramble stars (so 0 to J);
+  //   2. Meadow best lives; 3. Bramble best lives (0 when there are none).
+  // Older "BB1-" codes (two characters per level: the meadow state, then Meadow
+  // best lives) still load; they carry no Bramble stars and so never touch them.
+  // Loading a code only ever adds, like every other merge.
+  const CODE = 'BB2', CODES = { BB1: 2, BB2: 3 };   // characters per level in each version
   const check = (str) => { let h = 7; for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) % 1296; return h.toString(36).toUpperCase().padStart(2, '0'); };
+  const b36 = (n) => Math.max(0, Math.min(35, n || 0)).toString(36).toUpperCase();
   function exportCode() {
     const data = load();
     let body = '';
     for (const lv of LEVELS) {
-      const e = data.levels[lv.id];
+      const e = data.levels[lv.id], br = e.bramble || {};
       const st = !e.unlocked ? 0 : e.stars >= 3 ? 4 : e.stars === 2 ? 3 : e.stars === 1 ? 2 : 1;
-      body += st + Math.max(0, Math.min(35, e.bestLives || 0)).toString(36).toUpperCase();
+      const bs = Math.max(0, Math.min(3, br.stars || 0));
+      body += (st * 4 + bs).toString(36).toUpperCase() + b36(e.bestLives) + b36(bs ? br.bestLives : 0);
     }
     return CODE + '-' + (body + check(CODE + body)).match(/.{1,4}/g).join('-');
   }
-  // { ok: true, changed: levels that gained something } or { ok: false, reason }
+  // { ok: true, changed: levels that gained an unlock or stars on either tier }
+  // or { ok: false, reason: 'empty' | 'format' | 'newer' | 'check' }
   function importCode(raw) {
     const text = String(raw || '').toUpperCase().replace(/[\s_]/g, '');
     if (!text) return { ok: false, reason: 'empty' };
-    if (!text.startsWith(CODE + '-')) return { ok: false, reason: 'format' };
-    const all = text.slice(CODE.length + 1).replace(/-/g, '');
-    if (!/^[0-9A-Z]+$/.test(all) || all.length < 4 || all.length % 2) return { ok: false, reason: 'check' };
+    const m = /^BB(\d+)-/.exec(text);
+    if (!m) return { ok: false, reason: 'format' };
+    const ver = 'BB' + m[1], per = CODES[ver];
+    if (!per) return { ok: false, reason: +m[1] > 2 ? 'newer' : 'format' };
+    const all = text.slice(m[0].length).replace(/-/g, '');
+    if (!/^[0-9A-Z]+$/.test(all) || all.length < per + 2 || (all.length - 2) % per) return { ok: false, reason: 'check' };
     const body = all.slice(0, -2);
-    if (check(CODE + body) !== all.slice(-2)) return { ok: false, reason: 'check' };
+    if (check(ver + body) !== all.slice(-2)) return { ok: false, reason: 'check' };
     const incoming = defaults();
-    for (let i = 0; i < LEVELS.length && i * 2 < body.length; i++) {
-      const st = parseInt(body[i * 2], 10), lives = parseInt(body[i * 2 + 1], 36);
+    for (let i = 0; i < LEVELS.length && (i + 1) * per <= body.length; i++) {
+      const f = body.slice(i * per, (i + 1) * per);
+      const head = parseInt(f[0], 36), lives = parseInt(f[1], 36);
+      const st = per === 2 ? head : Math.floor(head / 4), bs = per === 2 ? 0 : head % 4;
       if (!(st >= 0 && st <= 4)) return { ok: false, reason: 'check' };
-      incoming.levels[LEVELS[i].id] = { unlocked: st >= 1, stars: st >= 2 ? st - 1 : 0, bestLives: st >= 2 && lives > 0 ? lives : null };
+      const bLives = per === 3 ? parseInt(f[2], 36) : 0;
+      incoming.levels[LEVELS[i].id] = {
+        unlocked: st >= 1 || bs > 0, stars: st >= 2 ? st - 1 : 0, bestLives: st >= 2 && lives > 0 ? lives : null,
+        bramble: { stars: bs, bestLives: bs > 0 && bLives > 0 ? bLives : null },
+      };
     }
     const before = load();
     const data = load();
@@ -132,7 +150,7 @@ const Progress = (() => {
     let changed = 0;
     for (const lv of LEVELS) {
       const a = before.levels[lv.id], b = data.levels[lv.id];
-      if ((b.unlocked && !a.unlocked) || b.stars > a.stars) changed++;
+      if ((b.unlocked && !a.unlocked) || b.stars > a.stars || b.bramble.stars > a.bramble.stars) changed++;
     }
     save(data);
     return { ok: true, changed };

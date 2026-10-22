@@ -182,8 +182,9 @@ async function enterLevel(page, levelId) {
   check('switching it back on shows the buttons again and saves it', (await camShown()).every(Boolean) && await page.evaluate(() => localStorage.getItem('bb-camui')) === '1' && await page.evaluate(() => Renderer.viewIndex()) === 0);
   // save code: campaign progress as text; typing in it must never reach the game's hotkeys
   await page.locator('#savecode-btn').click(); await page.waitForTimeout(200);
-  const sc0 = await page.evaluate(() => ({ open: document.getElementById('savecode').classList.contains('show'), code: document.getElementById('savecode-out').value, h: ['savecode-copy', 'savecode-load', 'savecode-done', 'savecode-in'].map((id) => document.getElementById(id).getBoundingClientRect().height) }));
-  check('Settings opens a Save code panel with a BB1 code and 44px controls', sc0.open && /^BB1-/.test(sc0.code) && sc0.h.every((v) => v >= 44), JSON.stringify(sc0));
+  const sc0 = await page.evaluate(() => { const o = document.getElementById('savecode-out'); return { open: document.getElementById('savecode').classList.contains('show'), code: o.value, fits: o.scrollWidth <= o.clientWidth && o.scrollHeight <= o.clientHeight + 1, h: ['savecode-copy', 'savecode-load', 'savecode-done', 'savecode-in', 'savecode-out'].map((id) => document.getElementById(id).getBoundingClientRect().height) }; });
+  check('Settings opens a Save code panel with a BB2 code and 44px controls', sc0.open && /^BB2-/.test(sc0.code) && sc0.h.every((v) => v >= 44), JSON.stringify(sc0));
+  check('the whole save code shows in its box, with no scrolling', sc0.fits, JSON.stringify(sc0));
   const viewBefore = await page.evaluate(() => Renderer.viewIndex());
   await page.locator('#savecode-in').click(); await page.keyboard.type('eq0 -+[]f', { delay: 5 });
   check('typing in the code box leaves the camera, speed and wave alone', await page.evaluate(() => document.getElementById('savecode-in').value === 'eq0 -+[]f' && Renderer.viewIndex() === 0 && GameState.state.speed === 1 && !GameState.state.waveActive) && viewBefore === 0);
@@ -193,6 +194,13 @@ async function enterLevel(page, levelId) {
   const scTypo = scCode.slice(0, 6) + (scCode[6] === '2' ? '3' : '2') + scCode.slice(7);
   await page.fill('#savecode-in', scTypo); await page.locator('#savecode-load').click();
   check('a mistyped code is caught and changes nothing', (await page.locator('#savecode-msg').innerText()).includes("doesn't match") && await page.evaluate((c) => Progress.exportCode() === c, scCode));
+  await page.fill('#savecode-in', 'BB3-ABCD-EF'); await page.locator('#savecode-load').click();
+  check('a code from a newer version says so and changes nothing', (await page.locator('#savecode-msg').innerText()).includes('newer version') && await page.evaluate((c) => Progress.exportCode() === c, scCode));
+  // an old BB1 code (Level 1 open, the rest locked: adds nothing to this run) still loads
+  const bb1Hash = (str) => { let h = 7; for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) % 1296; return h.toString(36).toUpperCase().padStart(2, '0'); };
+  const bb1Body = '10' + '00'.repeat(await page.evaluate(() => LEVELS.length - 1));
+  await page.fill('#savecode-in', 'BB1-' + (bb1Body + bb1Hash('BB1' + bb1Body)).match(/.{1,4}/g).join('-')); await page.locator('#savecode-load').click();
+  check('an old BB1 code still loads', (await page.locator('#savecode-msg').innerText()).includes('nothing new') && await page.evaluate((c) => Progress.exportCode() === c, scCode));
   // loading a code that adds nothing must leave this run's progress untouched (the real load paths are covered in validate-levels.js)
   await page.fill('#savecode-in', scCode.toLowerCase()); await page.keyboard.press('Enter'); await page.waitForTimeout(150);
   check('pasting a lowercase code with Enter loads it and says it has nothing new', (await page.locator('#savecode-msg').innerText()).includes('nothing new') && await page.evaluate((c) => Progress.exportCode() === c, scCode));
@@ -1352,6 +1360,8 @@ async function enterLevel(page, levelId) {
   // a Bramble win goes to the Bramble record only
   await page.evaluate(() => { GameState.state.lives = 14; GameState.state.phase = 'won'; GameState.emit('gameWon'); });
   check('tiers: a Bramble win is stored as Bramble stars and leaves Meadow stars alone', await page.evaluate(() => Progress.starsFor('shadow-hollow', 'bramble') === 3 && Progress.starsFor('shadow-hollow') === 3 && Progress.load().levels['shadow-hollow'].bestLives === 18 && Progress.load().levels['shadow-hollow'].bramble.bestLives === 14));
+  // Level 1: Meadow 3 stars (state 4) and Bramble 3 stars give 4 * 4 + 3 = J, then 18 and 14 lives in base 36
+  check('tiers: the BB2 save code carries the Bramble stars', await page.evaluate(() => Progress.exportCode().startsWith('BB2-JIE')), await page.evaluate(() => Progress.exportCode()));
   await page.locator('#end.show').waitFor({ timeout: 10000 }).catch(() => {});
   check('tiers: the Bramble win screen says so', await page.evaluate(() => document.getElementById('end').classList.contains('show') && document.getElementById('end-ribbon-text').textContent === 'Bramble won!'));
   await page.screenshot({ path: `${OUT}/tiers-bramble-win.png` });

@@ -767,7 +767,7 @@ const UI = (() => {
     function loadSaveCode() {
       const r = Progress.importCode($('savecode-in').value);
       if (!r.ok) {
-        codeMsg({ empty: 'Paste a code first.', format: "That doesn't look like a Briar & Bastion save code.", check: "That code doesn't match. Check for a typo or a missing character." }[r.reason], 'bad');
+        codeMsg({ empty: 'Paste a code first.', format: "That doesn't look like a Briar & Bastion save code.", newer: 'That code comes from a newer version of the game. Update this one, then try again.', check: "That code doesn't match. Check for a typo or a missing character." }[r.reason], 'bad');
         return;
       }
       $('savecode-out').value = Progress.exportCode();

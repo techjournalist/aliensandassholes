@@ -284,7 +284,7 @@ function progressTests() {
   local = store(); session = store(); P = make(local, session);
   P.recordWin(FIRST, 3, 17); P.recordWin('millbrook-watch', 2, 9); P.recordWin(WON, 1, 3);
   const code = P.exportCode();
-  add('save code has the BB1 prefix and dash groups', /^BB1(-[0-9A-Z]{1,4})+$/.test(code), code);
+  add('save code has the BB2 prefix and dash groups', /^BB2(-[0-9A-Z]{1,4})+$/.test(code), code);
   const fresh = make(store(), store());
   const r1 = fresh.importCode(code);
   const a = P.load().levels, b = fresh.load().levels;
@@ -296,8 +296,9 @@ function progressTests() {
   add('a missing character is caught', make(store(), store()).importCode(code.slice(0, -1)).ok === false);
   const bad = make(store(), store());
   add('empty input says empty', bad.importCode('   ').reason === 'empty');
-  add('other text says format', bad.importCode('hello there').reason === 'format' && bad.importCode(null).reason === 'empty' && bad.importCode('BB2-AAAA').reason === 'format');
-  add('garbage after the prefix says check, never throws', bad.importCode('BB1-!!!!').reason === 'check' && bad.importCode('BB1-').reason === 'check');
+  add('other text says format', bad.importCode('hello there').reason === 'format' && bad.importCode(null).reason === 'empty' && bad.importCode('BB0-AAAA').reason === 'format' && bad.importCode('BB-AAAA').reason === 'format' && bad.importCode('BB2AAAA').reason === 'format');
+  add('a code from a newer version says newer', bad.importCode('BB3-AAAA-AA').reason === 'newer' && bad.importCode('bb12-0000').reason === 'newer');
+  add('garbage after the prefix says check, never throws', ['BB1-!!!!', 'BB1-', 'BB2-!!!!', 'BB2-', 'BB2-A', 'BB2-AAAA'].every((c) => bad.importCode(c).reason === 'check'));
   add('a rejected code changes nothing', JSON.stringify(bad.load()) === JSON.stringify(make(store(), store()).load()));
   // loading never takes anything away
   local = store(); session = store(); const rich = make(local, session);
@@ -309,7 +310,7 @@ function progressTests() {
   const body = code.slice(4).replace(/-/g, '');
   add('a code with every level locked loads without effect', (() => { const z = make(store(), store()); const c = z.exportCode(); return z.importCode(c).ok; })());
   add('a code that is first-level-only still works', (() => { const z = make(store(), store()); z.recordWin(FIRST, 2, 5); const f = make(store(), store()); const res = f.importCode(z.exportCode()); return res.ok && f.starsFor(FIRST) === 2 && f.isUnlocked('millbrook-watch'); })());
-  add('save code holds two characters per level plus two check characters', body.length === 2 * Object.keys(make(store(), store()).load().levels).length + 2, `${body.length} chars`);
+  add('save code holds three characters per level plus two check characters', body.length === 3 * Object.keys(make(store(), store()).load().levels).length + 2, `${body.length} chars`);
 
   // ---- difficulty tiers (P3-D1): stars per tier, old saves still load ----
   local = store(); session = store();
@@ -351,6 +352,58 @@ function progressTests() {
   local.m.set('bb-difficulty', 'nightmare');
   add('an unknown saved tier reads as Meadow', make(local, store()).tier() === 'meadow');
   add('blocked storage reads as Meadow and never throws', (() => { const z = make(store({ failWrite: true, nullRead: true }), store()); z.setTier('bramble'); return z.tier() === 'meadow'; })());
+
+  // ---- BB2 save code: Bramble stars travel too, BB1 codes still load (P3-D2) ----
+  // the format, written out independently of progress.js so the test pins it
+  const hash = (str) => { let h = 7; for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) % 1296; return h.toString(36).toUpperCase().padStart(2, '0'); };
+  const group = (ver, body) => ver + '-' + (body + hash(ver + body)).match(/.{1,4}/g).join('-');
+  const IDS = Object.keys(make(store(), store()).load().levels);
+  const bb1 = (lv) => group('BB1', IDS.map((id) => { const e = lv[id] || {}; return String(e.st || 0) + (e.lives || 0).toString(36).toUpperCase(); }).join(''));
+  const bb2 = (lv, extra = '') => group('BB2', IDS.map((id) => { const e = lv[id] || {}; return ((e.st || 0) * 4 + (e.bs || 0)).toString(36).toUpperCase() + (e.lives || 0).toString(36).toUpperCase() + (e.bl || 0).toString(36).toUpperCase(); }).join('') + extra);
+  local = store(); session = store(); P = make(local, session);
+  P.recordWin(FIRST, 3, 17); P.recordWin(FIRST, 2, 11, 'bramble'); P.recordWin('millbrook-watch', 1, 4, 'bramble'); P.recordWin(WON, 2, 9);
+  const code2 = P.exportCode();
+  add('the BB2 code matches the written-out format exactly', code2 === bb2({ [FIRST]: { st: 4, lives: 17, bs: 2, bl: 11 }, 'millbrook-watch': { st: 1, bs: 1, bl: 4 }, cairnwatch: { st: 1 }, [WON]: { st: 3, lives: 9 }, [NEXT]: { st: 1 } }), code2);
+  const dev2 = make(store(), store()), r3 = dev2.importCode(code2);
+  const pa = P.load().levels, pb = dev2.load().levels;
+  add('a BB2 code carries both tiers\' stars, best lives and unlocks to a fresh device', r3.ok && IDS.every((id) => pa[id].unlocked === pb[id].unlocked && pa[id].stars === pb[id].stars && pa[id].bestLives === pb[id].bestLives && pa[id].bramble.stars === pb[id].bramble.stars && pa[id].bramble.bestLives === pb[id].bramble.bestLives), JSON.stringify(r3));
+  add('a BB2 code regenerates identically after loading', dev2.exportCode() === code2);
+  add('a level won only on Bramble arrives unlocked and opens the next one', pb['millbrook-watch'].unlocked && pb['millbrook-watch'].stars === 0 && dev2.isUnlocked('cairnwatch'));
+  // a real BB1 code from before this change
+  const old1 = bb1({ [FIRST]: { st: 4, lives: 18 }, 'millbrook-watch': { st: 3, lives: 10 }, cairnwatch: { st: 1 } });
+  local = store(); session = store(); P = make(local, session); P.recordWin(FIRST, 1, 6, 'bramble');
+  const r4 = P.importCode(old1);
+  add('an old BB1 code still loads its Meadow stars, lives and unlocks', r4.ok && r4.changed === 3 && P.starsFor(FIRST) === 3 && P.load().levels[FIRST].bestLives === 18 && P.starsFor('millbrook-watch') === 2 && P.isUnlocked('cairnwatch'), JSON.stringify(r4));
+  add('and leaves Bramble stars as they were', P.starsFor(FIRST, 'bramble') === 1 && P.load().levels[FIRST].bramble.bestLives === 6 && P.starsFor('millbrook-watch', 'bramble') === 0);
+  add('after a BB1 load the code offered is BB2', /^BB2-/.test(P.exportCode()));
+  const bodyOf = (c) => c.replace(/^BB\d-/, '');
+  add('a BB1 code relabeled BB2 (or the other way) fails the check', make(store(), store()).importCode('BB2-' + bodyOf(old1)).ok === false && make(store(), store()).importCode('BB1-' + bodyOf(code2)).ok === false);
+  // only ever adds
+  local = store(); session = store(); const rich2 = make(local, session);
+  rich2.recordWin(FIRST, 3, 20); rich2.recordWin(FIRST, 3, 15, 'bramble');
+  const poor = make(store(), store()); poor.recordWin(FIRST, 1, 3); poor.recordWin(FIRST, 1, 2, 'bramble');
+  const r5 = rich2.importCode(poor.exportCode());
+  add('loading a weaker BB2 code never lowers either tier', r5.ok && r5.changed === 0 && rich2.starsFor(FIRST) === 3 && rich2.starsFor(FIRST, 'bramble') === 3 && rich2.load().levels[FIRST].bestLives === 20 && rich2.load().levels[FIRST].bramble.bestLives === 15);
+  local = store(); session = store(); P = make(local, session); P.recordWin(FIRST, 3, 18);
+  const r6 = P.importCode(bb2({ [FIRST]: { st: 4, lives: 18, bs: 1, bl: 5 } }));
+  add('a code that adds only Bramble stars counts as a change', r6.ok && r6.changed === 1 && P.starsFor(FIRST, 'bramble') === 1, JSON.stringify(r6));
+  // out-of-range fields with a valid check are refused, and change nothing
+  const fresh2 = make(store(), store()), clean = JSON.stringify(fresh2.load());
+  const badHead = group('BB2', 'K00' + '100'.repeat(IDS.length - 1));
+  const badOld = group('BB1', '50' + '10'.repeat(IDS.length - 1));
+  add('a field out of range is refused even with a valid check', fresh2.importCode(badHead).reason === 'check' && fresh2.importCode(badOld).reason === 'check' && JSON.stringify(fresh2.load()) === clean);
+  // codes from builds with fewer or more levels
+  const short2 = make(store(), store()), rs = short2.importCode(group('BB2', 'E' + 'H' + '9'));
+  add('a BB2 code with fewer levels fills what it has', rs.ok && short2.starsFor(FIRST) === 2 && short2.load().levels[FIRST].bestLives === 17 && short2.starsFor(FIRST, 'bramble') === 2 && short2.load().levels[FIRST].bramble.bestLives === 9, JSON.stringify(rs));
+  const long2 = make(store(), store());
+  add('a BB2 code with more levels loads the ones this build has', long2.importCode(bb2({ [FIRST]: { st: 2, lives: 5 } }, 'F55')).ok && long2.starsFor(FIRST) === 1);
+  add('a BB2 code with a stray character is caught', make(store(), store()).importCode(code2 + 'A').ok === false && make(store(), store()).importCode(code2.slice(0, -1)).ok === false);
+  // every single-character change in a BB2 code is caught
+  const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ', flat = bodyOf(code2).replace(/-/g, '');
+  let missed = 0;
+  const probe = make(store(), store());   // a refused code changes nothing, so one device serves every try
+  for (let i = 0; i < flat.length; i++) for (const ch of chars) if (ch !== flat[i] && probe.importCode('BB2-' + flat.slice(0, i) + ch + flat.slice(i + 1)).ok) missed++;
+  add('every single-character typo in a BB2 code is caught', missed === 0, `${missed} missed of ${flat.length * 35}`);
   return out;
 }
 
