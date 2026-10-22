@@ -530,7 +530,8 @@ async function enterLevel(page, levelId) {
     const put = (type, c, r) => { S.selected = { kind: 'tile', c, r }; GameState.placeTower(type); };
     for (const [type, list] of Object.entries(stage)) for (const [c, r] of list) put(type, c, r);
     S.wave = 11; GameState.startWave();
-    for (let i = 0; i < 60 * 25; i++) GameState.update(1 / 60);
+    // the Siege Ram rolls out about 27s in, after the escort groups
+    for (let i = 0; i < 60 * 32; i++) GameState.update(1 / 60);
   }, F1.bossStagePlacements);
   await page.waitForTimeout(400);
   check('boss is on the field on wave 12', await page.evaluate(() => GameState.state.enemies.some((e) => e.boss)));
