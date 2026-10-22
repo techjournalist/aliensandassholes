@@ -1660,7 +1660,7 @@ Copy button (clipboard API, with a select-and-`execCommand` fallback), a paste
 box and a Load button (Enter also loads), and a plain status line. The title
 link now reads "Settings and save code".
 
-**Format.** `BB1-` then, per level in `LEVELS` order, two characters: a state
+**Format** (superseded by BB2 in P3-D2; BB1 codes still load). `BB1-` then, per level in `LEVELS` order, two characters: a state
 digit (0 locked, 1 open, 2 to 4 for one to three stars) and best lives in base
 36; then two check characters (a small polynomial hash mod 1296), all uppercase
 in groups of four. Ten levels give `BB1-xxxx-xxxx-xxxx-xxxx-xxxx-xx`. A changed
@@ -1748,8 +1748,7 @@ next level and counts as won for the map's pennant and reclaimed ground.
 `Progress.recordWin(id, stars, lives, tier)`, `starsFor(id, tier)` (Meadow by
 default), `isWon(id)`. The picked tier is saved as `bb-difficulty`
 (`Progress.tier()` and `setTier()`); boot applies it before loading a level.
-The BB1 save code still carries Meadow only and loading one keeps Bramble
-stars. A BB2 code with Bramble stars is not built: the user decides first.
+The save code carries both tiers since P3-D2 (BB2); BB1 codes still load.
 
 **UI.** Two radio buttons (Meadow, Bramble) beside Play, 52px tall (44px on
 short screens), arrow keys switch them. They show the battle's own tier and
@@ -1791,6 +1790,44 @@ touch (picker size and fit, defaults, thorn ring, old save, Bramble applied
 and remembered, HUD mark, picker locked mid-battle, Bramble win stored apart,
 win ribbon). Full `tools/playtest.js`: 739 of 739 passed, every level won
 by the mixed bot on Meadow, no console errors or warnings.
+
+**P3-D2 - Save code BB2: Bramble stars travel too** *(on branch
+`claude/fervent-wright-jeojom`, user-approved: "yes, build the BB2 save
+code")*. The BB1 code (P3-V18) carried Meadow progress only. `exportCode()` now
+writes `BB2-`, then three base-36 characters per level in `LEVELS` order, then
+the same two check characters (hashed over `BB2` plus the body):
+1. the level's Meadow state and its Bramble stars in one character,
+   `meadow * 4 + bramble`, where meadow is 0 locked, 1 open, 2 to 4 for one to
+   three Meadow stars and bramble is 0 to 3 Bramble stars (so `0` to `J`);
+2. Meadow best lives; 3. Bramble best lives (0 when it has none).
+
+Ten levels give 32 characters, `BB2-` and eight groups of four (43 characters
+with the dashes). `importCode()` reads both versions: a BB1 code decodes
+exactly as before and never touches Bramble stars; a BB1 body relabeled `BB2-`
+(or the other way) fails the check, since the prefix is hashed. A code whose
+version is newer than this build (`BB3-` and up) is refused with its own
+reason, `newer`, and message ("That code comes from a newer version of the
+game"). A Bramble star in a code unlocks that level even if its Meadow state
+says locked. `changed` now also counts Bramble stars gained. Loading still only
+ever adds, through the same `merge()`. A single mistyped character is always
+caught (checked exhaustively: every one of 1,120 single-character changes to a
+real code is refused).
+
+**One layout fix.** The code grew from 31 to 43 characters and the one-line
+field showed only about 350 of its 481px. `#savecode-out` is now a read-only
+two-line `textarea` (`.sc-out`) that wraps at a dash, so the whole code shows;
+its value is still exactly the code. The panel is 286px tall on an 844x390
+phone (was 263).
+
+**Checked.** 16 new validator checks (358 in all): the format written out
+independently of `progress.js` and compared character for character, a round
+trip of both tiers, regenerating identically, a Bramble-only win, a real BB1
+code (Meadow stars in, Bramble stars untouched, BB2 offered after), relabeling,
+a weaker code never lowering either tier, a Bramble-only gain counted, fields
+out of range with a valid check, fewer and more levels, stray characters, every
+single-character typo, the newer-version reason. Harness: the BB2 prefix, the
+whole code showing without scrolling, the newer-version message, a BB1 code
+loading in a real page, and the Bramble win carried in the code.
 
 **Graphics roadmap**: see `GRAPHICS-ROADMAP.md` for the approved list of
 further graphics work, its priority order, the performance budget and the

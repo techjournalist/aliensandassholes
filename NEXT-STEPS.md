@@ -21,8 +21,8 @@ Read `AGENTS.md` first, then the file named in each item below.
   `bb-camui`); keys and gestures always work. AGENTS.md P3-V17.
 - Speed: the speed button and F cycle 1x, 2x, 4x and 8x (AGENTS.md P3-V10 and P3-V19).
 - Save code: Settings has a "Save code" panel that copies the campaign as text
-  (`BB1-...`) and loads one pasted from another device. Loading only adds. AGENTS.md
-  P3-V18. "Resume a level" (mid-level save) was explained to the user and not built.
+  (`BB2-...`, both tiers; older `BB1-...` codes still load) and loads one pasted
+  from another device. Loading only adds. AGENTS.md P3-V18 and P3-D2. "Resume a level" (mid-level save) was explained to the user and not built.
 - Tilt: the player can tilt the camera 30 to 80 degrees (buttons from 1180px, [ and ],
   right-drag, two-finger swipe; saved as `bb-tilt`; 0 resets zoom, pan and tilt).
   AGENTS.md P3-V16.
@@ -60,9 +60,9 @@ Read `AGENTS.md` first, then the file named in each item below.
    lane jitter, a few effects) with a seeded generator. It fixes the flaky Level 6
    test cascade and is needed for the daily run. See `ENDLESS-MODE.md` section 3.
 4. ~~Difficulty tiers: Meadow and Bramble.~~ **Done** (AGENTS.md P3-D1). Open, for
-   the user to decide: (a) a BB2 save code that carries Bramble stars and still
-   accepts BB1; (b) whether to even out Bramble per level (per-level trims in the
-   difficulty table, or a bot that builds anti-air like a person before judging).
+   the user to decide whether to even out Bramble per level (per-level trims in
+   the difficulty table, or a bot that builds anti-air like a person before
+   judging). The BB2 save code is built (AGENTS.md P3-D2).
 5. **Endless mode, then the daily run.** `ENDLESS-MODE.md` sections 2 and 3.
 6. **New enemies:** Spore-Medic, Sapper, Digger (one each for Levels 8, 9 and 10).
    Pod-Bearer and Magpie were dropped by the user. `ENDLESS-MODE.md` section 7.
