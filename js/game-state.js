@@ -73,6 +73,12 @@ const GameState = (() => {
     ram:       { id: 'ram',       name: 'The Siege Ram',    hp: 1300, speed: 0.5,  bounty: 150, flying: false, armor: 5, boss: true },
     stonelord: { id: 'stonelord', name: 'The Gargoyle Lord', hp: 520, speed: 0.78, bounty: 150, flying: true, armor: 1, boss: true },
     dragon:    { id: 'dragon',    name: 'The Black Dragon', hp: 700, speed: 0.72, bounty: 200, flying: true,  armor: 2, boss: true },
+    giant:     { id: 'giant',     name: 'The Hill Giant',   hp: 1100, speed: 0.5,  bounty: 150, flying: false, armor: 3, boss: true },
+    ravens:    { id: 'ravens',    name: 'The Raven Host',   hp: 400, speed: 0.75, bounty: 150, flying: true,  armor: 0, boss: true },
+    wyvern:    { id: 'wyvern',    name: 'The Sea Wyvern',   hp: 500, speed: 0.8,  bounty: 160, flying: true,  armor: 1, boss: true },
+    siegetower: { id: 'siegetower', name: 'The Siege Tower', hp: 1900, speed: 0.42, bounty: 160, flying: false, armor: 4, boss: true },
+    warlock:   { id: 'warlock',   name: 'The Warlock',      hp: 520, speed: 0.72, bounty: 160, flying: true,  armor: 1, boss: true },
+    baron:     { id: 'baron',     name: 'The Black Baron',  hp: 1400, speed: 0.62, bounty: 200, flying: false, armor: 4, boss: true },
   };
 
   // Difficulty tiers. Meadow is the game as tuned: every multiplier is 1 and

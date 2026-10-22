@@ -307,10 +307,21 @@ const UI = (() => {
       + '<rect class="st" x="-15" y="-10" width="6" height="17"></rect><rect class="st" x="9" y="-10" width="6" height="17"></rect>'
       + '<path class="ry" d="M -16 -10 L -12 -18 L -8 -10 Z"></path><path class="ry" d="M 8 -10 L 12 -18 L 16 -10 Z"></path><path class="ry" d="M -6 -14 L 0 -22 L 6 -14 Z"></path>'
       + '<rect class="wn" x="-2.5" y="1" width="5" height="6"></rect>',
+    fort: '<rect class="st" x="-11" y="-6" width="14" height="13"></rect><path class="rs" d="M -13 -6 L -4 -13 L 5 -6 Z"></path><path class="pl" d="M -7 -9 L -4 -13 L -1 -9 Z"></path>'
+      + '<rect class="st" x="4" y="-12" width="7" height="19"></rect><path class="rs" d="M 3 -12 L 7.5 -22 L 12 -12 Z"></path><path class="pl" d="M 5.6 -17 L 7.5 -22 L 9.4 -17 Z"></path><rect class="wn" x="-6" y="-2" width="4" height="5"></rect>',
+    guildhall: '<rect class="pl" x="-12" y="-4" width="24" height="11"></rect><path class="wd" d="M -6 -4 V 7 M 6 -4 V 7 M -12 1 H 12"></path><path class="rf" d="M -14 -4 L 0 -14 L 14 -4 Z"></path>'
+      + '<rect class="st" x="-2" y="-20" width="4" height="6"></rect><path class="rs" d="M -3.5 -20 L 0 -25 L 3.5 -20 Z"></path><circle class="wn" cx="0" cy="-7" r="2.2"></circle>',
+    lighthouse: '<path class="pl" d="M -5 7 L -3 -14 L 3 -14 L 5 7 Z"></path><rect class="rf" x="-4.4" y="-3" width="8.8" height="3"></rect><rect class="rf" x="-3.8" y="-10" width="7.6" height="2.6"></rect>'
+      + '<rect class="wn" x="-3" y="-19" width="6" height="5"></rect><path class="rf" d="M -4.4 -19 L 0 -25 L 4.4 -19 Z"></path><rect class="st" x="5" y="1" width="8" height="6"></rect>',
+    windmill: '<path class="st" d="M -6 7 L -4 -8 L 4 -8 L 6 7 Z"></path><path class="rb" d="M -5.5 -8 L 0 -14 L 5.5 -8 Z"></path>'
+      + '<path class="wd" d="M -11 -20 L 11 2 M 11 -20 L -11 2"></path><rect class="wn" x="-1.6" y="1" width="3.2" height="6"></rect>',
+    siegecamp: '<path class="ry" d="M -13 7 L -4 -9 L 5 7 Z"></path><path class="tn" d="M 3 7 L 9 -3 L 15 7 Z"></path><path class="wd" d="M -4 -9 V -19"></path><path class="rf" d="M -4 -19 L 4 -17 L -4 -15 Z"></path>',
+    pavilion: '<rect class="pl" x="-9" y="-2" width="18" height="9"></rect><path class="ry" d="M -11 -2 L 0 -13 L 11 -2 Z"></path><circle class="wn" cx="0" cy="-13.5" r="1.6"></circle>'
+      + '<path class="wd" d="M 11 7 V -22"></path><rect class="ry" x="11" y="-22" width="9" height="6"></rect><rect class="wn" x="11" y="-20" width="9" height="1.6"></rect>',
   };
   // woods and farmsteads of the King's own lands, and the burnt stumps the Baron leaves behind
-  const HOME_TREES = [[730, 100], [752, 150], [712, 84], [748, 214], [700, 272], [612, 80], [758, 116], [640, 284], [258, 280], [284, 266], [236, 292], [470, 150]];
-  const DEADWOOD = [[150, 168], [96, 226], [212, 262], [380, 282], [452, 120], [250, 208], [520, 270], [176, 74], [408, 64], [560, 180]];
+  const HOME_TREES = [[730, 100], [752, 150], [712, 84], [748, 214], [700, 272], [758, 116], [640, 284], [258, 280], [284, 266], [236, 292]];
+  const DEADWOOD = [[150, 168], [56, 248], [212, 262], [452, 120], [250, 208], [520, 270], [176, 74], [408, 64], [560, 180], [60, 140]];
   let artDrawn = false;
   function drawMapArt() {
     if (artDrawn) return;

@@ -1873,35 +1873,226 @@ const Renderer = (() => {
   // The Black Dragon (final boss): a long-necked wyrm with ember eyes, a
   // ridge of red spines, a spade-tipped tail and vast leathery wings.
   // Faces +z. Silhouette: the wingspan and the neck.
-  function dragonParts() {
-    const d = PALETTE.dragon, dw = PALETTE.dragonWing;
+  function dragonParts({ body = PALETTE.dragon, wing = PALETTE.dragonWing, belly = PALETTE.dragonBelly, spine = PALETTE.baronRed, eye = PALETTE.spore, legs = 4 } = {}) {
+    const d = body, dw = wing;
     const parts = [
       P(GEO.sphereLo, d, M(0, 0, 0, { sx: 0.3, sy: 0.27, sz: 0.5 }), true, { name: 'core' }),
-      P(GEO.sphereLo, PALETTE.dragonBelly, M(0, -0.1, 0.04, { sx: 0.22, sy: 0.15, sz: 0.42 }), false),
+      P(GEO.sphereLo, belly, M(0, -0.1, 0.04, { sx: 0.22, sy: 0.15, sz: 0.42 }), false),
       // neck, head, snout, horns and eyes
       P(GEO.cylTaper, d, M(0, 0.18, 0.46, { sx: 0.11, sy: 0.42, sz: 0.11, rx: 0.9 }), true),
       P(GEO.sphereLo, d, M(0, 0.36, 0.68, { sx: 0.15, sy: 0.13, sz: 0.17 }), true, { name: 'head' }),
       P(GEO.box, d, M(0, 0.32, 0.84, { sx: 0.14, sy: 0.08, sz: 0.2 }), true),
-      P(GEO.box, PALETTE.dragonBelly, M(0, 0.26, 0.82, { sx: 0.12, sy: 0.04, sz: 0.18 }), true, { name: 'jaw', live: true }),
+      P(GEO.box, belly, M(0, 0.26, 0.82, { sx: 0.12, sy: 0.04, sz: 0.18 }), true, { name: 'jaw', live: true }),
       P(GEO.cone, PALETTE.cream, M(0.08, 0.48, 0.62, { sx: 0.03, sy: 0.16, sz: 0.03, rx: -0.9 }), false),
       P(GEO.cone, PALETTE.cream, M(-0.08, 0.48, 0.62, { sx: 0.03, sy: 0.16, sz: 0.03, rx: -0.9 }), false),
-      P(GEO.bead, PALETTE.spore, M(0.09, 0.4, 0.78, { s: 0.03 }), false, { unlit: true }),
-      P(GEO.bead, PALETTE.spore, M(-0.09, 0.4, 0.78, { s: 0.03 }), false, { unlit: true }),
+      P(GEO.bead, eye, M(0.09, 0.4, 0.78, { s: 0.03 }), false, { unlit: true }),
+      P(GEO.bead, eye, M(-0.09, 0.4, 0.78, { s: 0.03 }), false, { unlit: true }),
       P(GEO.bead, PALETTE.outline, M(0.04, 0.35, 0.94, { s: 0.015 }), false),
       P(GEO.bead, PALETTE.outline, M(-0.04, 0.35, 0.94, { s: 0.015 }), false),
       // the tail and its spade
       P(GEO.cone, d, M(0, -0.02, -0.66, { sx: 0.12, sy: 0.5, sz: 0.12, rx: -Math.PI / 2 - 0.15 }), true, { name: 'tail' }),
-      P(GEO.cone, PALETTE.baronRed, M(0, -0.06, -0.96, { sx: 0.1, sy: 0.12, sz: 0.02, rx: -Math.PI / 2 }), false),
-      // little legs tucked up
-      P(GEO.sphereLo, d, M(0.18, -0.2, 0.18, { sx: 0.07, sy: 0.06, sz: 0.09 }), false),
-      P(GEO.sphereLo, d, M(-0.18, -0.2, 0.18, { sx: 0.07, sy: 0.06, sz: 0.09 }), false),
+      P(GEO.cone, spine, M(0, -0.06, -0.96, { sx: 0.1, sy: 0.12, sz: 0.02, rx: -Math.PI / 2 }), false),
+      // little legs tucked up (a wyvern has only the hind pair)
       P(GEO.sphereLo, d, M(0.16, -0.2, -0.22, { sx: 0.07, sy: 0.06, sz: 0.09 }), false),
       P(GEO.sphereLo, d, M(-0.16, -0.2, -0.22, { sx: 0.07, sy: 0.06, sz: 0.09 }), false),
+      ...(legs === 4 ? [P(GEO.sphereLo, d, M(0.18, -0.2, 0.18, { sx: 0.07, sy: 0.06, sz: 0.09 }), false), P(GEO.sphereLo, d, M(-0.18, -0.2, 0.18, { sx: 0.07, sy: 0.06, sz: 0.09 }), false)] : []),
       // the wings: a leathery membrane and a bony leading edge, each flapping from the shoulder
       P(GEO.wingL, dw, pivotMatrix(0.2, 0.14, 0.1, 0, 0, 0, 0.55, 0, -0.05, 1.1, 0.035, 1.0), true, { name: 'wingL', live: true }),
       P(GEO.wingR, dw, pivotMatrix(-0.2, 0.14, 0.1, 0, 0, 0, -0.55, 0, -0.05, 1.1, 0.035, 1.0), true, { name: 'wingR', live: true }),
     ];
-    for (let i = 0; i < 5; i++) parts.push(P(GEO.cone, PALETTE.baronRed, M(0, 0.25 - i * 0.02, 0.28 - i * 0.18, { sx: 0.04, sy: 0.12, sz: 0.06, rx: -0.3 }), false));
+    for (let i = 0; i < 5; i++) parts.push(P(GEO.cone, spine, M(0, 0.25 - i * 0.02, 0.28 - i * 0.18, { sx: 0.04, sy: 0.12, sz: 0.06, rx: -0.3 }), false));
+    return parts;
+  }
+
+  // The Sea Wyvern (Level 7 finale): the dragon's frame in deep sea green,
+  // pale belly and fins, two legs, sea-spray breath (see updateDragonView).
+  function wyvernParts() {
+    const parts = dragonParts({ body: PALETTE.pine, wing: PALETTE.streamBed, belly: PALETTE.frost, spine: PALETTE.water, eye: PALETTE.flowerYellow, legs: 2 });
+    // a finned crest down the back of the head and a forked tail fin
+    parts.push(P(GEO.cone, PALETTE.water, M(0, 0.5, 0.56, { sx: 0.02, sy: 0.16, sz: 0.12, rx: -0.6 }), false));
+    parts.push(P(GEO.cone, PALETTE.frost, M(0.08, -0.04, -1.0, { sx: 0.02, sy: 0.16, sz: 0.1, rx: -Math.PI / 2, rz: 0.5 }), false));
+    parts.push(P(GEO.cone, PALETTE.frost, M(-0.08, -0.04, -1.0, { sx: 0.02, sy: 0.16, sz: 0.1, rx: -Math.PI / 2, rz: -0.5 }), false));
+    return parts;
+  }
+
+  // The Raven Host (Level 6 finale): a black storm of ravens round a dark
+  // core with one great purple eye, the warlock's eye that steers them.
+  function ravensParts() {
+    return makeBossParts({
+      coreColor: PALETTE.trollDark, coreScale: { sx: 0.38, sy: 0.34, sz: 0.38 }, heartColor: PALETTE.magic, heartScale: { s: 0.16 }, accentColor: PALETTE.magicGlow,
+      extra: [
+        P(GEO.sphereLo, PALETTE.cream, M(0, 0.06, 0.3, { sx: 0.14, sy: 0.11, sz: 0.06 }), false, { unlit: true }),
+        P(GEO.sphereLo, PALETTE.magic, M(0, 0.06, 0.34, { sx: 0.08, sy: 0.08, sz: 0.04 }), false, { unlit: true }),
+        P(GEO.cone, PALETTE.gold, M(0, -0.08, 0.42, { sx: 0.05, sy: 0.16, sz: 0.04, rx: Math.PI / 2 + 0.3 }), false),
+        P(GEO.box, PALETTE.trollDark, M(0.5, 0.1, -0.06, { sx: 0.56, sy: 0.025, sz: 0.3, rz: 0.4 })),
+        P(GEO.box, PALETTE.trollDark, M(-0.5, 0.1, -0.06, { sx: 0.56, sy: 0.025, sz: 0.3, rz: -0.4 })),
+        P(GEO.cone, PALETTE.trollDark, M(0, 0.0, -0.42, { sx: 0.16, sy: 0.24, sz: 0.04, rx: -Math.PI / 2 })),
+      ],
+      orbitScale: { sx: 0.08, sy: 0.07, sz: 0.12 }, orbitColor: PALETTE.trollDark,
+      wingScale: { sx: 0.36, sy: 0.015, sz: 0.12 }, wingColor: PALETTE.troll,
+      beakScale: { sx: 0.025, sy: 0.07, sz: 0.025 }, beakColor: PALETTE.gold,
+    });
+  }
+
+  // The Warlock (Level 9 finale): the Baron's sorcerer, a hooded plum robe
+  // with ember eyes and a crooked staff, riding a storm of bats.
+  function warlockParts() {
+    return makeBossParts({
+      coreColor: PALETTE.tricksterDark, coreScale: { sx: 0.3, sy: 0.4, sz: 0.3 }, heartColor: PALETTE.magicGlow, heartScale: { s: 0.14 }, accentColor: PALETTE.spore,
+      extra: [
+        P(GEO.cone, PALETTE.tricksterDark, M(0, 0.48, -0.02, { sx: 0.24, sy: 0.42, sz: 0.24 })),
+        P(GEO.sphereLo, PALETTE.outline, M(0, 0.3, 0.16, { sx: 0.16, sy: 0.14, sz: 0.1 }), false, { unlit: true }),
+        P(GEO.box, PALETTE.trickster, M(0, -0.3, 0, { sx: 0.5, sy: 0.08, sz: 0.4 })),
+        P(GEO.cyl, PALETTE.wood, M(0.36, 0.1, 0.12, { sx: 0.025, sy: 1.0, sz: 0.025, rz: -0.15 })),
+        P(GEO.sphereLo, PALETTE.magic, M(0.42, 0.62, 0.12, { s: 0.09 }), false, { unlit: true }),
+        P(GEO.ring, PALETTE.gold, M(0.42, 0.62, 0.12, { s: 0.12 }), false),
+      ],
+      orbitScale: { sx: 0.07, sy: 0.06, sz: 0.09 }, orbitColor: PALETTE.batDark,
+      wingScale: { sx: 0.3, sy: 0.015, sz: 0.11 }, wingColor: PALETTE.batWing,
+      beakScale: { sx: 0.02, sy: 0.04, sz: 0.02 }, beakColor: PALETTE.spore,
+    });
+  }
+
+  // The Hill Giant (Level 5 finale): a huge bald lump in a patched hide
+  // tunic and a fur mantle, a ginger beard and topknot, dragging a whole
+  // tree trunk as a club. Faces +z. Silhouette: the size and the club.
+  // Limbs: 1 free arm, 2 club arm, 3/4 legs, 8 topknot.
+  function giantParts() {
+    const sk = PALETTE.skin, hide = PALETTE.acorn, dark = PALETTE.acornCap;
+    // the club hangs from the fist, forward and down, its knotted head near the ground
+    const club = (ox, oy, oz, sx, sy, sz, rz = 0) => pivotMatrix(-0.47, 0.42, 0.06, 2.25, 0, 0.12 + rz, ox, oy, oz, sx, sy, sz);
+    return [
+      P(GEO.sphereLo, hide, M(0, 0.64, 0, { sx: 0.42, sy: 0.42, sz: 0.36 }), true, { name: 'body' }),
+      P(GEO.sphereLo, sk, M(0, 0.62, 0.22, { sx: 0.22, sy: 0.2, sz: 0.16 }), false),
+      P(GEO.box, PALETTE.canvas, M(0.18, 0.74, 0.3, { sx: 0.12, sy: 0.1, sz: 0.02, rz: 0.3 }), false),
+      P(GEO.cyl, dark, M(0, 0.46, 0, { sx: 0.42, sy: 0.07, sz: 0.36 }), false),
+      P(GEO.box, PALETTE.gold, M(0, 0.46, 0.36, { sx: 0.09, sy: 0.07, sz: 0.02 }), false),
+      P(GEO.sphereLo, PALETTE.canvas, M(0.3, 0.42, 0.18, { sx: 0.1, sy: 0.12, sz: 0.08 }), false),
+      // fur mantle over the shoulders
+      P(GEO.sphereLo, PALETTE.straw, M(0, 0.92, -0.02, { sx: 0.44, sy: 0.13, sz: 0.34 }), true),
+      // legs and feet
+      P(GEO.cyl, sk, M(0.16, 0.22, 0, { sx: 0.1, sy: 0.32, sz: 0.1 }), true, { limb: 3 }),
+      P(GEO.cyl, sk, M(-0.16, 0.22, 0, { sx: 0.1, sy: 0.32, sz: 0.1 }), true, { limb: 4 }),
+      P(GEO.sphereLo, sk, M(0.16, 0.06, 0.06, { sx: 0.13, sy: 0.07, sz: 0.17 }), true, { limb: 3 }),
+      P(GEO.sphereLo, sk, M(-0.16, 0.06, 0.06, { sx: 0.13, sy: 0.07, sz: 0.17 }), true, { limb: 4 }),
+      // the head: bald, a big nose, ginger beard and topknot, small eyes, ears
+      P(GEO.sphere, sk, M(0, 1.14, 0.04, { sx: 0.24, sy: 0.24, sz: 0.23 }), true, { name: 'head' }),
+      P(GEO.sphereLo, sk, M(0.24, 1.14, 0.02, { sx: 0.05, sy: 0.08, sz: 0.04 }), true),
+      P(GEO.sphereLo, sk, M(-0.24, 1.14, 0.02, { sx: 0.05, sy: 0.08, sz: 0.04 }), true),
+      P(GEO.sphereLo, 0xd47a64, M(0, 1.11, 0.28, { sx: 0.07, sy: 0.07, sz: 0.08 }), true, { name: 'nose' }),
+      P(GEO.sphereLo, PALETTE.autumnDark, M(0, 0.99, 0.16, { sx: 0.2, sy: 0.15, sz: 0.12 }), true, { name: 'beard' }),
+      P(GEO.bead, PALETTE.outline, M(0.08, 1.19, 0.23, { s: 0.025 }), false, { unlit: true }),
+      P(GEO.bead, PALETTE.outline, M(-0.08, 1.19, 0.23, { s: 0.025 }), false, { unlit: true }),
+      P(GEO.box, PALETTE.outline, M(0.08, 1.25, 0.23, { sx: 0.09, sy: 0.018, sz: 0.02, rz: -0.3 }), false),
+      P(GEO.box, PALETTE.outline, M(-0.08, 1.25, 0.23, { sx: 0.09, sy: 0.018, sz: 0.02, rz: 0.3 }), false),
+      P(GEO.sphereLo, PALETTE.autumnDark, M(0, 1.4, -0.04, { sx: 0.06, sy: 0.1, sz: 0.06 }), true, { limb: 8 }),
+      P(GEO.ring, dark, M(0, 1.34, -0.04, { s: 0.05, rx: Math.PI / 2 }), false, { limb: 8 }),
+      // free arm
+      P(GEO.cyl, sk, M(0.44, 0.62, 0.02, { sx: 0.085, sy: 0.38, sz: 0.085, rz: 0.12 }), true, { limb: 1 }),
+      P(GEO.sphereLo, sk, M(0.47, 0.42, 0.04, { s: 0.1 }), true, { limb: 1 }),
+      // club arm and the tree-trunk club, a knot and a few twigs at its head
+      P(GEO.cyl, sk, M(-0.44, 0.62, 0.02, { sx: 0.085, sy: 0.38, sz: 0.085, rz: -0.12 }), true, { limb: 2 }),
+      P(GEO.sphereLo, sk, M(-0.47, 0.42, 0.04, { s: 0.1 }), true, { limb: 2 }),
+      P(GEO.cyl, PALETTE.wood, club(0, 0.3, 0, 0.07, 0.62, 0.07), true, { limb: 2 }),
+      P(GEO.sphereLo, PALETTE.woodLight, club(0, 0.64, 0, 0.13, 0.15, 0.13), true, { limb: 2 }),
+      P(GEO.cyl, PALETTE.wood, club(0.08, 0.5, 0, 0.015, 0.16, 0.015, 0.7), false, { limb: 2 }),
+      P(GEO.sphereLo, PALETTE.meadowDark, club(0.13, 0.56, 0, 0.05, 0.04, 0.05), false, { limb: 2 }),
+    ];
+  }
+
+  // The Black Baron (the campaign's last boss): the Baron himself in black
+  // plate and a spiked crown, red cape streaming, on a barded black
+  // warhorse with ember eyes. Faces +z. Silhouette: horse and rider.
+  // Limbs: 1 shield arm, 2 sword arm, 3/4 front legs, 5/6 hind legs, 7 cape, 8 tail.
+  function baronParts() {
+    const h = PALETTE.trollDark, plate = PALETTE.troll, red = PALETTE.baronRed;
+    const parts = [
+      // the horse: body, red caparison with a gold trim, neck, armored head, ears, mane
+      P(GEO.sphereLo, h, M(0, 0.62, 0, { sx: 0.25, sy: 0.24, sz: 0.48 }), true, { name: 'body' }),
+      P(GEO.cylTaper, red, M(0, 0.52, 0, { sx: 0.27, sy: 0.24, sz: 0.5, rx: Math.PI }), false),
+      P(GEO.ring, PALETTE.gold, M(0, 0.4, 0, { sx: 0.27, sy: 0.5, sz: 0.27, rx: Math.PI / 2 }), false),
+      P(GEO.cylTaper, h, M(0, 0.86, 0.38, { sx: 0.1, sy: 0.38, sz: 0.11, rx: 0.55 }), true),
+      P(GEO.box, h, M(0, 1.02, 0.56, { sx: 0.13, sy: 0.14, sz: 0.3, rx: 0.35 }), true, { name: 'head' }),
+      P(GEO.box, PALETTE.steelDark, M(0, 1.06, 0.6, { sx: 0.14, sy: 0.06, sz: 0.24, rx: 0.35 }), false),
+      P(GEO.cone, h, M(0.05, 1.16, 0.46, { sx: 0.025, sy: 0.08, sz: 0.025 }), false),
+      P(GEO.cone, h, M(-0.05, 1.16, 0.46, { sx: 0.025, sy: 0.08, sz: 0.025 }), false),
+      P(GEO.bead, PALETTE.spore, M(0.07, 1.06, 0.6, { s: 0.022 }), false, { unlit: true }),
+      P(GEO.bead, PALETTE.spore, M(-0.07, 1.06, 0.6, { s: 0.022 }), false, { unlit: true }),
+      P(GEO.box, red, M(0, 0.98, 0.34, { sx: 0.03, sy: 0.12, sz: 0.3, rx: 0.55 }), false),
+      // legs: front pair, hind pair, each with a hoof
+      ...[[3, 0.13, 0.3], [4, -0.13, 0.3], [5, 0.13, -0.3], [6, -0.13, -0.3]].flatMap(([limb, x, z]) => [
+        P(GEO.cyl, h, M(x, 0.24, z, { sx: 0.055, sy: 0.42, sz: 0.055 }), true, { limb }),
+        P(GEO.cyl, PALETTE.steelDark, M(x, 0.04, z + 0.01, { sx: 0.07, sy: 0.07, sz: 0.07 }), false, { limb }),
+      ]),
+      // tail
+      P(GEO.cone, red, M(0, 0.56, -0.56, { sx: 0.06, sy: 0.32, sz: 0.04, rx: -2.4 }), true, { limb: 8 }),
+      // the rider: black plate, a red tabard, a bucket helm with a burning slit and a spiked crown
+      P(GEO.sphereLo, plate, M(0, 1.06, -0.04, { sx: 0.17, sy: 0.2, sz: 0.15 }), true),
+      P(GEO.box, red, M(0, 1.02, 0.1, { sx: 0.18, sy: 0.24, sz: 0.02 }), false),
+      P(GEO.box, PALETTE.gold, M(0, 1.06, 0.115, { sx: 0.04, sy: 0.1, sz: 0.01 }), false),
+      P(GEO.sphereLo, plate, M(0.16, 1.2, -0.04, { sx: 0.08, sy: 0.06, sz: 0.08 }), true),
+      P(GEO.sphereLo, plate, M(-0.16, 1.2, -0.04, { sx: 0.08, sy: 0.06, sz: 0.08 }), true),
+      P(GEO.cyl, plate, M(0, 1.36, -0.02, { sx: 0.11, sy: 0.2, sz: 0.11 }), true, { name: 'helm' }),
+      P(GEO.box, PALETTE.spore, M(0, 1.38, 0.1, { sx: 0.15, sy: 0.025, sz: 0.01 }), false, { unlit: true }),
+      P(GEO.cyl, PALETTE.gold, M(0, 1.47, -0.02, { sx: 0.12, sy: 0.03, sz: 0.12 }), false),
+      ...[0, 1, 2, 3, 4].map((i) => { const a = (i / 5) * Math.PI * 2; return P(GEO.cone, PALETTE.gold, M(Math.sin(a) * 0.1, 1.53, -0.02 + Math.cos(a) * 0.1, { sx: 0.02, sy: 0.08, sz: 0.02 }), false); }),
+      // legs astride the horse
+      P(GEO.sphereLo, plate, M(0.2, 0.86, 0.04, { sx: 0.06, sy: 0.12, sz: 0.1 }), true),
+      P(GEO.sphereLo, plate, M(-0.2, 0.86, 0.04, { sx: 0.06, sy: 0.12, sz: 0.1 }), true),
+      // shield arm (left) and sword arm (right)
+      P(GEO.box, PALETTE.baron, M(0.24, 1.0, 0.06, { sx: 0.04, sy: 0.3, sz: 0.22 }), true, { limb: 1 }),
+      P(GEO.box, red, M(0.265, 1.0, 0.06, { sx: 0.01, sy: 0.24, sz: 0.05 }), false, { limb: 1 }),
+      P(GEO.sphereLo, plate, M(-0.2, 1.06, 0.06, { s: 0.06 }), true, { limb: 2 }),
+      P(GEO.box, PALETTE.steel, M(-0.22, 1.32, 0.2, { sx: 0.03, sy: 0.5, sz: 0.012, rx: 0.5 }), true, { limb: 2 }),
+      P(GEO.box, PALETTE.gold, M(-0.22, 1.1, 0.08, { sx: 0.12, sy: 0.025, sz: 0.025, rx: 0.5 }), false, { limb: 2 }),
+      // the cape streaming behind
+      P(GEO.box, red, M(0, 1.04, -0.2, { sx: 0.3, sy: 0.36, sz: 0.025, rx: 0.35 }), true, { limb: 7 }),
+    ];
+    return parts;
+  }
+
+  // The Siege Tower (Level 8 finale): a tall timber tower on four wheels,
+  // hides nailed over its sides, a drawbridge strapped to its face, the
+  // Baron's banner on top and brigands pushing behind. Faces +z.
+  function siegeTowerParts() {
+    const w = PALETTE.wood, wl = PALETTE.woodLight;
+    const parts = [
+      P(GEO.box, w, M(0, 0.3, 0, { sx: 0.74, sy: 0.1, sz: 0.74 }), true, { name: 'body' }),
+      ...[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([sx, sz]) => P(GEO.box, w, M(sx * 0.3, 1.1, sz * 0.3, { sx: 0.07, sy: 1.6, sz: 0.07 }), true)),
+      // hide panels on three levels, darker each storey, with lashings
+      ...[0.62, 1.12, 1.6].flatMap((y, i) => [
+        P(GEO.box, i % 2 ? PALETTE.acornCap : PALETTE.acorn, M(0, y, 0, { sx: 0.62, sy: 0.42, sz: 0.62 }), true),
+        P(GEO.box, PALETTE.straw, M(0, y + 0.2, 0, { sx: 0.66, sy: 0.03, sz: 0.66 }), false),
+      ]),
+      // the drawbridge strapped up on the front face, chains to the top
+      P(GEO.box, wl, M(0, 1.15, 0.33, { sx: 0.44, sy: 0.9, sz: 0.04 }), true),
+      ...[-0.12, 0.12].map((x) => P(GEO.box, PALETTE.steelDark, M(x, 1.15, 0.355, { sx: 0.03, sy: 0.9, sz: 0.01 }), false)),
+      P(GEO.box, PALETTE.steelDark, M(0, 1.15, 0.355, { sx: 0.44, sy: 0.04, sz: 0.01 }), false),
+      // the fighting top: a plank floor, crenellated rail, a brigand archer peeking out
+      P(GEO.box, w, M(0, 1.92, 0, { sx: 0.8, sy: 0.06, sz: 0.8 }), true),
+      ...[-0.3, -0.1, 0.1, 0.3].flatMap((u) => [
+        P(GEO.box, wl, M(u, 2.04, 0.38, { sx: 0.12, sy: 0.18, sz: 0.04 }), false),
+        P(GEO.box, wl, M(0.38, 2.04, u, { sx: 0.04, sy: 0.18, sz: 0.12 }), false),
+        P(GEO.box, wl, M(-0.38, 2.04, u, { sx: 0.04, sy: 0.18, sz: 0.12 }), false),
+      ]),
+      P(GEO.sphereLo, PALETTE.skin, M(0.12, 2.06, 0.2, { s: 0.08 }), true),
+      P(GEO.sphereLo, PALETTE.goblinDark, M(0.12, 2.11, 0.18, { sx: 0.09, sy: 0.07, sz: 0.09 }), true),
+      P(GEO.bow, PALETTE.wood, M(0.22, 2.1, 0.26, { s: 0.12, ry: Math.PI / 2 }), false),
+      // the Baron's banner on a pole at the top
+      P(GEO.cyl, w, M(-0.25, 2.3, -0.25, { sx: 0.02, sy: 0.8, sz: 0.02 }), false),
+      P(GEO.box, PALETTE.baron, M(-0.11, 2.5, -0.25, { sx: 0.28, sy: 0.2, sz: 0.01 }), true, { name: 'flag', live: true }),
+      P(GEO.box, PALETTE.baronRed, M(-0.11, 2.5, -0.245, { sx: 0.28, sy: 0.05, sz: 0.01 }), false, { name: 'flagStripe', live: true }),
+      // brigands' boots shoving from behind
+      P(GEO.sphereLo, PALETTE.goblin, M(0.16, 0.24, -0.5, { sx: 0.1, sy: 0.12, sz: 0.09 }), true),
+      P(GEO.sphereLo, PALETTE.goblin, M(-0.16, 0.24, -0.5, { sx: 0.1, sy: 0.12, sz: 0.09 }), true),
+      P(GEO.sphereLo, PALETTE.goblinDark, M(0.16, 0.06, -0.58, { sx: 0.07, sy: 0.05, sz: 0.1 }), true, { name: 'footL', live: true }),
+      P(GEO.sphereLo, PALETTE.goblinDark, M(-0.16, 0.06, -0.58, { sx: 0.07, sy: 0.05, sz: 0.1 }), true, { name: 'footR', live: true }),
+    ];
+    for (let i = 0; i < 4; i++) {
+      const sx = i % 2 ? 1 : -1, sz = i < 2 ? -0.3 : 0.3;
+      parts.push(P(GEO.cyl, wl, M(sx * 0.42, 0.2, sz, { sx: 0.2, sy: 0.07, sz: 0.2, rz: Math.PI / 2 }), true, { name: `wheel${i}`, live: true }));
+      parts.push(P(GEO.cyl, PALETTE.steelDark, M(sx * 0.46, 0.2, sz, { sx: 0.05, sy: 0.04, sz: 0.05, rz: Math.PI / 2 }), false));
+    }
     return parts;
   }
 
@@ -1910,6 +2101,9 @@ const Renderer = (() => {
     trickster: { freq: 12,  bounce: 0.15, lean: 0.25, sway: 0.16 },
     troll:     { freq: 3.6, bounce: 0.05, lean: 0.04, sway: 0.06 },
     ram:       { freq: 2.4, bounce: 0.02, lean: 0, sway: 0.025 },
+    siegetower: { freq: 2.0, bounce: 0.012, lean: 0, sway: 0.035 },
+    giant:     { freq: 2.2, bounce: 0.06, lean: 0.06, sway: 0.08 },
+    baron:     { freq: 4.2, bounce: 0.06, lean: 0.02, sway: 0.03 },
   };
   // Per-limb rigging. Every walker's limbs live in its one merged mesh, tagged
   // with a limb slot (aLimb); a vertex shader swings each slot about its
@@ -1923,8 +2117,15 @@ const Renderer = (() => {
     trickster: { 1: [0.12, 0.42, 0.03], 2: [-0.12, 0.42, 0.03], 3: [0.07, 0.24, 0.02], 4: [-0.07, 0.24, 0.02], 5: [0.08, 0.6, -0.08], 8: [-0.02, 0.74, -0.04] },
     troll:     { 1: [0.3, 0.6, 0.08], 2: [-0.34, 0.54, 0.12], 3: [0.14, 0.16, -0.02], 4: [-0.14, 0.16, -0.02] },
     bat:       { 1: [0.12, 0.02, 0], 2: [-0.12, 0.02, 0] },
+    giant:     { 1: [0.42, 0.82, 0.02], 2: [-0.42, 0.82, 0.02], 3: [0.16, 0.38, 0], 4: [-0.16, 0.38, 0], 8: [0, 1.34, -0.04] },
+    baron:     { 1: [0.2, 1.1, 0.04], 2: [-0.2, 1.1, 0.06], 3: [0.13, 0.46, 0.3], 4: [-0.13, 0.46, 0.3], 5: [0.13, 0.46, -0.3], 6: [-0.13, 0.46, -0.3], 7: [0, 1.22, -0.14], 8: [0, 0.64, -0.46] },
   };
-  const ENEMY_RECIPES = { grunt: gruntParts, trickster: tricksterParts, troll: trollParts, bat: batParts, ram: ramParts, stonelord: stonelordParts, dragon: dragonParts };
+  // ground bosses that walk on the limb rig like the rank and file
+  const WALKER_BOSSES = new Set(['giant', 'baron']);
+  // ground bosses that roll on wheels (updateRamView)
+  const ROLLERS = new Set(['ram', 'siegetower']);
+  const ENEMY_RECIPES = { grunt: gruntParts, trickster: tricksterParts, troll: trollParts, bat: batParts, ram: ramParts, stonelord: stonelordParts, dragon: () => dragonParts(),
+    giant: giantParts, ravens: ravensParts, wyvern: wyvernParts, siegetower: siegeTowerParts, warlock: warlockParts, baron: baronParts };
 
   // -------- particles: a pooled dust puff --------
   // The whole pool is one Points draw call: each puff is a flat round
@@ -2546,19 +2747,22 @@ const Renderer = (() => {
   function addEnemyView(e) {
     // walkers and bats are rigged (limbs animated in the shader); bosses keep their own rig
     let rig = null;
-    if (!e.boss && RIG_PIVOTS[e.type]) { rig = makeRig(e.type); rig.mats = makeRigMats(rig); }
+    if ((!e.boss || WALKER_BOSSES.has(e.type)) && RIG_PIVOTS[e.type]) { rig = makeRig(e.type); rig.mats = makeRigMats(rig); }
     const g = liveProp(ENEMY_RECIPES[e.type](), e.x, 0, e.z, { ao: !e.flying, rim: true, rig });
     g.name = `enemy-${e.id}`;
-    const big = e.type === 'troll' ? 0.45 : e.type === 'ram' ? 0.85 : 0.3;
+    const big = e.type === 'troll' ? 0.45 : ROLLERS.has(e.type) ? 0.85 : WALKER_BOSSES.has(e.type) ? 0.62 : 0.3;
     const v = { group: g, e, rig, decal: decal(0, 0, big, g), decalR: big, pop: 0, live: {} };
     g.traverse((o) => { if (o.name && o !== g) v.live[o.name] = o; });
-    if (e.type === 'ram') {
-      // the ground boss: live wheels, ram log and flag, no limb rig
-      v.walk = WALK.ram;
+    if (ROLLERS.has(e.type)) {
+      // the rolling ground bosses: live wheels, ram log and flag, no limb rig
+      v.walk = WALK[e.type];
       v.base = {};
       for (const k in v.live) v.base[k] = { p: v.live[k].position.clone(), r: v.live[k].rotation.clone() };
+    } else if (WALKER_BOSSES.has(e.type)) {
+      v.walk = WALK[e.type];
     } else if (e.boss) {
       v.decal.scale.setScalar(e.type === 'dragon' ? 0.8 : 0.7);
+      v.k = e.type === 'wyvern' ? 0.85 : 1;
       v.breath = 2 + Math.random() * 2;
       if (v.live.wingL) { v.live.wingL.matrixAutoUpdate = false; v.live.wingR.matrixAutoUpdate = false; }
     } else if (e.flying) {
@@ -2597,9 +2801,9 @@ const Renderer = (() => {
       v.frost.visible = !!e.chilled;
       v.roots.visible = !!e.rooted;
       if (e.chilled) v.frost.rotation.y = t * 2;
-      if (e.type === 'dragon') { updateDragonView(v, t, dt); continue; }
-      if (e.type === 'ram') { updateRamView(v, t, dt); continue; }
-      if (e.boss) { updateBossView(v, t, dt); continue; }
+      if (e.type === 'dragon' || e.type === 'wyvern') { updateDragonView(v, t, dt); continue; }
+      if (ROLLERS.has(e.type)) { updateRamView(v, t, dt); continue; }
+      if (e.boss && !WALKER_BOSSES.has(e.type)) { updateBossView(v, t, dt); continue; }
       if (e.flying) { updateBatView(v, t, dt); continue; }
       const w = v.walk;
       const cycle = e.dist * w.freq;
@@ -2613,8 +2817,10 @@ const Renderer = (() => {
       if (!e.rooted) g.rotation.y += Math.sin(cycle) * w.sway * 0.9;   // shoulders twist against the stride
       // a footfall: the moment the hop lands, the heavy walkers kick up dust
       const step = Math.floor(cycle / Math.PI);
-      if (v.lastStep !== undefined && step !== v.lastStep && !e.rooted && e.age > 0.4 && (e.type === 'troll' || e.type === 'grunt')) {
-        puff(e.x, 0.05, e.z, { count: e.type === 'troll' ? 3 : 1, color: PALETTE.path, speed: 0.6, size: e.type === 'troll' ? 0.09 : 0.06, up: 0.5, ttl: 0.4 });
+      if (v.lastStep !== undefined && step !== v.lastStep && !e.rooted && e.age > 0.4 && (e.type === 'troll' || e.type === 'grunt' || e.boss)) {
+        const heavy = e.type === 'troll' || e.boss;
+        puff(e.x, 0.05, e.z, { count: e.boss ? 6 : heavy ? 3 : 1, color: PALETTE.path, speed: e.boss ? 1 : 0.6, size: e.boss ? 0.14 : heavy ? 0.09 : 0.06, up: 0.5, ttl: 0.4 });
+        if (e.type === 'giant') shakeCamera(0.035, 0.18);   // the ground shakes under each step
       }
       v.lastStep = step;
       const stretch = 0.9 + 0.22 * bounce;
@@ -2631,6 +2837,20 @@ const Renderer = (() => {
         const f = Math.sin(t * 26 + e.id);
         rig[1].set(f * 1.1, 0.3, 0, 0); rig[2].set(-f * 1.1, -0.3, 0, 0);
         rig[3].set(-f * 0.4, 0, 0, 0); rig[4].set(f * 0.4, 0, 0, 0);
+      } else if (e.type === 'giant') {
+        // a lumbering stomp: the free arm swings, the club arm hauls the trunk up and lets it drop
+        rig[1].set(-sn * 0.5, 0.08, 0, 0);
+        rig[2].set(sn * 0.35 - 0.25, -0.08, 0, 0);
+        rig[3].set(sn * 0.45, 0, Math.max(0, sn) * 0.06, 0); rig[4].set(-sn * 0.45, 0, Math.max(0, -sn) * 0.06, 0);
+        rig[8].set(0, Math.sin(cycle + 0.6) * 0.3, 0, 0);
+      } else if (e.type === 'baron') {
+        // a canter: legs in diagonal pairs, sword raised and swinging, cape streaming, tail swishing
+        rig[3].set(sn * 0.6, 0, 0, 0); rig[6].set(sn * 0.6, 0, 0, 0);
+        rig[4].set(-sn * 0.6, 0, 0, 0); rig[5].set(-sn * 0.6, 0, 0, 0);
+        rig[1].set(-0.1 + sn * 0.08, 0, 0, 0);
+        rig[2].set(-0.5 + Math.sin(t * 3.1) * 0.35, -0.1, 0, 0);
+        rig[7].set(-0.35 - Math.abs(Math.sin(t * 7)) * 0.2, Math.sin(t * 5) * 0.08, 0, 0);
+        rig[8].set(0, Math.sin(t * 4) * 0.4, 0, 0);
       } else if (e.type === 'troll') {
         // a heavy armored stomp: shield and mace swing against the stride
         rig[1].set(-sn * 0.6, 0, 0, 0); rig[2].set(sn * 0.6, 0, 0, 0);
@@ -2645,11 +2865,11 @@ const Renderer = (() => {
         rig[2].set(sn * 0.55 - 0.35, -0.1, 0, 0);
         rig[3].set(sn * 0.8, 0, Math.max(0, sn) * 0.05, 0); rig[4].set(-sn * 0.8, 0, Math.max(0, -sn) * 0.05, 0);
       }
-      if (e.type !== 'troll') {
+      if (e.type !== 'troll' && !WALKER_BOSSES.has(e.type)) {
         const k = e.type === 'trickster' ? 0.8 : 1;
         rig[5].set(0, flap * k, 0, 0); rig[6].set(0, -flap * k, 0, 0);
       }
-      v.decal.scale.setScalar((e.type === 'troll' ? 0.45 : 0.3) * (1 - 0.3 * bounce));
+      v.decal.scale.setScalar(v.decalR * (1 - 0.3 * bounce));
       v.decal.position.y = 0.012 - w.bounce * bounce;   // keep the shadow flat on the ground while the body hops
     }
     for (let i = dying.length - 1; i >= 0; i--) {
@@ -2701,7 +2921,7 @@ const Renderer = (() => {
     g.position.set(e.x, BOSS_HEIGHT + 0.15 + bob, e.z);
     g.rotation.y = Math.atan2(e.dirX, e.dirZ);
     g.rotation.x = beat * 0.05;
-    g.scale.set(born * (1 + popK), born * (1 - popK * 0.5), born * (1 + popK));
+    g.scale.set(born * (1 + popK), born * (1 - popK * 0.5), born * (1 + popK)).multiplyScalar(v.k || 1);
     const flap = beat * 0.7 + 0.1;
     pivotMatrix(0.2, 0.14, 0.1, 0, 0, flap, 0.55, 0, -0.05, 1.1, 0.035, 1.0, v.live.wingL.matrix);
     pivotMatrix(-0.2, 0.14, 0.1, 0, 0, -flap, -0.55, 0, -0.05, 1.1, 0.035, 1.0, v.live.wingR.matrix);
@@ -2711,7 +2931,8 @@ const Renderer = (() => {
     v.live.jaw.rotation.x = open * 0.5;
     if (v.breath < 0.45 && v.breath > 0 && Math.random() < 0.6) {
       const fx = Math.sin(g.rotation.y), fz = Math.cos(g.rotation.y);
-      puff(e.x + fx * 1.0, g.position.y + 0.25, e.z + fz * 1.0, { count: 2, color: Math.random() < 0.5 ? PALETTE.ember : PALETTE.flowerYellow, speed: 0.9, size: 0.1, up: 0.4, ttl: 0.5 });
+      const sea = e.type === 'wyvern';
+      puff(e.x + fx * 1.0, g.position.y + 0.25, e.z + fz * 1.0, { count: 2, color: Math.random() < 0.5 ? (sea ? PALETTE.waterFoam : PALETTE.ember) : (sea ? PALETTE.water : PALETTE.flowerYellow), speed: 0.9, size: 0.1, up: 0.4, ttl: 0.5 });
     }
     if (v.breath <= 0) v.breath = 2.5 + Math.random() * 1.5;
     v.decal.position.y = -(g.position.y) + 0.012;
@@ -2732,9 +2953,11 @@ const Renderer = (() => {
     const popK = Math.sin(Math.min(1, v.pop) * Math.PI) * 0.12;
     g.scale.set(born * (1 + popK), born * (1 - popK * 0.5), born * (1 + popK));
     for (let i = 0; i < 4; i++) v.live[`wheel${i}`].rotation.x = -e.dist * 4.5;
-    const swing = Math.sin(t * 2.4) * 0.12;
-    v.live.ram.position.z = v.base.ram.p.z + swing;
-    v.live.ramHead.position.z = v.base.ramHead.p.z + swing;
+    if (v.live.ram) {
+      const swing = Math.sin(t * 2.4) * 0.12;
+      v.live.ram.position.z = v.base.ram.p.z + swing;
+      v.live.ramHead.position.z = v.base.ramHead.p.z + swing;
+    }
     v.live.flag.rotation.y = Math.sin(t * 5) * 0.4;
     v.live.flagStripe.rotation.y = v.live.flag.rotation.y;
     v.live.footL.position.z = v.base.footL.p.z + Math.sin(cycle * 3) * 0.08;

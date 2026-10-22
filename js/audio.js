@@ -271,7 +271,21 @@ const Audio = (() => {
         // war drums: three heavy beats and a creak of timber
         [0.4, 0.75, 1.1].forEach((d) => { voice({ type: 'triangle', freq: 70, to: 40, dur: 0.25, vol: 0.5, cutoff: 400, delay: d }); noise({ dur: 0.12, vol: 0.3, freq: 300, filter: 'lowpass', delay: d }); });
         voice({ type: 'square', freq: 180, to: 140, dur: 0.4, vol: 0.06, cutoff: 700, delay: 1.3 });
-      } else if (type === 'dragon') {
+      } else if (type === 'siegetower') {
+        // timber groaning and iron-bound wheels grinding
+        voice({ type: 'square', freq: 150, to: 110, dur: 0.6, vol: 0.06, cutoff: 600, delay: 0.35 });
+        voice({ type: 'square', freq: 130, to: 170, dur: 0.5, vol: 0.05, cutoff: 600, delay: 0.95 });
+        noise({ dur: 1.0, vol: 0.2, freq: 260, filter: 'lowpass', delay: 0.4 });
+      } else if (type === 'giant') {
+        // three ground-shaking footsteps and a bellow
+        [0.35, 0.8, 1.25].forEach((d) => { voice({ type: 'sine', freq: 60, to: 32, dur: 0.35, vol: 0.55, cutoff: 300, delay: d }); noise({ dur: 0.15, vol: 0.3, freq: 200, filter: 'lowpass', delay: d }); });
+        voice({ type: 'sawtooth', freq: 130, to: 90, dur: 0.9, vol: 0.18, cutoff: 700, delay: 1.5 });
+      } else if (type === 'baron') {
+        // a war-horn call over galloping hooves
+        voice({ type: 'sawtooth', freq: 196, to: 196, dur: 0.5, vol: 0.14, cutoff: 1400, delay: 0.3 });
+        voice({ type: 'sawtooth', freq: 262, to: 262, dur: 0.9, vol: 0.14, cutoff: 1400, delay: 0.75 });
+        for (let i = 0; i < 6; i++) noise({ dur: 0.05, vol: 0.18, freq: 500, q: 1.5, delay: 0.3 + i * 0.16 + (i % 2) * 0.05 });
+      } else if (type === 'dragon' || type === 'wyvern') {
         // a long roar with a crackle of flame
         voice({ type: 'sawtooth', freq: 240, to: 85, dur: 1.1, vol: 0.22, cutoff: 1200, delay: 0.35 });
         voice({ type: 'sawtooth', freq: 180, to: 70, dur: 1.1, vol: 0.16, cutoff: 900, delay: 0.38 });
@@ -419,6 +433,12 @@ const Audio = (() => {
     'ravensford':       { root: 43, minor: false },
     'st-wendels':       { root: 45, minor: true },
     'castle-aldermere': { root: 41, minor: false },
+    'highcrag-pass':    { root: 40, minor: true },
+    'wickham-fair':     { root: 45, minor: false },
+    'saltmarsh-quay':   { root: 42, minor: true },
+    'amberlea-vineyards': { root: 44, minor: false },
+    'blackmoor-lines':  { root: 39, minor: true },
+    'black-keep':       { root: 38, minor: true },
   };
   // chord = [semitones above the key root, 'maj' | 'min']; one chord per bar
   const PROG = {

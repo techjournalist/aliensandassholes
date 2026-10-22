@@ -1,9 +1,19 @@
 # Next steps (Knights & Knaves)
 
 This branch is the Knights & Knaves fork (see the top of `AGENTS.md`). Its
-four levels are `js/level1-hollybrook.js` to `js/level4-castle-aldermere.js`.
-The notes below are the Briar & Bastion handoff the fork was built from;
-level names in them refer to the original game.
+ten levels are `js/level1-hollybrook.js` to `js/level10-black-keep.js`
+(Levels 5 to 10 follow the King's host into Blackmoor). The notes below are
+the Briar & Bastion handoff the fork was built from; level names in them
+refer to the original game.
+
+Open items for the fork:
+- Knight tier spread: seeded bot wins out of 10 per level are Hollybrook 10,
+  Ravensford 4, St Wendel's 0 (the Gargoyle Lord leaks at about a third of
+  its hp), Castle 10, Highcrag 10, Wickham 2, Saltmarsh 10, Amberlea 10,
+  Blackmoor Lines 3, Black Keep 3. Squire tier wins 20 of 20 everywhere.
+  Same shape as the original's Bramble spread; evening it out is a choice.
+- Pitchpot Friar branches: Tar Abbot and Firepot Friar separate clearly on
+  the new duel tiles, but watch them if the duel tiles move again.
 
 # Next steps (handoff for a new chat)
 

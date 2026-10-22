@@ -48,6 +48,55 @@ Black Dragon, its own view with wingbeats and fire breath).
 4. Castle Aldermere: three looping roads (a hairpin Ridge Road, a Fen
    loop) joining before the drawbridge, the Black Dragon finale. 14 waves.
 
+After the castle the Baron flees west and the King's host follows him into
+Blackmoor (user request: "the original has 10", so the fork matches it):
+
+5. Highcrag Pass: snow, a goat-track switchback and a low pass meeting
+   east of a frozen gorge, a rope bridge, Highcrag Fort (gate on its south
+   side, the road rounds the fort to reach it). Boss: the Hill Giant
+   (`giant`, a ground boss on the limb rig whose steps shake the camera).
+6. Wickham Fair: a market town. Two western roads cross the brook on a
+   stone bridge; the east road reaches the square without crossing water.
+   The Guildhall's clock hands turn and its bell swings harder as it takes
+   damage; a maypole spins on the green. Boss: the Raven Host (`ravens`).
+7. Saltmarsh Quay: the shore road and dune path cross the inlet on a pier;
+   the beach track winds east of the water and joins them on the headland.
+   A cog rides at anchor; the lighthouse beam turns (and dims at state 2).
+   Boss: the Sea Wyvern (`wyvern`, the dragon's view in sea colors).
+8. Amberlea Vineyards: vine rows, apple trees and casks; the Vine Road
+   sweeps round two sides of the windmill hill, whose sails turn, slow and
+   stop (one blows off) as the mill is hurt. Boss: the Siege Tower
+   (`siegetower`, a ground boss on the Siege Ram's rolling view).
+9. The Blackmoor Lines: six roads (five from the west, a flank behind the
+   camp that never crosses the ditch), a palisade along the ditch, gate
+   towers, the royal pavilion and a trebuchet that throws every 7 seconds.
+   Boss: the Warlock (`warlock`, swarm rig).
+10. The Black Keep: the finale. The King's standard in the middle of
+   Blackmoor, three roads from the west over a lava fissure (iron bridge),
+   two from the east; the Baron's black tower looms beyond the west rim.
+   Wave 13 is the Black Guard, wave 14 the Black Baron himself (`baron`, a
+   rigged knight on a barded warhorse). 14 waves.
+
+Every gate faces south: the engine walks the last step into the gate from
+the cell below it (`gate.z` in `loadLevel`), so a level's last road cell
+must sit directly south of `gateCell`. Levels 5 and 6 were first drawn
+with west- and north-facing gates and failed the curve check until the
+roads were rerouted to come up from below.
+
+Balance (`tools/bot-runner.js`, 20 seeded runs each, Squire tier): every
+new level wins 20 of 20 with 7 to 13 lives on average, the lone-tower and
+per-road checks leak nothing, and no single tower type wins any level. Two
+lessons repeated from the original campaign. A flyer that leaks at the
+same hp every run is a damage ceiling or a coverage gap, not bad luck:
+Wickham Fair's roads are short, so its gargoyle counts were cut; Saltmarsh's
+beach track first joined the others only at the gate, so it was rerouted to
+join them on the headland where towers can see all three roads. And a loop
+that lets a tower see one road three times trivializes a level: Amberlea's
+first loop circled the whole mill and the bot kept 18 of 20 lives however
+hard the waves got, so the loop was cut to two sides. The Black Dragon was
+first reprised on the Black Keep's wave 13; on roads half the castle's
+length it leaked at 80% hp every run, so that wave became the Black Guard.
+
 All four levels set `curvyRoads: true` and `curveKeepsPace: true`, the base
 branch's curved-road option, so roads bend smoothly through their corners
 instead of turning on the grid. The validator keeps every curve within
@@ -57,8 +106,11 @@ and two collinear waypoints to pass.
 Storage keys are `kk-*` (progress, mute, audio, camera view and tilt,
 difficulty, active level) so the fork never reads the original game's saves.
 Difficulty tiers keep their engine ids (`meadow`, `bramble`) but are named
-Squire and Knight on screen. Save codes start `KK1-` (the BB2 layout). The original eight Briar & Bastion level
-files are no longer loaded by `index.html`.
+Squire and Knight on screen. Save codes start `KK1-` (the BB2 layout, three
+characters per level, so ten levels make a 32-character body). The original
+ten Briar & Bastion level files (`js/level1-shadow-hollow.js` to
+`js/level10-keep-between.js`) and `js/dawn-kit.js` stay in the repo but are
+no longer loaded by `index.html`.
 
 **Balance tooling**: besides `tools/playtest.js`, a headless bot that
 replays `runBotOn` over the plain game logic (via `validate-levels.js`'s
