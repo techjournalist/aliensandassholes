@@ -637,6 +637,7 @@ async function enterLevel(page, levelId) {
     check(`${N} win screen ${last ? 'keeps "Choose another battle" (last level)' : 'offers Continue'}`, label === (last ? 'Choose another battle' : 'Continue'), label);
     // a finished level can never strand the player (the last level holds this scenario)
     if (last && mixed.phase === 'won') {
+      await page.evaluate(() => { document.getElementById('end').classList.remove('show'); });
       await page.locator('#pause-btn').click(); await page.waitForTimeout(200);
       check('after a win the pause button brings back the end screen', await page.locator('#end').isVisible());
       await page.evaluate(() => { document.getElementById('end').classList.remove('show'); });

@@ -10,8 +10,12 @@ module.exports = {
     roadTile: [3, 4], streamTile: [10, 2], farTile: [1, 9],
     firstSlingerTile: [4, 6], secondSlingerTile: [7, 5], brokeTile: [11, 4],
     towerSpots: { warden: [5, 6], druid: [7, 4], golem: [8, 4], artillery: [13, 4] },
-    // two tiles beside the first stretch of road, for the branch duels
-    duelTiles: [[4, 6], [5, 6]],
+    // two tiles beside a straight stretch of road, for the branch duels.
+    // Duel scores swing with how much road the pair can see: beside the
+    // doubled-back bends everything scores ~100% and nothing separates.
+    // Watch the Pitchpot Friar here: Tar Abbot only out-scores Firepot Friar
+    // on the mixed stream (~98 vs 88) and ties on Black Knights, a thin edge.
+    duelTiles: [[2, 4], [2, 5]],
     // the tip tile first, then spots inside the road's own doubled-back bends
     botBuildSpots: [[4, 6], [5, 6], [7, 4], [4, 3], [8, 5], [7, 6], [11, 5], [13, 4], [2, 3], [11, 3], [13, 7], [8, 4], [11, 7], [14, 4], [16, 4], [14, 9]],
     botPlan: ['slinger', 'slinger', 'warden', 'druid', 'artillery', 'golem', 'druid', 'warden', 'slinger', 'golem', 'artillery', 'warden', 'druid', 'slinger', 'golem', 'artillery'],
