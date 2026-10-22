@@ -77,7 +77,7 @@ const GameState = (() => {
     ravens:    { id: 'ravens',    name: 'The Raven Host',   hp: 400, speed: 0.75, bounty: 150, flying: true,  armor: 0, boss: true },
     wyvern:    { id: 'wyvern',    name: 'The Sea Wyvern',   hp: 500, speed: 0.8,  bounty: 160, flying: true,  armor: 1, boss: true },
     siegetower: { id: 'siegetower', name: 'The Siege Tower', hp: 1900, speed: 0.42, bounty: 160, flying: false, armor: 4, boss: true },
-    warlock:   { id: 'warlock',   name: 'The Warlock',      hp: 520, speed: 0.72, bounty: 160, flying: true,  armor: 1, boss: true },
+    warlock:   { id: 'warlock',   name: 'The Warlock',      hp: 370, speed: 0.72, bounty: 160, flying: true,  armor: 1, boss: true },
     baron:     { id: 'baron',     name: 'The Black Baron',  hp: 1400, speed: 0.62, bounty: 200, flying: false, armor: 4, boss: true },
   };
 

@@ -84,7 +84,7 @@ with west- and north-facing gates and failed the curve check until the
 roads were rerouted to come up from below.
 
 Balance (`tools/bot-runner.js`, 20 seeded runs each, Squire tier): every
-new level wins 20 of 20 with 7 to 13 lives on average, the lone-tower and
+new level wins 40 of 40 with 9 to 14 lives on average, the lone-tower and
 per-road checks leak nothing, and no single tower type wins any level. Two
 lessons repeated from the original campaign. A flyer that leaks at the
 same hp every run is a damage ceiling or a coverage gap, not bad luck:
@@ -96,6 +96,13 @@ first loop circled the whole mill and the bot kept 18 of 20 lives however
 hard the waves got, so the loop was cut to two sides. The Black Dragon was
 first reprised on the Black Keep's wave 13; on roads half the castle's
 length it leaked at 80% hp every run, so that wave became the Black Guard.
+The first full browser run then lost Level 9 (its unseeded lanes landed on
+the thin side of an 8-life seeded margin). Its flank road leaked a constant
+3 of 4 grunts on wave 7, and the Warlock always reached the gate having
+taken exactly 638 damage, whatever its hp: a fixed damage ceiling. The flank
+groups were thinned and the Warlock's hp set to 370 (592 at wave 13), and
+two Black Keep waves eased; over 40 seeds Level 9 now keeps 12.3 lives on
+average and Level 10 keeps 10, neither below 2.
 
 All four levels set `curvyRoads: true` and `curveKeepsPace: true`, the base
 branch's curved-road option, so roads bend smoothly through their corners
