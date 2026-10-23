@@ -145,11 +145,16 @@ const UI = (() => {
   }
 
   // Onboarding: one tip at a time, anchored to the thing to tap next.
+  const coachDone = (k) => { try { return localStorage.getItem('kk-coach-' + k) === '1'; } catch (e) { return false; } };
+  const coachMark = (k) => { try { localStorage.setItem('kk-coach-' + k, '1'); } catch (e) { /* storage may be blocked */ } };
   function tipState() {
     const s = GameState.state;
     if (s.phase !== 'playing' || s.paused) return null;
     if (s.towers.length === 0) return 'build';
     if (s.wave === 0) return 'wave';
+    // first battle only: between the early waves, show how to upgrade once it's affordable
+    if (GameState.currentLevel().index === 1 && !s.waveActive && s.wave <= 3 && !coachDone('upgrade')
+      && !s.towers.some((t) => t.tier > 1) && s.towers.some((t) => { const c = GameState.upgradeCost(t); return c !== null && s.gold >= c; })) return 'upgrade';
     return null;
   }
   function updateTip() {
@@ -175,6 +180,24 @@ const UI = (() => {
         tip.style.transform = 'translate(-50%, -100%)';
       }
       $('tip').querySelector('.tip-text').textContent = text;
+    } else if (st === 'upgrade') {
+      const s = GameState.state, sel = s.selected;
+      if (sel && sel.kind === 'tower') {
+        const bb = $('panel').getBoundingClientRect();
+        tip.classList.add('up');
+        tip.style.left = (bb.left + bb.width / 2) + 'px';
+        tip.style.top = (bb.top - 52) + 'px';
+        tip.style.transform = 'translate(-50%, -100%)';
+        $('tip').querySelector('.tip-text').textContent = 'Upgrade it to hit harder and farther';
+      } else {
+        const t = s.towers[0];
+        const p = Renderer.worldToScreen(t.x, 0.9, t.z);
+        tip.classList.remove('up');
+        tip.style.left = p.x + 'px';
+        tip.style.top = (p.y - 50) + 'px';
+        tip.style.transform = 'translate(-50%, -100%)';
+        $('tip').querySelector('.tip-text').textContent = 'Gold to spare? Tap a tower';
+      }
     } else {
       const bb = $('wave-btn').getBoundingClientRect();
       tip.classList.add('up');
@@ -814,9 +837,60 @@ const UI = (() => {
     $('savecode-in').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); loadSaveCode(); } });
     $('savecode-out').addEventListener('focus', (e) => e.target.select());
     codeEl.addEventListener('pointerdown', (e) => { if (e.target === codeEl) closeSaveCode(); });
+    // ---- how to play: five short cards, shown once before the first battle ----
+    const guideEl = $('guide'), slides = [...guideEl.querySelectorAll('.g-slide')], dots = [...guideEl.querySelectorAll('.g-dots i')];
+    let gStep = 0;
+    $('guide-roster').innerHTML = GameState.TOWER_ORDER.map((id) => {
+      const t = GameState.TOWER_TYPES[id];
+      return `<li><span class="ico">${t.icon}</span><span><span class="nm">${t.name}</span> &middot; ${t.cost} gold${t.hitsFlying ? ' <span class="air">Hits flyers</span>' : ''}<br>${t.blurb.replace(/ (Ground only|Reaches flyers)\.$/, '')}</span></li>`;
+    }).join('');
+    function showStep(n) {
+      gStep = Math.max(0, Math.min(slides.length - 1, n));
+      slides.forEach((el, i) => el.classList.toggle('on', i === gStep));
+      dots.forEach((el, i) => el.classList.toggle('on', i === gStep));
+      $('guide-back').style.visibility = gStep ? 'visible' : 'hidden';
+      $('guide-next').textContent = gStep === slides.length - 1 ? 'To battle!' : 'Next';
+      $('guide-skip').style.visibility = gStep === slides.length - 1 ? 'hidden' : 'visible';
+    }
+    function openGuide() {
+      Audio.unlock();
+      if (GameState.state.phase === 'playing' && !GameState.state.paused) GameState.pause();
+      showStep(0);
+      guideEl.classList.add('show');
+      $('guide-next').focus();
+    }
+    function closeGuide() {
+      guideEl.classList.remove('show');
+      try { localStorage.setItem('kk-guide-seen', '1'); } catch (e) { /* storage may be blocked */ }
+    }
+    $('guide-next').addEventListener('click', () => { try { Audio.sfx.select(); } catch (e) { /* audio is optional */ } if (gStep === slides.length - 1) closeGuide(); else showStep(gStep + 1); });
+    $('guide-back').addEventListener('click', () => showStep(gStep - 1));
+    $('guide-skip').addEventListener('click', closeGuide);
+    $('title-guide-btn').addEventListener('click', openGuide);
+    $('pause-guide-btn').addEventListener('click', openGuide);
+    // swipe the cards on a touch screen
+    let gx = null;
+    guideEl.addEventListener('pointerdown', (e) => { gx = e.clientX; });
+    guideEl.addEventListener('pointerup', (e) => {
+      if (gx === null) return;
+      const dx = e.clientX - gx; gx = null;
+      if (Math.abs(dx) > 60 && !e.target.closest('button')) showStep(gStep + (dx < 0 ? 1 : -1));
+    });
+    // the first press of Raise the Banners opens it over the map (never under automation)
+    $('start-btn').addEventListener('click', () => {
+      let seen = true;
+      try { seen = localStorage.getItem('kk-guide-seen') === '1'; } catch (e) { /* treat as seen */ }
+      if (!seen && !navigator.webdriver) openGuide();
+    });
+    window.addEventListener('keydown', (e) => {
+      if (!guideEl.classList.contains('show')) return;
+      if (e.key === 'ArrowRight') { e.preventDefault(); e.stopImmediatePropagation(); showStep(gStep + 1); }
+      else if (e.key === 'ArrowLeft') { e.preventDefault(); e.stopImmediatePropagation(); showStep(gStep - 1); }
+    }, true);
     window.addEventListener('keydown', (e) => {
       if (e.key !== 'Escape') return;
-      if (codeEl.classList.contains('show')) { e.preventDefault(); e.stopImmediatePropagation(); closeSaveCode(); }
+      if (guideEl.classList.contains('show')) { e.preventDefault(); e.stopImmediatePropagation(); closeGuide(); }
+      else if (codeEl.classList.contains('show')) { e.preventDefault(); e.stopImmediatePropagation(); closeSaveCode(); }
       else if (settingsEl.classList.contains('show')) { e.preventDefault(); e.stopImmediatePropagation(); closeSettings(); }
     }, true);
     GameState.on('enemyHit', ({ enemy, amount, armored, x, z }) => floater(x, enemy.boss ? 1.6 : enemy.flying ? 1.2 : 0.7, z, armored ? `${amount} clink` : amount, armored ? 'armored' : ''));
@@ -845,6 +919,13 @@ const UI = (() => {
     GameState.on('selectionCleared', renderPanel);
     GameState.on('towerPlaced', renderPanel);
     GameState.on('towerUpgraded', renderPanel);
+    GameState.on('towerUpgraded', () => coachMark('upgrade'));
+    GameState.on('waveStarted', (n) => {
+      const w = GameState.waveInfo(n);
+      if (!w || coachDone('flyers') || !w.groups.some((g) => GameState.ENEMY_TYPES[g.type].flying && !GameState.ENEMY_TYPES[g.type].boss)) return;
+      coachMark('flyers');
+      setTimeout(() => toast('Gargoyles fly over the road. Only the Court Magus and the Longbowman can hit them.', true, 6000), 1800);
+    });
     GameState.on('goldChanged', renderPanel);
     GameState.on('towerSold', ({ value }) => toast(`Sold for ${value} gold.`));
     GameState.on('towerUpgraded', (tw) => toast(tw.branch
