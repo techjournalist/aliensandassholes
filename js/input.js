@@ -2,8 +2,9 @@
 // Input  (Pointer Events: mouse and touch share one path, handleTap)
 //   A short press with little movement is a tap (place or select).
 //   Dragging pans the view when it is zoomed in, two fingers pinch to zoom
-//   (and swipe up or down to tilt the camera), the wheel (or a trackpad
-//   pinch) zooms toward the pointer and a right-button drag tilts it.
+//   (swipe up or down to tilt the camera, twist to turn the view a quarter),
+//   the wheel (or a trackpad pinch) zooms toward the pointer and a
+//   right-button drag tilts it.
 // ===================================================================
 const Input = (() => {
   let down = null, lastTap = -1e9;
@@ -11,6 +12,8 @@ const Input = (() => {
   const pts = new Map(); // every pointer currently pressed: id -> { x, y }
   let pinchDist = 0, dragging = false;
   let swipeAcc = 0, swiping = false;   // two-finger vertical travel; a pinch's small drift must not tilt
+  let twistAcc = 0;                     // two-finger rotation since the last quarter turn, radians
+  const TWIST_TURN = 0.6;               // about 35 degrees of twist turns the view one step
 
   const playing = () => GameState.state.phase === 'playing';
 
@@ -22,7 +25,7 @@ const Input = (() => {
 
   function pair() {
     const [a, b] = [...pts.values()];
-    return { d: Math.hypot(a.x - b.x, a.y - b.y), cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2 };
+    return { d: Math.hypot(a.x - b.x, a.y - b.y), cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2, ang: Math.atan2(b.y - a.y, b.x - a.x) };
   }
 
   function init(canvas) {
@@ -30,7 +33,7 @@ const Input = (() => {
       Audio.unlock();
       pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (pts.size === 1) { down = { x: e.clientX, y: e.clientY, id: e.pointerId, tilt: e.button === 2 }; dragging = false; }
-      else { down = null; pinchDist = pts.size === 2 ? pair().d : 0; swipeAcc = 0; swiping = false; }   // a second finger makes it a pinch, never a tap
+      else { down = null; pinchDist = pts.size === 2 ? pair().d : 0; swipeAcc = 0; swiping = false; twistAcc = 0; }   // a second finger makes it a pinch, never a tap
       if (canvas.setPointerCapture) { try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* older browsers */ } }
     });
     canvas.addEventListener('pointermove', (e) => {
@@ -48,6 +51,11 @@ const Input = (() => {
         if (!swiping && Math.abs(swipeAcc) > 14) swiping = true;
         if (swiping) Renderer.tiltBy((now.cy - before.cy) * 0.25, true);
         Renderer.panBy(now.cx - before.cx, 0);
+        // twisting the two fingers turns the view a quarter, clockwise with the fingers
+        let da = now.ang - before.ang;
+        if (da > Math.PI) da -= 2 * Math.PI; else if (da < -Math.PI) da += 2 * Math.PI;
+        twistAcc += da;
+        if (Math.abs(twistAcc) > TWIST_TURN) { Renderer.rotateView(twistAcc > 0 ? 1 : -1); twistAcc = 0; }
         pinchDist = now.d;
       } else if (pts.size === 1 && down && down.id === e.pointerId) {
         if (down.tilt) Renderer.tiltBy(dy * 0.25, true);    // right-button drag: down looks more from above
@@ -70,6 +78,9 @@ const Input = (() => {
     });
     canvas.addEventListener('pointercancel', (e) => { release(e); down = null; });
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+    // iOS Safari ignores user-scalable=no and would pinch-zoom the whole page
+    // instead of the game; its own gesture events must be stopped
+    for (const ev of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(ev, (e) => e.preventDefault(), { passive: false });
     canvas.addEventListener('wheel', (e) => {
       e.preventDefault();
       if (!playing()) return;

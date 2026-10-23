@@ -40,6 +40,9 @@ const Audio = (() => {
   }
 
   function unlock() {
+    // iPhones mute web audio while the ring/silent switch is on silent;
+    // iOS 17+ lets a page ask to play like media instead
+    try { if (navigator.audioSession && navigator.audioSession.type !== 'playback') navigator.audioSession.type = 'playback'; } catch (e) { /* not supported */ }
     if (!ctx) {
       const AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return;
@@ -51,7 +54,8 @@ const Audio = (() => {
       startAmbience();
       startMusic();
     }
-    if (ctx.state === 'suspended') ctx.resume();
+    // iOS reports 'interrupted' after a call or a trip to the home screen
+    if (ctx.state !== 'running') { try { ctx.resume(); } catch (e) { /* retried on the next tap */ } }
   }
 
   function setMuted(m) {
