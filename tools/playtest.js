@@ -435,7 +435,8 @@ async function enterLevel(page, levelId) {
   }, [lead.x, lead.z]);
   await page.screenshot({ path: `${OUT}/goblin-zoom.png`, clip: { x: lx - 90, y: ly - 110, width: 180, height: 160 } });
   check('tip gone once the wave is sent', !(await page.locator('#tip').isVisible()));
-  const fired = await page.evaluate(() => GameState.state.projectiles.length > 0 || GameState.state.towers.some((t) => t.targetId));
+  // a single instant can fall between two shots: wait a few seconds for one
+  const fired = await page.waitForFunction(() => GameState.state.projectiles.length > 0 || GameState.state.towers.some((t) => t.targetId), null, { timeout: 8000 }).then(() => true, () => false);
   check('towers acquire targets and fire', fired);
   await page.evaluate(() => { for (let i = 0; i < 60 * 90 && GameState.state.waveActive; i++) GameState.update(1 / 60); });
   await page.waitForTimeout(4000);   // let exit animations and puffs finish (headless frames are slow)
