@@ -4,6 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Knights">
+<meta name="theme-color" content="#34452e">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <title>Knights &amp; Knaves</title>
 <style>
   :root {
@@ -41,6 +48,9 @@
     --thorn: #9a3f6e;
   }
   * { box-sizing: border-box; }
+  /* no double-tap zoom anywhere: on iPhones two quick taps on a button zoomed
+     the page onto it; manipulation keeps taps and scrolling, drops that zoom */
+  html, body, button, .screen, #hud { touch-action: manipulation; }
   html, body {
     margin: 0; padding: 0; width: 100%; height: 100%;
     overflow: hidden; background: #34452e;

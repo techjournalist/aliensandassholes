@@ -46,13 +46,13 @@ const UI = (() => {
     }
   }
 
-  function toast(text, bad) {
+  function toast(text, bad, ms = 2200) {
     const el = $('toast');
     el.textContent = text;
     el.classList.toggle('bad', !!bad);
     el.classList.add('show');
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+    toastTimer = setTimeout(() => el.classList.remove('show'), ms);
   }
 
   function flash(cls) {
@@ -217,6 +217,21 @@ const UI = (() => {
     $('finale-total').textContent = total === max
       ? `${total} of ${max} stars${on}. A perfect campaign. Not one wall was breached.`
       : `${total} of ${max} stars across the campaign${on}. Replay any level to earn the rest.`;
+  }
+  // Android browsers can drop their toolbars on a tap; iPhones can't (there the
+  // game goes full screen once added to the home screen, see manifest.webmanifest).
+  // Skipped under automation so the harness viewport never changes.
+  function goFullscreen() {
+    try {
+      if (navigator.webdriver || document.fullscreenElement) return;
+      if (matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches) return;
+      if (!matchMedia('(pointer: coarse)').matches) return;   // phones and tablets only
+      const el = document.documentElement;
+      const req = el.requestFullscreen || el.webkitRequestFullscreen;
+      if (!req) return;
+      const p = req.call(el, { navigationUI: 'hide' });
+      if (p && p.then) p.then(() => { try { screen.orientation.lock('landscape').catch(() => {}); } catch (e) { /* not supported */ } }).catch(() => {});
+    } catch (e) { /* full screen is a nicety */ }
   }
   function showEnd(won) {
     const s = GameState.state, level = GameState.currentLevel();
@@ -581,7 +596,7 @@ const UI = (() => {
     let skipToPlay = false;
     try { skipToPlay = sessionStorage.getItem('kk-enter-play') === '1'; sessionStorage.removeItem('kk-enter-play'); } catch (e) { /* ignore */ }
     if (skipToPlay) GameState.startGame(); else $('title').classList.add('show');
-    $('start-btn').addEventListener('click', () => { Audio.unlock(); $('title').classList.remove('show'); enterWorldMap(); });
+    $('start-btn').addEventListener('click', () => { Audio.unlock(); goFullscreen(); $('title').classList.remove('show'); enterWorldMap(); });
     const pickNode = (e) => {
       const node = e.target.closest('.wm-node');
       if (!node) return;
@@ -725,7 +740,19 @@ const UI = (() => {
       setChecked($('set-camui'), show);
       if (save) { try { localStorage.setItem(CAMUI_KEY, show ? '1' : '0'); } catch (e) { /* storage may be blocked */ } }
     }
-    try { if (localStorage.getItem(CAMUI_KEY) === '0') setCamUi(false, false); } catch (e) { /* ignore */ }
+    // touch screens steer the camera with gestures, so the buttons start hidden
+    // there; a saved choice either way wins
+    const touchFirst = matchMedia('(pointer: coarse)').matches;
+    try {
+      const saved = localStorage.getItem(CAMUI_KEY);
+      if (saved === '0' || (saved === null && touchFirst)) setCamUi(false, false);
+    } catch (e) { if (touchFirst) setCamUi(false, false); }
+    // the first battle on a touch screen names the gestures once
+    GameState.on('gameStarted', () => {
+      if (!touchFirst) return;
+      try { if (localStorage.getItem('kk-gesture-hint')) return; localStorage.setItem('kk-gesture-hint', '1'); } catch (e) { /* show it anyway */ }
+      setTimeout(() => toast('Pinch to zoom. Two fingers: twist to turn, slide up or down to tilt.', false, 6000), 1200);
+    });
     $('set-camui').addEventListener('click', () => { Audio.unlock(); setCamUi(document.body.classList.contains('hide-camui'), true); try { Audio.sfx.select(); } catch (e) { /* audio is optional */ } });
     function openSettings() {
       Audio.unlock();

@@ -13,7 +13,7 @@ const Input = (() => {
   let pinchDist = 0, dragging = false;
   let swipeAcc = 0, swiping = false;   // two-finger vertical travel; a pinch's small drift must not tilt
   let twistAcc = 0;                     // two-finger rotation since the last quarter turn, radians
-  const TWIST_TURN = 0.6;               // about 35 degrees of twist turns the view one step
+  const TWIST_TURN = 0.45;              // about 26 degrees of twist turns the view one step
 
   const playing = () => GameState.state.phase === 'playing';
 
@@ -81,6 +81,8 @@ const Input = (() => {
     // iOS Safari ignores user-scalable=no and would pinch-zoom the whole page
     // instead of the game; its own gesture events must be stopped
     for (const ev of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(ev, (e) => e.preventDefault(), { passive: false });
+    // and older iOS still zooms on a fast double tap despite touch-action
+    document.addEventListener('dblclick', (e) => e.preventDefault(), { passive: false });
     canvas.addEventListener('wheel', (e) => {
       e.preventDefault();
       if (!playing()) return;
