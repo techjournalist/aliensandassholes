@@ -6,6 +6,11 @@ ten levels are `js/level1-hollybrook.js` to `js/level10-black-keep.js`
 the Briar & Bastion handoff the fork was built from; level names in them
 refer to the original game.
 
+Hosting: a separate Cloudflare Worker, `knights-and-knaves`, builds this
+branch (production branch `claude/focused-keller-tr07bl`, no build command,
+deploy `npx wrangler deploy` reading `wrangler.jsonc`). Every push redeploys.
+It never touches `main` or the Briar & Bastion worker.
+
 Open items for the fork:
 - Knight tier spread: seeded bot wins out of 10 per level are Hollybrook 10,
   Ravensford 4, St Wendel's 0 (the Gargoyle Lord leaks at about a third of
