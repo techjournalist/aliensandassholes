@@ -10,9 +10,10 @@ module.exports = {
   'greenhope': {
     roadTile: [5, 9], streamTile: [10, 3], farTile: [0, 9],
     firstSlingerTile: [4, 5], secondSlingerTile: [6, 4], brokeTile: [11, 4],
-    towerSpots: { warden: [6, 7], druid: [8, 5], golem: [8, 8], artillery: [13, 5] },
-    // two tiles for the branch duels, by the last stretch before the homestead
-    duelTiles: [[16, 9], [16, 10]],
+    towerSpots: { warden: [2, 3], druid: [8, 5], golem: [8, 8], artillery: [13, 5] },
+    // two tiles for the branch duels, picked by scanning every adjacent pair: each
+    // tower's two branches each win a scenario by 12%+ on three lane seeds
+    duelTiles: [[4, 7], [4, 8]],
     bossStagePlacements: { druid: [[8, 5], [4, 5]], artillery: [[13, 5], [6, 7]], golem: [[8, 8]], warden: [[11, 8]] },
     botBuildSpots: [[4, 5], [13, 7], [13, 5], [7, 7], [5, 2], [13, 8], [8, 7], [13, 6], [6, 2], [7, 8], [13, 4], [2, 2], [13, 9], [8, 8], [6, 3], [2, 3]],
     botPlan: ['slinger', 'slinger', 'warden', 'druid', 'artillery', 'golem', 'druid', 'warden', 'slinger', 'golem', 'artillery', 'warden', 'druid', 'slinger', 'golem', 'artillery'],

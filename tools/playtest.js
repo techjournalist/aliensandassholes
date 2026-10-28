@@ -734,7 +734,7 @@ async function enterLevel(page, levelId) {
   const wm1 = await page.evaluate(() => ({
     cut: !!document.querySelector('#wm-cuts .wm-cut[data-level="greenhope"]'),
     otherCuts: document.querySelectorAll('#wm-cuts .wm-cut:not([data-level="greenhope"])').length,
-    seg: document.querySelector('.wm-seg[data-from="greenhope"][data-to="ravensford"]')?.getAttribute('class'),
+    seg: document.querySelector('.wm-seg[data-from="greenhope"][data-to="crater-rim"]')?.getAttribute('class'),
     next: document.querySelector('.wm-node.next')?.dataset.level,
   }));
   check('winning Level 1 cuts its ground out of the blight, and only its ground', wm1.cut && wm1.otherCuts === 0, JSON.stringify(wm1));
@@ -935,7 +935,7 @@ async function enterLevel(page, levelId) {
   const tierBoxes = await page.evaluate(() => ['meadow', 'bramble'].map((t) => { const r = document.querySelector(`.tier-btn[data-tier="${t}"]`).getBoundingClientRect(); return { w: r.width, h: r.height, bottom: r.bottom }; }).concat([(() => { const r = document.getElementById('wm-play-btn').getBoundingClientRect(); return { w: r.width, h: r.height, bottom: r.bottom }; })()]));
   check('tiers: the picker sits beside Play, every button 44px and on screen at 844x390', tierBoxes.every((b) => b.w >= 44 && b.h >= 44 && b.bottom <= 390) && await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), JSON.stringify(tierBoxes));
   check('tiers: Meadow is checked by default', (await page.locator('.tier-btn[data-tier="meadow"]').getAttribute('aria-checked')) === 'true');
-  check('tiers: a level beaten on Bramble shows the thorn ring, others do not', await page.evaluate(() => !!document.querySelector('.wm-node[data-level="greenhope"] .wm-thorn') && !document.querySelector('.wm-node[data-level="ravensford"] .wm-thorn')));
+  check('tiers: a level beaten on Bramble shows the thorn ring, others do not', await page.evaluate(() => !!document.querySelector('.wm-node[data-level="greenhope"] .wm-thorn') && !document.querySelector('.wm-node[data-level="crater-rim"] .wm-thorn')));
   check('tiers: an old save without tier fields keeps its Meadow stars', await page.evaluate(() => Progress.starsFor('crater-rim') === 2 && Progress.starsFor('crater-rim', 'bramble') === 0));
   await page.locator('.tier-btn[data-tier="bramble"]').tap(); await page.waitForTimeout(200);
   const br = await page.evaluate(() => ({ checked: document.querySelector('.tier-btn[data-tier="bramble"]').getAttribute('aria-checked'), saved: localStorage.getItem('aa-difficulty'), s: GameState.state.difficulty, lives: GameState.state.lives, gold: GameState.state.gold, want: Math.round(GameState.currentLevel().startGold * GameState.DIFFICULTY.bramble.gold), wantLives: GameState.DIFFICULTY.bramble.lives, lit: document.querySelectorAll('.wm-node[data-level="greenhope"] .wm-star.lit').length }));
