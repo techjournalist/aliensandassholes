@@ -10,8 +10,10 @@ command, deploy `npx wrangler deploy`). A Cloudflare project with that name
 still has to be connected to this repo.
 
 Open items for the fork:
-- Veteran tier spread per level has not been tuned yet; run
-  `node tools/bot-runner.js all --tier bramble --seeds 20`.
+- Veteran tier (seeded bot, 10 runs per level): wins 99 of 100. Terraformer
+  Prime is the hardest (9 of 10, mean 3 lives, the Mothership leaks in half
+  the runs); Bloomfruit and the Spaceport keep 4 to 6 lives. Evening it out
+  is a choice: `node tools/bot-runner.js all --tier bramble --seeds 20`.
 - The Hive Front plays easiest of the ten for the bot (about 18 lives);
   harden it if it feels too easy.
 - Check the look and the frame rate on a real phone.
