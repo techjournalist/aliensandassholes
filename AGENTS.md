@@ -1,4 +1,125 @@
-# Project: Knights & Knaves (medieval fork of Briar & Bastion)
+# Project: Aliens & Assholes (alien fork of Knights & Knaves)
+
+## This repo is a fork
+**Base**: the full history of `techjournalist/kingdomrush` branch
+`claude/focused-keller-tr07bl` (Knights & Knaves) is this repo's `main`; the
+reskin lives on top of it. It keeps everything Knights & Knaves has: the
+settings screen, generative music, the rotatable, tiltable, zoomable camera
+with phone gestures and the camera button grid, difficulty tiers, save
+codes, 8x speed, victory screens and the Level 10 finale, health bars, the
+How to play walkthrough and first-battle coaching, endless mode (engine
+only), the web app manifest for home-screen full screen and the Cloudflare
+`wrangler.jsonc` (worker `aliens-and-assholes`). The engine, mechanics,
+design pillars, workflow and quality bar below all still apply; only the
+theme, characters and levels changed. Where later sections name Knights &
+Knaves or Briar & Bastion content, read them as the engine's history. The
+old level files of both games were removed from `js/` (they live in git
+history on `main`).
+
+**World**: Tumble, a small farming moon. A colony of farmers in bubble
+helmets grows moonwheat under glass domes; rude aliens land in pods at every
+road mouth and crawl toward the colony's buildings. Playful, not horror.
+Neon purples and teals: teal moonmoss, lilac dust roads, violet rock,
+crystal outcrops, craters, an indigo sky. The engine's `hollow*` palette
+keys hold the alien goo crust (dark violet with an acid-lime glow) that
+spreads from the pods; the world map's "blight" is that goo, washed back by
+each win. Currency on screen is "credits" (the engine still says `gold`).
+
+**Role ids are unchanged** so the engine, tests and tooling carry over:
+| id | Tower | Branches (tier 3) |
+|---|---|---|
+| slinger | Laser Turret | Railgun (marksman) / Twin Blaster (bloom) |
+| warden | Goo Cannon | Glue Bomber (thicket) / Acid Mortar (briarstorm) |
+| druid | Cryo Beam | Blizzard Array (hoarfrost) / Ice Lance (seer) |
+| golem | Mech Walker | Quake Stomper (earthshaker) / Hull Breaker (mountainheart) |
+| artillery | Missile Pod | Big Boomer (oakfall) / Swarm Rockets (squirrel) |
+
+Every tower number (cost, range, damage, cooldown) is the Knights & Knaves
+value, so the branch duels and economy are unchanged. Each tower has a
+colonist operator (`colonist()` in `js/renderer.js`) and animates its own
+way: the laser's coils spin up and the barrel kicks, the goo mortar tips
+back, the cryo orb swells, the mech fires its fist as a rocket (`fistPose`),
+the missile pod tips up and its four tips vanish (`podTip`).
+
+Enemies: grunt = Blob Drone, trickster = Skitter Crawler, troll = Armored
+Brute, bat = Saucer Scout. Every level ends on a boss:
+| Level | Boss id | How it moves |
+|---|---|---|
+| 1 Greenhope Homestead | `drilltank` The Drill Tank | roller (`ROLLERS`), spinning drill |
+| 2 Crater Rim | `gloopking` The Gloop King | limb-rig walker (`WALKER_BOSSES`) |
+| 3 Glowshroom Grove | `hivequeen` The Hive Queen | limb-rig walker, four legs, buzzing wings |
+| 4 Comms Ridge | `manta` The Sky Manta | flying, the dragon view (`updateDragonView`) |
+| 5 The Dune Sea | `sandworm` The Sand Worm | ground, its own view (`updateWormView`): segments trail along the road |
+| 6 Spaceport Bazaar | `sporecloud` The Spore Cloud | flying, swarm rig |
+| 7 The Glacier Shelf | `tripod` The Tripod | limb-rig walker, three legs |
+| 8 Bloomfruit Orchard | `harvester` The Harvester | roller, turning reel |
+| 9 The Hive Front | `brain` The Big Brain | flying, swarm rig |
+| 10 Terraformer Prime | `mothership` The Mothership | flying, swarm rig scaled 1.35x, tractor beam |
+
+Ground-boss walk poses live in `BOSS_GAIT`. Boss stats were set from the
+Knights & Knaves boss each one replaces, then tuned: the Mothership's hp was
+cut to 600 (its first runs leaked at about a third of its hp every seed,
+a damage ceiling) and it comes down the longer north-west road; the Spore
+Cloud is 330 and comes down the west road, the Sky Manta 600.
+
+**Levels** (`js/level*.js`). Level 1 builds its own scene; Levels 2 to 10
+are mostly data and call `LevelCommon.standardScene(kit, {...})`, which picks
+the level's own chokepoint channel (`STREAMS`: canal, chasm, goo, coolant,
+quicksand, meltwater, plasma), its own bridge (girder, mushroom-stalk log,
+cable span, pipeline, monorail, ice arch, aqueduct, crane gantry,
+hard-light) and its own outpost at the end of the road (`outpost()`: pump
+station, research lab, comms dish, moisture farm, spaceport, ice mine, seed
+vault, shield generator, Terraformer Prime). Shared set dressing in
+`js/level-common.js`: crashed landing pods at every road mouth
+(`alienPods`), habs, greenhouses, silos, solar arrays, rovers, crates, crop
+rows, glass domes (`glassDome`, a transparent mesh) and a terraformer stack
+with turning fans. Layouts:
+1. Greenhope Homestead: one long lane that doubles back three times, a
+   canal footbridge. 12 waves.
+2. Crater Rim: the zigzag rim road and the gully track meet before a
+   girder bridge over a crevasse. 12 waves.
+3. Glowshroom Grove: three roads (one a switchback) meet before a fallen
+   mushroom stalk over a goo creek. 12 waves.
+4. Comms Ridge: three looping roads meet before a cable span. 14 waves.
+5. The Dune Sea: a winding caravan road and a straight dry wash meet before
+   the pipeline over quicksand. 13 waves.
+6. Spaceport Bazaar: two western roads cross a coolant canal under the
+   monorail; the east road comes round behind. 13 waves.
+7. The Glacier Shelf: two roads cross meltwater on an ice arch; the ridge
+   road comes off the ice to the north-east. 13 waves.
+8. Bloomfruit Orchard: three lanes meet before an aqueduct. 13 waves.
+9. The Hive Front: five roads meet before a gantry over a plasma trench,
+   a sixth flanks from the east. 13 waves.
+10. Terraformer Prime: three roads cross a plasma rift on a hard-light
+   bridge, two come from the east. 14 waves.
+
+All ten set `curvyRoads` and `curveKeepsPace`, and every gate faces south
+(the last road cell sits directly south of `gateCell`). One lesson from the
+layouts: Chaikin smoothing cuts a quarter of each segment, so a corner
+between two long segments cuts too wide for the validator's 0.75-cell
+rule; Bloomfruit's tail needed collinear waypoints at [16,2] and [17,3].
+
+**Storage and codes**: every localStorage and sessionStorage key is `aa-*`
+(progress, mute, audio, view, tilt, camera buttons, difficulty, coaching,
+guide, active level), so the game never reads Knights & Knaves (`kk-*`) or
+Briar & Bastion saves. Save codes start `AA1-` (the BB2 layout); `KK` and
+`BB` codes are refused as another game's. Tiers keep their engine ids
+(`meadow`, `bramble`) and are named Cadet and Veteran on screen.
+
+**Tooling**: `tools/validate-levels.js` and `tools/bot-runner.js` now read
+the level files from `index.html`'s script tags, so a new level needs no
+list edit there. `tools/level-fixtures.js` holds each level's bot build
+spots, ranked by a road-coverage scan (later stretches of road weighted
+higher), and one plot near each road's entry for the lone-turret check.
+
+**Balance** (seeded bot, Cadet tier, 20 runs per level): every level wins
+20 of 20; mean lives run from about 8 (Terraformer Prime) to 18 (The Hive
+Front), minimum 5. Running the bot with one tower type only (both branches,
+three seeds) wins no level.
+
+---
+
+# Knights & Knaves (the medieval fork this game was built from)
 
 ## This branch is a fork
 **Base**: forked from `claude/fervent-wright-jeojom`, the most recent active

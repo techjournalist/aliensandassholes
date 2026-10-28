@@ -16,13 +16,13 @@ const LEVEL_10 = (() => {
     { name: "Saucers in the Smoke", flavor: "Saucers from the east. Cryo Beams and Missile Pods only.", groups: [g('bat', 2, 1.5, 0, 'eastlow', 0), g('grunt', 6, 1.1, 0, 'westhigh', 3)] },
     { name: "Both Fronts", flavor: "Every road at once, from both sides of the dome.", groups: [g('grunt', 3, 1.3, 0, 'westhigh', 0), g('grunt', 2, 1.3, 0, 'westmid', 0), g('grunt', 3, 1.3, 0, 'westlow', 0), g('grunt', 3, 1.3, 0, 'easthigh', 2), g('grunt', 2, 1.3, 0, 'eastlow', 2)] },
     { name: "Shell on the High Road", flavor: "A brute on the high road, a rush from the south-east.", groups: [g('troll', 1, 1, 0, 'westhigh', 0), g('trickster', 4, 0.9, 0, 'eastlow', 2), g('grunt', 5, 1.2, 0, 'westmid', 4)] },
-    { name: "Smoke and Saucers", flavor: "Saucers in the north-east, crawlers on the low road.", groups: [g('bat', 4, 1.1, 0, 'easthigh', 0), g('trickster', 7, 0.6, 0, 'westlow', 1), g('grunt', 5, 1.0, 0, 'eastlow', 3)] },
+    { name: "Smoke and Saucers", flavor: "Saucers in the north-east, crawlers on the low road.", groups: [g('bat', 3, 1.3, 0, 'easthigh', 0), g('trickster', 7, 0.6, 0, 'westlow', 1), g('grunt', 5, 1.0, 0, 'eastlow', 3)] },
     { name: "The Dome Between", flavor: "They lean on both fronts in turn.", groups: [g('troll', 2, 2.4, 0, 'eastlow', 0), g('grunt', 6, 0.9, 0, 'westmid', 1), g('trickster', 5, 0.65, 0, 'westhigh', 2), g('bat', 3, 1.2, 0, 'easthigh', 6)] },
     { name: "Pincer", flavor: "Brutes from the low road and the north-east, saucers over the high road.", groups: [g('troll', 2, 2.4, 0, 'westlow', 0), g('troll', 1, 2.3, 0, 'easthigh', 1), g('bat', 3, 1.2, 0, 'westhigh', 3), g('grunt', 5, 0.9, 0, 'eastlow', 4)] },
     { name: "Five Roads at Once", flavor: "Every pod at once. The ground shakes.", groups: [g('grunt', 8, 0.8, 0, 'westmid', 0), g('trickster', 8, 0.55, 0, 'eastlow', 0), g('troll', 2, 2.0, 0, 'westhigh', 0), g('grunt', 6, 0.9, 0, 'westlow', 0), g('bat', 3, 1.2, 0, 'easthigh', 6)] },
     { name: "The Long Night", flavor: "Brutes, crawlers and saucers, all at once.", groups: [g('troll', 3, 2.1, 0, 'easthigh', 0), g('trickster', 8, 0.55, 0, 'westlow', 0), g('bat', 4, 1.0, 0, 'westhigh', 0), g('grunt', 6, 0.8, 0, 'eastlow', 0)] },
     { name: "The Escort", flavor: "The Mothership sends its guard ahead: brutes, saucers and crawlers.", groups: [g('troll', 4, 2.2, 0, 'westhigh', 0), g('bat', 4, 1.0, 0, 'easthigh', 2), g('trickster', 8, 0.5, 0, 'westlow', 4), g('grunt', 8, 0.7, 0, 'eastlow', 6)] },
-    { name: "The Mothership", flavor: "The Mothership comes down over the dome. It flies: Cryo Beams and Missile Pods only. Bring everything.", groups: [g('grunt', 6, 0.8, 0, 'easthigh', 0), g('trickster', 6, 0.6, 0, 'westlow', 1), g('mothership', 1, 1, 0, 'westmid', 5)] },
+    { name: "The Mothership", flavor: "The Mothership comes down over the dome. It flies: Cryo Beams and Missile Pods only. Bring everything.", groups: [g('grunt', 6, 0.8, 0, 'easthigh', 0), g('trickster', 6, 0.6, 0, 'westlow', 1), g('mothership', 1, 1, 0, 'westhigh', 5)] },
   ];
 
   function buildScene(kit) {

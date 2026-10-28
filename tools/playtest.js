@@ -1,4 +1,4 @@
-// Headless critic harness for Knights & Knaves. See tools/README.md.
+// Headless critic harness for Aliens & Assholes. See tools/README.md.
 const { chromium } = (() => { try { return require('playwright'); } catch (e) { return require('/opt/node22/lib/node_modules/playwright'); } })();
 const fs = require('fs');
 const path = require('path');
@@ -106,7 +106,7 @@ async function enterLevel(page, levelId) {
   await page.locator('#speed-btn').click(); await page.waitForTimeout(100);
   check('speed cycles back to 1x after 8x', await page.evaluate(() => GameState.state.speed === 1 && !document.getElementById('speed-btn').classList.contains('faster') && !document.getElementById('speed-btn').classList.contains('fastest')));
   check('only 1x, 2x, 4x and 8x are valid speeds', await page.evaluate(() => [GameState.setSpeed(8), GameState.setSpeed(4), GameState.setSpeed(3), GameState.setSpeed(2), GameState.setSpeed(16), GameState.setSpeed(0), GameState.setSpeed(1)].join() === '8,4,1,2,1,1,1'));
-  check('tip points at a tile before the first tower', await page.locator('#tip').isVisible() && (await page.locator('#tip').innerText()).includes('raise'));
+  check('tip points at a tile before the first tower', await page.locator('#tip').isVisible() && (await page.locator('#tip').innerText()).includes('build'));
   await page.screenshot({ path: `${OUT}/desktop.png` });
   console.log('DEBUG OVERLAY: ' + (await page.locator('#debug').innerText()).replace(/\n/g, ' | '));
   const baselineCalls = await page.evaluate(() => Renderer.stats().calls);
@@ -205,7 +205,10 @@ async function enterLevel(page, levelId) {
   check('a valid code that adds nothing loads and changes nothing', (await page.locator('#savecode-msg').innerText()).includes('nothing new') && await page.evaluate((c) => Progress.exportCode() === c, scCode));
   // a Briar & Bastion code belongs to a different campaign
   await page.fill('#savecode-in', 'BB2-4000-0000'); await page.locator('#savecode-load').click();
-  check('a Briar & Bastion code is refused as the wrong game', (await page.locator('#savecode-msg').innerText()).includes('Knights & Knaves') && await page.evaluate((c) => Progress.exportCode() === c, scCode));
+  check('a Briar & Bastion code is refused as the wrong game', (await page.locator('#savecode-msg').innerText()).includes('Aliens & Assholes') && await page.evaluate((c) => Progress.exportCode() === c, scCode));
+  // and so does a Knights & Knaves code
+  await page.fill('#savecode-in', 'KK1-4000-0000'); await page.locator('#savecode-load').click();
+  check('a Knights & Knaves code is refused as the wrong game', (await page.locator('#savecode-msg').innerText()).includes('Aliens & Assholes') && await page.evaluate((c) => Progress.exportCode() === c, scCode));
   // loading a code that adds nothing must leave this run's progress untouched (the real load paths are covered in validate-levels.js)
   await page.fill('#savecode-in', scCode.toLowerCase()); await page.keyboard.press('Enter'); await page.waitForTimeout(150);
   check('pasting a lowercase code with Enter loads it and says it has nothing new', (await page.locator('#savecode-msg').innerText()).includes('nothing new') && await page.evaluate((c) => Progress.exportCode() === c, scCode));
@@ -246,7 +249,7 @@ async function enterLevel(page, levelId) {
   check('tower placed by mouse', st.towers === 1 && st.gold === 80, `towers=${st.towers} gold=${st.gold}`);
   check('tip moves to the wave button after the first tower', await tipSays('wave'));
   check('placed tower becomes selection', st.selected && st.selected.kind === 'tower');
-  check('tower panel shows name', (await page.locator('#panel').innerText()).includes('Javelin Squire'));
+  check('tower panel shows name', (await page.locator('#panel').innerText()).includes('Laser Turret'));
   await page.screenshot({ path: `${OUT}/placed.png` });
   const [gx, gy] = await cellToScreen(page, ...F1.firstSlingerTile);
   await page.screenshot({ path: `${OUT}/slinger-zoom.png`, clip: { x: gx - 90, y: gy - 130, width: 180, height: 180 } });
@@ -412,14 +415,14 @@ async function enterLevel(page, levelId) {
   await simulate(page, 9);
   await page.waitForTimeout(150);
   const mid = await page.evaluate(() => GameState.state.enemies.map((e) => ({ id: e.id, dist: +e.dist.toFixed(2), x: +e.x.toFixed(2), z: +e.z.toFixed(2) })));
-  check('knaves spawned and spread along the road', mid.length >= 2 && mid[0].dist > 5,   // 6 on a straight road; curved roads walk about 14% less path distance in the same time
+  check('invaders spawned and spread along the road', mid.length >= 2 && mid[0].dist > 5,   // 6 on a straight road; curved roads walk about 14% less path distance in the same time
      JSON.stringify(mid.slice(0, 3)));
   const onRoad = await page.evaluate(() => GameState.state.enemies.every((e) => {
     let best = Infinity;
     for (const [c, r] of GameState.pathCells) best = Math.min(best, Math.hypot(GameState.worldX(c) - e.x, GameState.worldZ(r) - e.z));
     return best < 0.55;
   }));
-  check('every knave stays on the road', onRoad);
+  check('every invader stays on the road', onRoad);
   await page.screenshot({ path: `${OUT}/wave.png` });
   console.log('draw calls mid-wave with ' + mid.length + ' goblins: ' + await page.evaluate(() => Renderer.stats().calls));
   const lead = mid[0];
@@ -442,7 +445,7 @@ async function enterLevel(page, levelId) {
   await page.waitForTimeout(4000);   // let exit animations and puffs finish (headless frames are slow)
   st = await S(page);
   const kills = await page.evaluate(() => GameState.state.kills);
-  check('wave 1 cleared: brigands fall to two Squires', st.enemies === 0 && kills >= 5 && st.lives >= 18, `kills=${kills} lives=${st.lives}`);
+  check('wave 1 cleared: blob drones fall to two Laser Turrets', st.enemies === 0 && kills >= 5 && st.lives >= 18, `kills=${kills} lives=${st.lives}`);
   check('kills pay gold', st.gold > 10, `gold=${st.gold}`);
   check('floating numbers rendered', (await page.evaluate(() => window.__floaters || 0)) >= 0);
   check('wave ended, button re-armed for wave 2 with a prep countdown', !st.waveActive && (await page.locator('#wave-btn').innerText()).includes('wave 2') && (await page.evaluate(() => GameState.state.prep > 0)));
@@ -467,7 +470,7 @@ async function enterLevel(page, levelId) {
   await page.waitForTimeout(1500);
   const callsAfter = await page.evaluate(() => Renderer.stats().calls);
   const views = await page.evaluate(() => Renderer.debugViews());
-  check('leaked knave views are removed', views.enemyViews === 0 && views.dying.length === 0, JSON.stringify(views));
+  check('leaked invader views are removed', views.enemyViews === 0 && views.dying.length === 0, JSON.stringify(views));
   check('draw calls back near baseline with 2 towers', callsAfter < baselineCalls + 50, `baseline=${baselineCalls} after=${callsAfter}`);
   console.log('DEBUG OVERLAY (after wave): ' + (await page.locator('#debug').innerText()).replace(/\n/g, ' | '));
 
@@ -528,10 +531,10 @@ async function enterLevel(page, levelId) {
   await page.screenshot({ path: `${OUT}/branch-armed.png` });
   await page.locator('button[data-branch="thicket"]').click(); await page.waitForTimeout(250);
   const t3 = await page.evaluate(() => { const t = GameState.state.towers.find((t) => t.type === 'warden'); return { tier: t.tier, branch: t.branch }; });
-  check('the second tap commits: tier 3 Tar Abbot', t3.tier === 3 && t3.branch === 'thicket', JSON.stringify(t3));
+  check('the second tap commits: tier 3 Glue Bomber', t3.tier === 3 && t3.branch === 'thicket', JSON.stringify(t3));
   check('tier 3 reached and upgrade button retires', await page.locator('button[data-upgrade]').count() === 0 && await page.locator('button[data-branch]').count() === 0);
   check('a specialization is permanent', await page.evaluate(() => { const t = GameState.state.towers.find((t) => t.type === 'warden'); return !GameState.upgradeTower(t.id, 'briarstorm').ok && t.branch === 'thicket'; }));
-  check('the panel names the specialization', (await page.locator('#panel .panel-title').innerText()).includes('Tar Abbot'));
+  check('the panel names the specialization', (await page.locator('#panel .panel-title').innerText()).includes('Glue Bomber'));
   const [zx2, zy2] = await cellToScreen(page, ...spots.warden);
   await page.screenshot({ path: `${OUT}/tower-warden-t3.png`, clip: { x: zx2 - 70, y: zy2 - 110, width: 140, height: 150 } });
   const goldPreSell = (await S(page)).gold;
@@ -563,8 +566,8 @@ async function enterLevel(page, levelId) {
     for (let i = 0; i < 60 * 12 && GameState.state.enemies.includes(bat2); i++) GameState.update(1 / 60);
     return { groundOnlyHits, hpAfter, maxHp, dist, flyerHits: hits2, chilled, bat2hp: bat2.hp };
   }, spots);
-  check('ground-only towers never touch a gargoyle', flyRes.groundOnlyHits === 0 && flyRes.hpAfter === flyRes.maxHp && flyRes.dist > 8, JSON.stringify(flyRes));
-  check('the Magus and the Longbowman hit the gargoyle, and the Magus chills it', flyRes.flyerHits > 0 && flyRes.chilled, JSON.stringify(flyRes));
+  check('ground-only towers never touch a saucer', flyRes.groundOnlyHits === 0 && flyRes.hpAfter === flyRes.maxHp && flyRes.dist > 8, JSON.stringify(flyRes));
+  check('the Cryo Beam and the Missile Pod hit the saucer, and the Cryo Beam chills it', flyRes.flyerHits > 0 && flyRes.chilled, JSON.stringify(flyRes));
   await quiet();
   // rooting: a warden thorn burst stops a grunt in its tracks
   const rootRes = await page.evaluate((w) => {
@@ -577,7 +580,7 @@ async function enterLevel(page, levelId) {
     for (let i = 0; i < 60 * 12 && GameState.state.enemies.includes(g); i++) { const d0 = g.dist; GameState.update(1 / 60); if (rooted && g.dist === d0) frozenFrames++; }
     return { rooted, frozenFrames };
   }, spots.warden);
-  check('the friar pitch sticks a brigand and it stops moving', rootRes.rooted && rootRes.frozenFrames > 20, JSON.stringify(rootRes));
+  check('goo sticks a blob drone and it stops moving', rootRes.rooted && rootRes.frozenFrames > 20, JSON.stringify(rootRes));
   await page.waitForTimeout(800);
   // a wave-5 style mix with everything on the field, for the screenshot and a sanity check
   await quiet();
@@ -592,7 +595,7 @@ async function enterLevel(page, levelId) {
   }, { spots, first: F1.firstSlingerTile });
   await page.waitForTimeout(300);
   await page.screenshot({ path: `${OUT}/wave5.png` });
-  check('wave 5 sends gargoyles', (await page.evaluate(() => window.__bats)) >= 3);
+  check('wave 5 sends saucers', (await page.evaluate(() => window.__bats)) >= 3);
   await page.evaluate(() => { for (let i = 0; i < 60 * 60 && GameState.state.waveActive; i++) GameState.update(1 / 60); });
   const w5 = await S(page);
   console.log('wave 5 with one of each tower: lives ' + w5.lives + ', gold ' + w5.gold);
@@ -644,7 +647,7 @@ async function enterLevel(page, levelId) {
     const aWins = d.rows.some((r) => r.a >= r.b * 1.1), bWins = d.rows.some((r) => r.b >= r.a * 1.1);
     check(`${type}: neither specialization is a strict upgrade (each wins a situation by 10%+)`, aWins && bWins, JSON.stringify(d.rows));
   }
-  check('Armorbreaker ignores Black Knight armor', await page.evaluate((w) => {
+  check('Hull Breaker ignores Armored Brute armor', await page.evaluate((w) => {
     const G = GameState, S = G.state;
     S.gold = 99999; S.selected = { kind: 'tile', c: w[0], r: w[1] }; G.placeTower('golem');
     const tw = S.towers[S.towers.length - 1]; G.upgradeTower(tw.id); G.upgradeTower(tw.id, 'mountainheart');
@@ -716,7 +719,7 @@ async function enterLevel(page, levelId) {
     const ribbon = { 3: 'Flawless!', 2: 'Well held!', 1: 'Victory!' }[mixed.stars];
     check('win screen shows the victory ribbon for its star rating', (await page.locator('#end-ribbon').isVisible()) && (await page.locator('#end-ribbon-text').textContent()) === ribbon, ribbon);   // textContent: innerText honors the CSS uppercase
     check('win screen counts up its stats to the real numbers', await page.waitForFunction((n) => document.getElementById('stat-waves').textContent === String(n) && +document.getElementById('stat-kills').textContent > 0 && document.getElementById('stat-lives').textContent === String(GameState.state.lives), 12, { timeout: 15000 }).then(() => true, () => false));
-    check('win screen is not the finale on a level that has a next one', !(await page.locator('#finale').isVisible()) && (await page.locator('#end-title').innerText()) === 'Hollybrook Manor holds!');
+    check('win screen is not the finale on a level that has a next one', !(await page.locator('#finale').isVisible()) && (await page.locator('#end-title').innerText()) === 'Greenhope Homestead holds!');
     check('the celebration canvas covers the screen and never blocks a tap', await page.evaluate(() => { const c = document.getElementById('celebrate'), r = c.getBoundingClientRect(); return r.width >= innerWidth - 1 && r.height >= innerHeight - 1 && getComputedStyle(c).pointerEvents === 'none'; }));
   }
   check('win screen offers Continue now that the next level is unlocked', (await page.locator('#end-map-btn').innerText()) === 'Continue');
@@ -777,7 +780,7 @@ async function enterLevel(page, levelId) {
     const put = (type, c, r) => { S.selected = { kind: 'tile', c, r }; GameState.placeTower(type); };
     for (const [type, list] of Object.entries(stage)) for (const [c, r] of list) put(type, c, r);
     S.wave = 11; GameState.startWave();
-    // the Siege Ram rolls out about 27s in, after its escort
+    // the Drill Tank rolls out about 27s in, after its escort
     for (let i = 0; i < 60 * 32; i++) GameState.update(1 / 60);
   }, F1.bossStagePlacements);
   await page.waitForTimeout(400);
@@ -785,7 +788,7 @@ async function enterLevel(page, levelId) {
   check('boss bar shows while the boss lives', await page.waitForFunction(() => document.getElementById('boss-bar').classList.contains('show'), null, { timeout: 8000 }).then(() => true).catch(() => false));
   await page.screenshot({ path: `${OUT}/boss.png` });
   await page.evaluate(() => { for (let i = 0; i < 60 * 120 && GameState.state.waveActive; i++) GameState.update(1 / 60); });
-  check('wave 12 ends in a win when the Siege Ram falls', await page.evaluate(() => GameState.state.phase === 'won'));
+  check('wave 12 ends in a win when the Drill Tank falls', await page.evaluate(() => GameState.state.phase === 'won'));
   await page.waitForFunction(() => Renderer.debugViews().dying.length === 0, null, { timeout: 20000 }).catch(() => {});
   await page.evaluate(() => { document.getElementById('end').classList.remove('show'); });
   await page.waitForTimeout(500);
@@ -863,7 +866,7 @@ async function enterLevel(page, levelId) {
       return out;
     }, { tip: F.firstSlingerTile, lanes: F.laneSlingerTiles });
     check(`${N} wave 1 is winnable by a single lone tower (no leaks)`, lone.wave1 === 0, JSON.stringify(lone));
-    if (F.laneSlingerTiles) check(`${N}: every road can be held early by one Squire at its entry`, Object.keys(F.laneSlingerTiles).every((k) => lone[k] === 0), JSON.stringify(lone));
+    if (F.laneSlingerTiles) check(`${N}: every road can be held early by one Laser Turret at its entry`, Object.keys(F.laneSlingerTiles).every((k) => lone[k] === 0), JSON.stringify(lone));
     if (F.hasBossOnWave) {
       const boss = await page.evaluate(([n, type]) => {
         const w = GameState.waveInfo(n);
@@ -955,7 +958,7 @@ async function enterLevel(page, levelId) {
   // Level 1: Meadow 3 stars (state 4) and Bramble 3 stars give 4 * 4 + 3 = J, then 18 and 14 lives in base 36
   check('tiers: the AA1 save code carries the Bramble stars', await page.evaluate(() => Progress.exportCode().startsWith('AA1-JIE')), await page.evaluate(() => Progress.exportCode()));
   await page.locator('#end.show').waitFor({ timeout: 10000 }).catch(() => {});
-  check('tiers: the Bramble win screen says so', await page.evaluate(() => document.getElementById('end').classList.contains('show') && document.getElementById('end-ribbon-text').textContent === 'Knight won!'));
+  check('tiers: the Bramble win screen says so', await page.evaluate(() => document.getElementById('end').classList.contains('show') && document.getElementById('end-ribbon-text').textContent === 'Veteran won!'));
   await page.screenshot({ path: `${OUT}/tiers-bramble-win.png` });
   await ctx.close();
 

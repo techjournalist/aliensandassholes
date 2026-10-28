@@ -1,3 +1,21 @@
+# Next steps (Aliens & Assholes)
+
+This repo is the Aliens & Assholes fork (see the top of `AGENTS.md`). Its
+ten levels are `js/level1-greenhope.js` to `js/level10-terraformer-prime.js`.
+The notes further down are the Knights & Knaves and Briar & Bastion
+handoffs the fork was built from; level names in them refer to those games.
+
+Hosting: `wrangler.jsonc` names the worker `aliens-and-assholes` (no build
+command, deploy `npx wrangler deploy`). A Cloudflare project with that name
+still has to be connected to this repo.
+
+Open items for the fork:
+- Veteran tier spread per level has not been tuned yet; run
+  `node tools/bot-runner.js all --tier bramble --seeds 20`.
+- The Hive Front plays easiest of the ten for the bot (about 18 lives);
+  harden it if it feels too easy.
+- Check the look and the frame rate on a real phone.
+
 # Next steps (Knights & Knaves)
 
 This branch is the Knights & Knaves fork (see the top of `AGENTS.md`). Its

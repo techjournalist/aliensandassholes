@@ -75,13 +75,13 @@ const GameState = (() => {
     drilltank:  { id: 'drilltank',  name: 'The Drill Tank',  hp: 1300, speed: 0.5,  bounty: 150, flying: false, armor: 5, boss: true },
     gloopking:  { id: 'gloopking',  name: 'The Gloop King',  hp: 900, speed: 0.52, bounty: 140, flying: false, armor: 2, boss: true },
     hivequeen:  { id: 'hivequeen',  name: 'The Hive Queen',  hp: 1100, speed: 0.5,  bounty: 150, flying: false, armor: 3, boss: true },
-    manta:      { id: 'manta',      name: 'The Sky Manta',   hp: 700, speed: 0.72, bounty: 200, flying: true,  armor: 2, boss: true },
+    manta:      { id: 'manta',      name: 'The Sky Manta',   hp: 600, speed: 0.72, bounty: 200, flying: true,  armor: 2, boss: true },
     sandworm:   { id: 'sandworm',   name: 'The Sand Worm',   hp: 1500, speed: 0.48, bounty: 160, flying: false, armor: 3, boss: true },
-    sporecloud: { id: 'sporecloud', name: 'The Spore Cloud', hp: 400, speed: 0.75, bounty: 150, flying: true,  armor: 0, boss: true },
+    sporecloud: { id: 'sporecloud', name: 'The Spore Cloud', hp: 330, speed: 0.75, bounty: 150, flying: true,  armor: 0, boss: true },
     tripod:     { id: 'tripod',     name: 'The Tripod',      hp: 1300, speed: 0.52, bounty: 160, flying: false, armor: 4, boss: true },
     harvester:  { id: 'harvester',  name: 'The Harvester',   hp: 1900, speed: 0.42, bounty: 160, flying: false, armor: 4, boss: true },
     brain:      { id: 'brain',      name: 'The Big Brain',   hp: 370, speed: 0.72, bounty: 160, flying: true,  armor: 1, boss: true },
-    mothership: { id: 'mothership', name: 'The Mothership',  hp: 900, speed: 0.6,  bounty: 220, flying: true,  armor: 2, boss: true },
+    mothership: { id: 'mothership', name: 'The Mothership',  hp: 600, speed: 0.6,  bounty: 220, flying: true,  armor: 2, boss: true },
   };
 
   // Difficulty tiers. Meadow is the game as tuned: every multiplier is 1 and
@@ -476,7 +476,7 @@ const GameState = (() => {
     const needsBranch = tower.tier + 1 >= TIERS.length;
     if (needsBranch && !(branch && BRANCHES[tower.type][branch])) return { ok: false, reason: 'Pick a specialization.' };
     if (state.gold < cost) {
-      const res = { ok: false, reason: `Not enough gold. The upgrade costs ${cost}.` };
+      const res = { ok: false, reason: `Not enough credits. The upgrade costs ${cost}.` };
       emit('placeRejected', res);
       return res;
     }
@@ -509,7 +509,7 @@ const GameState = (() => {
     if (!sel || sel.kind !== 'tile' || !type) return { ok: false, reason: 'Pick a spot by the road first.' };
     if (towerAt(sel.c, sel.r)) return { ok: false, reason: 'Something already stands there.' };
     if (state.gold < type.cost) {
-      const res = { ok: false, reason: `Not enough gold. A ${type.name} costs ${type.cost}.` };
+      const res = { ok: false, reason: `Not enough credits. A ${type.name} costs ${type.cost}.` };
       emit('placeRejected', res);
       return res;
     }

@@ -11,7 +11,7 @@ const LEVEL_6 = (() => {
   const waves = [
     { name: "Arrivals", flavor: "Blob drones on the west road.", groups: [g('grunt', 5, 3.2, 0, 'west', 0)] },
     { name: "Down the Mill Road", flavor: "The southern road opens.", groups: [g('grunt', 5, 2.0, 0, 'west', 0), g('grunt', 5, 2.0, 0, 'mill', 4)] },
-    { name: "From Behind", flavor: "Crawlers come round from the east. They never cross the canal.", groups: [g('trickster', 6, 0.8, 0, 'east', 0), g('grunt', 5, 1.4, 0, 'west', 3)] },
+    { name: "From Behind", flavor: "Crawlers come round from the east. They never cross the canal.", groups: [g('trickster', 4, 1.0, 0, 'east', 0), g('grunt', 5, 1.4, 0, 'west', 3)] },
     { name: "Shell at the Gate", flavor: "A brute on the mill road.", groups: [g('troll', 1, 1, 0, 'mill', 0), g('grunt', 6, 1.2, 0, 'west', 2), g('trickster', 5, 0.8, 0, 'east', 6)] },
     { name: "Unscheduled Flights", flavor: "Saucers on the mill road.", groups: [g('bat', 2, 1.5, 0, 'mill', 0), g('grunt', 8, 1.0, 0, 'west', 3)] },
     { name: "Three Gates", flavor: "All three roads.", groups: [g('grunt', 5, 1.0, 0, 'west', 0), g('grunt', 5, 1.0, 0, 'mill', 0), g('trickster', 6, 0.6, 0, 'east', 2)] },
@@ -21,7 +21,7 @@ const LEVEL_6 = (() => {
     { name: "Pincer", flavor: "Brutes west and south, saucers east.", groups: [g('troll', 2, 2.4, 0, 'west', 0), g('troll', 1, 2.4, 0, 'mill', 2), g('bat', 4, 1.0, 0, 'east', 4), g('grunt', 7, 0.8, 0, 'east', 9)] },
     { name: "Sale Day", flavor: "Everybody wants in.", groups: [g('grunt', 12, 0.6, 0, 'west', 0), g('trickster', 12, 0.45, 0, 'east', 0), g('troll', 3, 2.0, 0, 'mill', 0), g('bat', 4, 1.0, 0, 'mill', 6)] },
     { name: "Riot", flavor: "Brutes, crawlers and saucers.", groups: [g('troll', 4, 2.0, 0, 'mill', 0), g('trickster', 14, 0.4, 0, 'east', 0), g('bat', 4, 0.9, 0, 'west', 0)] },
-    { name: "The Spore Cloud", flavor: "A Spore Cloud as big as a hab drifts in from the east. It flies: Cryo Beams and Missile Pods only.", groups: [g('bat', 3, 1.0, 0, 'mill', 0), g('grunt', 8, 0.7, 0, 'west', 1), g('sporecloud', 1, 1, 0, 'east', 7)] },
+    { name: "The Spore Cloud", flavor: "A Spore Cloud as big as a hab drifts in from the east. It flies: Cryo Beams and Missile Pods only.", groups: [g('bat', 3, 1.0, 0, 'mill', 0), g('grunt', 8, 0.7, 0, 'west', 1), g('sporecloud', 1, 1, 0, 'west', 7)] },
   ];
 
   function buildScene(kit) {

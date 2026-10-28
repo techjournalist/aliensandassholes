@@ -102,8 +102,8 @@ const Progress = (() => {
   //      where meadow is 0 locked, 1 open, 2 to 4 for one to three Meadow stars
   //      and bramble is 0 to 3 Bramble stars (so 0 to J);
   //   2. Meadow best lives; 3. Bramble best lives (0 when there are none).
-  // (Knights & Knaves codes start AA; Briar & Bastion's BB codes describe a
-  // different campaign and are refused.)
+  // (Aliens & Assholes codes start AA; Knights & Knaves' KK codes and Briar &
+  // Bastion's BB codes describe different campaigns and are refused.)
   // Loading a code only ever adds, like every other merge.
   const CODE = 'AA1', CODES = { AA1: 3 };   // characters per level in each version
   const check = (str) => { let h = 7; for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) % 1296; return h.toString(36).toUpperCase().padStart(2, '0'); };

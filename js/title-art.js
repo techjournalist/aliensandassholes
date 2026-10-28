@@ -1,9 +1,10 @@
 // ===================================================================
 // TitleArt  (the illustrated title backdrop and its parallax)
 // ===================================================================
-// A dawn over the valley painted as layered SVG: distant mountains, rolling
-// hills, the blighted Shadow Hollow on the left, the lit Bastion on the
-// right, a road winding between them and a meadow in front. Each layer
+// Dusk on the moon painted as layered SVG: a ringed gas giant in the sky,
+// crystal ridges, moss hills, the crashed alien hive oozing goo on the left,
+// the colony's glass dome on the right, a road between them and glowing
+// flora in front. Each layer
 // drifts by a different amount as the pointer moves (and sways slowly on its
 // own), which is what makes a flat picture read as depth. Pure DOM and CSS
 // transforms: no canvas, no extra WebGL work, and it only animates while the
@@ -23,116 +24,124 @@ const TitleArt = (() => {
 
   function build(svg) {
     const P = window.PALETTE || {};
-    const meadow = hex(P.meadow || 0x6fae4a), meadowDark = hex(P.meadowDark || 0x3f7a3a), meadowLight = hex(P.meadowLight || 0x9ad06a);
-    const stone = hex(P.cobble || 0xc9c2b0), capRed = hex(P.capRed || 0xd94f3a), cream = hex(P.cream || 0xf6ecd4), gold = hex(P.gold || 0xf2c14e);
+    const meadow = hex(P.meadow || 0x3aa89a), meadowDark = hex(P.meadowDark || 0x2a8a84), meadowLight = hex(P.meadowLight || 0x5fd0b8);
+    const hull = hex(P.hull || 0xe6eaf4), teal = hex(P.tunic || 0x2bb3a8), gold = hex(P.gold || 0xffc84a), goo = hex(P.goo || 0x9dff4a);
     const r = rng(77);
 
-    // ---- far mountains: jagged, hazy, purple-blue ----
-    const mtn = (base, amp, step, fill, seed, snow) => {
-      const q = rng(seed); let d = `M -120 ${H} L -120 ${base}`; let pts = [];
+    // ---- stars, twinkling ----
+    let stars = '';
+    for (let i = 0; i < 90; i++) {
+      const x = r() * W, y = r() * 520, s = 0.8 + r() * 2;
+      stars += `<circle cx="${x.toFixed(0)}" cy="${y.toFixed(0)}" r="${s.toFixed(1)}" fill="#f4f0fc" opacity="${(0.3 + r() * 0.7).toFixed(2)}">${i % 4 ? '' : `<animate attributeName="opacity" dur="${(2 + r() * 3).toFixed(1)}s" repeatCount="indefinite" values="0.2;1;0.2"/>`}</circle>`;
+    }
+
+    // ---- far ridges: jagged crystal peaks, hazy violet ----
+    const mtn = (base, amp, step, fill, seed, tips) => {
+      const q = rng(seed); let d = `M -120 ${H} L -120 ${base}`; const pts = [];
       for (let x = -120; x <= W + 140; x += step) { const y = base - (q() * amp) * (((x / step) | 0) % 2 ? 0.45 : 1); pts.push([x, y]); d += ` L ${x} ${y.toFixed(1)}`; }
       d += ` L ${W + 140} ${H} Z`;
       let caps = '';
-      if (snow) for (const [x, y] of pts) if (y < base - amp * 0.7) caps += `<path d="M ${x} ${y.toFixed(1)} l -22 34 l 14 -8 l 8 12 l 8 -12 l 14 8 Z" fill="#f4eef8" opacity="0.85"/>`;
+      if (tips) for (const [x, y] of pts) if (y < base - amp * 0.7) caps += `<path d="M ${x} ${y.toFixed(1)} l -10 30 l 10 -6 l 10 6 Z" fill="${tips}" opacity="0.85"/>`;
       return `<path d="${d}" fill="${fill}"/>${caps}`;
     };
 
-    // ---- trees along the mid ridge ----
+    // ---- moon flora along the mid ridge: bulb trees and coral tubes ----
     let trees = '';
     for (let x = -60; x < W + 80; x += 34 + r() * 40) {
       const y = ridge(x, 690, [34, 16], [190, 71], [0.4, 1.1]);
-      const s = 0.8 + r() * 0.9, dark = x < 560, fill = dark ? '#2a2233' : meadowDark;
+      const s = 0.8 + r() * 0.9, dark = x < 560, fill = dark ? '#251838' : meadowDark;
       trees += r() < 0.4
-        ? `<path d="M ${x} ${(y - 62 * s).toFixed(1)} l ${-20 * s} ${52 * s} h ${40 * s} Z M ${x} ${(y - 42 * s).toFixed(1)} l ${-26 * s} ${48 * s} h ${52 * s} Z" fill="${fill}"/>`
-        : `<circle cx="${x}" cy="${(y - 34 * s).toFixed(1)}" r="${(26 * s).toFixed(1)}" fill="${fill}"/><rect x="${x - 3}" y="${(y - 10 * s).toFixed(1)}" width="6" height="${12 * s}" fill="#3a2a1c"/>`;
+        ? `<rect x="${x - 4}" y="${(y - 54 * s).toFixed(1)}" width="8" height="${54 * s}" rx="4" fill="${fill}"/><rect x="${x + 6}" y="${(y - 36 * s).toFixed(1)}" width="7" height="${36 * s}" rx="3.5" fill="${fill}"/><circle cx="${x}" cy="${(y - 56 * s).toFixed(1)}" r="5" fill="${dark ? goo : '#ff6fd8'}"/>`
+        : `<circle cx="${x}" cy="${(y - 36 * s).toFixed(1)}" r="${(26 * s).toFixed(1)}" fill="${fill}"/><rect x="${x - 3}" y="${(y - 12 * s).toFixed(1)}" width="6" height="${14 * s}" fill="#2a2048"/><circle cx="${x + 8 * s}" cy="${(y - 44 * s).toFixed(1)}" r="3" fill="${dark ? goo : '#45f0d8'}"/>`;
     }
 
-    // ---- Blackmoor: the Black Baron's tower, ember-lit, with charred trees ----
-    const hx = 250, hy = ridge(hx, 690, [34, 16], [190, 71], [0.4, 1.1]);
-    const hollow = `
-      <ellipse cx="${hx}" cy="${hy}" rx="210" ry="46" fill="url(#ts-glow)" opacity="0.8"/>
-      <path d="M ${hx - 56} ${hy + 10} V ${hy - 120} h 16 v -14 h 16 v 14 h 16 v -14 h 16 v 14 h 16 v -14 h 16 v 14 h 16 V ${hy + 10} Z" fill="#221d24"/>
-      <path d="M ${hx - 20} ${hy + 10} V ${hy - 220} h 12 v -14 h 12 v 14 h 12 v -14 h 12 v 14 h 12 V ${hy + 10} Z" fill="#1a161c"/>
-      <path d="M ${hx + 10} ${hy - 234} v -60" stroke="#1a161c" stroke-width="4"/>
-      <path d="M ${hx + 10} ${hy - 294} l 52 12 l -16 10 l 16 12 l -52 -8 Z" fill="#9e2a2a"><animate attributeName="d" dur="2.4s" repeatCount="indefinite" values="M ${hx + 10} ${hy - 294} l 52 12 l -16 10 l 16 12 l -52 -8 Z;M ${hx + 10} ${hy - 294} l 46 6 l -12 12 l 14 10 l -48 -2 Z;M ${hx + 10} ${hy - 294} l 52 12 l -16 10 l 16 12 l -52 -8 Z"/></path>
-      <rect x="${hx - 2}" y="${hy - 180}" width="10" height="18" rx="5" fill="#ff8a3d"/>
-      <rect x="${hx - 2}" y="${hy - 120}" width="10" height="18" rx="5" fill="#ff8a3d"/>
-      <path d="M ${hx - 16} ${hy + 10} v -40 a 14 14 0 0 1 28 0 v 40 Z" fill="#ff8a3d" opacity="0.85"/>
-      <g stroke="#1b1424" stroke-width="7" stroke-linecap="round" fill="none">
-        <path d="M ${hx - 120} ${hy + 4} l 6 -78 l -22 -30 M ${hx - 114} ${hy - 50} l 24 -22"/>
-        <path d="M ${hx + 130} ${hy + 6} l -8 -92 l 24 -34 M ${hx + 124} ${hy - 60} l -26 -20"/>
-        <path d="M ${hx + 200} ${hy + 14} l 4 -60 l 18 -22"/>
-      </g>
-      <g fill="#ff8a3d" opacity="0.6">${[0, 1, 2, 3, 4, 5].map((i) => `<circle cx="${hx - 150 + i * 62 + r() * 20}" cy="${hy - 24 - r() * 120}" r="${2 + r() * 3}"/>`).join('')}</g>`;
+    // ---- the hive: a crashed alien ship oozing goo, a saucer circling it ----
+    const hx = 260, hy = ridge(hx, 690, [34, 16], [190, 71], [0.4, 1.1]);
+    const hive = `
+      <ellipse cx="${hx}" cy="${hy}" rx="230" ry="50" fill="url(#ts-glow)" opacity="0.85"/>
+      <ellipse cx="${hx}" cy="${hy - 40}" rx="130" ry="36" fill="#2a1c40" transform="rotate(-14 ${hx} ${hy - 40})"/>
+      <ellipse cx="${hx}" cy="${hy - 48}" rx="130" ry="12" fill="#3a2a5a" transform="rotate(-14 ${hx} ${hy - 40})"/>
+      <path d="M ${hx - 30} ${hy - 70} q 30 -60 60 -14 Z" fill="#bff4ff" opacity="0.5" transform="rotate(-14 ${hx} ${hy - 40})"/>
+      ${[0, 1, 2, 3, 4].map((i) => `<circle cx="${hx - 100 + i * 50}" cy="${hy - 30 - (2 - Math.abs(i - 2)) * 6 + i * 12}" r="6" fill="${goo}"><animate attributeName="opacity" dur="${1.2 + i * 0.3}s" repeatCount="indefinite" values="0.4;1;0.4"/></circle>`).join('')}
+      <path d="M ${hx - 60} ${hy + 6} q 60 -24 140 0 q -70 18 -140 0 Z" fill="${goo}" opacity="0.7"/>
+      <g fill="${goo}" opacity="0.6">${[0, 1, 2, 3, 4, 5].map((i) => `<circle cx="${hx - 150 + i * 62 + r() * 20}" cy="${hy - 24 - r() * 120}" r="${2 + r() * 3}"/>`).join('')}</g>
+      <g class="ts-saucer"><ellipse cx="0" cy="0" rx="34" ry="9" fill="#bfc7dc"/><path d="M -14 -4 a 14 12 0 0 1 28 0 Z" fill="#bff4ff"/><circle cx="0" cy="-8" r="5" fill="${goo}"/>
+        <circle cx="-22" cy="2" r="2.5" fill="#39f0ff"/><circle cx="0" cy="4" r="2.5" fill="${goo}"/><circle cx="22" cy="2" r="2.5" fill="#39f0ff"/>
+        <path d="M -12 9 L -30 70 L 30 70 L 12 9 Z" fill="${goo}" opacity="0.18"/>
+        <animateTransform attributeName="transform" type="translate" dur="9s" repeatCount="indefinite" values="${hx - 160} ${hy - 230};${hx + 120} ${hy - 260};${hx - 160} ${hy - 230}"/></g>`;
 
-    // ---- Castle Aldermere: pale stone, blue conical roofs, lit windows, a banner ----
-    const bx = 1330, by = ridge(bx, 690, [34, 16], [190, 71], [0.4, 1.1]) + 6;
-    const tower = (x, top, w, h) => `
-      <rect x="${x}" y="${top}" width="${w}" height="${h}" fill="${stone}"/>
-      <rect x="${x}" y="${top}" width="${w * 0.28}" height="${h}" fill="#000" opacity="0.13"/>
-      <path d="M ${x - 10} ${top} L ${x + w / 2} ${top - w * 1.25} L ${x + w + 10} ${top} Z" fill="#2f5d9e"/>
-      <path d="M ${x + w / 2} ${top - w * 1.25} L ${x + w + 10} ${top} L ${x + w * 0.62} ${top} Z" fill="#000" opacity="0.18"/>
-      <circle cx="${x + w / 2}" cy="${top - w * 1.25}" r="4" fill="${gold}"/>
-      <rect x="${x + w / 2 - 6}" y="${top + 22}" width="12" height="22" rx="6" fill="#ffd678"/>
-      <rect x="${x + w / 2 - 6}" y="${top + 62}" width="12" height="22" rx="6" fill="#ffd678"/>`;
-    const bastion = `
-      <ellipse cx="${bx + 60}" cy="${by}" rx="200" ry="30" fill="#2b4a2a" opacity="0.5"/>
-      <rect x="${bx - 30}" y="${by - 96}" width="180" height="96" fill="${stone}"/>
-      <rect x="${bx - 30}" y="${by - 96}" width="52" height="96" fill="#000" opacity="0.1"/>
-      ${Array.from({ length: 7 }, (_, i) => `<rect x="${bx - 30 + i * 28}" y="${by - 110}" width="16" height="14" fill="${stone}"/>`).join('')}
-      <path d="M ${bx + 40} ${by} v -46 a 20 20 0 0 1 40 0 v 46 Z" fill="#3a2a1c"/>
-      <rect x="${bx + 8}" y="${by - 70}" width="12" height="20" rx="6" fill="#ffd678"/><rect x="${bx + 100}" y="${by - 70}" width="12" height="20" rx="6" fill="#ffd678"/>
-      ${tower(bx - 62, by - 190, 60, 190)}${tower(bx + 128, by - 214, 64, 214)}${tower(bx + 34, by - 246, 56, 150)}
-      <path d="M ${bx + 62} ${by - 342} v -34" stroke="#3a2a1c" stroke-width="3"/>
-      <path d="M ${bx + 62} ${by - 376} l 46 10 l -14 10 l 14 10 l -46 -8 Z" fill="${gold}"><animate attributeName="d" dur="2.6s" repeatCount="indefinite" values="M ${bx + 62} ${by - 376} l 46 10 l -14 10 l 14 10 l -46 -8 Z;M ${bx + 62} ${by - 376} l 40 4 l -10 12 l 12 8 l -42 -2 Z;M ${bx + 62} ${by - 376} l 46 10 l -14 10 l 14 10 l -46 -8 Z"/></path>
-      <ellipse cx="${bx + 60}" cy="${by - 60}" rx="120" ry="90" fill="url(#ts-warm)" opacity="0.55"/>`;
+    // ---- the colony: a glass crop dome, habs and a terraformer stack ----
+    const bx = 1300, by = ridge(bx, 690, [34, 16], [190, 71], [0.4, 1.1]) + 6;
+    const colony = `
+      <ellipse cx="${bx + 60}" cy="${by}" rx="220" ry="30" fill="#1e5a5a" opacity="0.5"/>
+      <rect x="${bx + 150}" y="${by - 250}" width="34" height="250" fill="${hull}"/><rect x="${bx + 150}" y="${by - 250}" width="10" height="250" fill="#000" opacity="0.12"/>
+      <rect x="${bx + 146}" y="${by - 170}" width="42" height="10" fill="${teal}"/><rect x="${bx + 146}" y="${by - 110}" width="42" height="10" fill="${teal}"/>
+      <rect x="${bx + 160}" y="${by - 140}" width="14" height="28" fill="#39f0ff" opacity="0.8"/>
+      <g><animateTransform attributeName="transform" type="rotate" dur="3s" repeatCount="indefinite" values="0 ${bx + 167} ${by - 200};360 ${bx + 167} ${by - 200}"/>
+        <rect x="${bx + 127}" y="${by - 204}" width="80" height="8" rx="4" fill="#c4ccdc"/><rect x="${bx + 163}" y="${by - 240}" width="8" height="80" rx="4" fill="#c4ccdc"/></g>
+      <path d="M ${bx + 167} ${by - 250} v -40" stroke="#c4ccdc" stroke-width="3"/><circle cx="${bx + 167}" cy="${by - 292}" r="6" fill="#ff5d73"><animate attributeName="opacity" dur="1.4s" repeatCount="indefinite" values="1;0.2;1"/></circle>
+      <rect x="${bx - 40}" y="${by - 30}" width="200" height="30" fill="#5fd0b8"/>
+      <rect x="${bx - 30}" y="${by - 26}" width="180" height="10" fill="#e8c25a"/>
+      <path d="M ${bx - 60} ${by} A 120 110 0 0 1 ${bx + 180} ${by} Z" fill="#bff4ff" opacity="0.35"/>
+      <path d="M ${bx - 60} ${by} A 120 110 0 0 1 ${bx + 180} ${by}" fill="none" stroke="#eef1f8" stroke-width="4"/>
+      <path d="M ${bx + 60} ${by - 110} V ${by} M ${bx - 25} ${by - 76} Q ${bx + 60} ${by - 40} ${bx + 145} ${by - 76}" fill="none" stroke="#eef1f8" stroke-width="3" opacity="0.8"/>
+      <path d="M ${bx - 20} ${by - 90} Q ${bx + 10} ${by - 108} ${bx + 40} ${by - 104}" fill="none" stroke="#fff" stroke-width="6" opacity="0.5" stroke-linecap="round"/>
+      <rect x="${bx - 150}" y="${by - 56}" width="100" height="56" rx="8" fill="${hull}"/><path d="M ${bx - 150} ${by - 56} a 50 22 0 0 1 100 0 Z" fill="#ff8a4c"/>
+      <rect x="${bx - 130}" y="${by - 40}" width="14" height="14" rx="7" fill="#ffd678"/><rect x="${bx - 95}" y="${by - 30}" width="20" height="30" rx="4" fill="#3e3a5e"/>
+      <ellipse cx="${bx + 60}" cy="${by - 60}" rx="140" ry="90" fill="url(#ts-warm)" opacity="0.4"/>`;
 
-    // ---- the road from Blackmoor to the castle ----
-    const road = `<path d="M 300 ${hy + 34} C 480 ${hy + 90}, 520 ${hy + 60}, 720 ${hy + 100} S 1020 ${by + 70} ${bx + 60} ${by + 6}" fill="none" stroke="#5b4526" stroke-width="30" stroke-linecap="round" opacity="0.5"/>
-      <path d="M 300 ${hy + 30} C 480 ${hy + 86}, 520 ${hy + 56}, 720 ${hy + 96} S 1020 ${by + 66} ${bx + 60} ${by + 2}" fill="none" stroke="#e0bf86" stroke-width="22" stroke-linecap="round"/>
-      <path d="M 300 ${hy + 30} C 480 ${hy + 86}, 520 ${hy + 56}, 720 ${hy + 96} S 1020 ${by + 66} ${bx + 60} ${by + 2}" fill="none" stroke="#f3dcae" stroke-width="3" stroke-dasharray="14 18" stroke-linecap="round" opacity="0.8"/>`;
+    // ---- the road from the hive to the colony ----
+    const road = `<path d="M 330 ${hy + 34} C 480 ${hy + 90}, 520 ${hy + 60}, 720 ${hy + 100} S 1020 ${by + 70} ${bx + 40} ${by + 6}" fill="none" stroke="#3a2a5a" stroke-width="30" stroke-linecap="round" opacity="0.5"/>
+      <path d="M 330 ${hy + 30} C 480 ${hy + 86}, 520 ${hy + 56}, 720 ${hy + 96} S 1020 ${by + 66} ${bx + 40} ${by + 2}" fill="none" stroke="#cab8e6" stroke-width="22" stroke-linecap="round"/>
+      <path d="M 330 ${hy + 30} C 480 ${hy + 86}, 520 ${hy + 56}, 720 ${hy + 96} S 1020 ${by + 66} ${bx + 40} ${by + 2}" fill="none" stroke="#f4f0fc" stroke-width="3" stroke-dasharray="14 18" stroke-linecap="round" opacity="0.8"/>`;
 
-    // ---- the meadow in front: flowers, mushrooms, tufts ----
+    // ---- the moss in front: glowshrooms, blooms and crystals ----
     let meadowBits = '';
     for (let i = 0; i < 46; i++) {
       const x = r() * W, y = ridge(x, 790, [22, 10], [160, 53], [2.2, 0.3]) + 26 + r() * 110;
       if (y > H + 10) continue;
       const roll = r();
-      if (roll < 0.5) meadowBits += `<circle cx="${x.toFixed(0)}" cy="${y.toFixed(0)}" r="${4 + r() * 4}" fill="${['#ff8fb3', '#ffe27a', '#ffffff', '#c861e0'][i % 4]}"/><circle cx="${x.toFixed(0)}" cy="${y.toFixed(0)}" r="2" fill="#f2c14e"/>`;
-      else if (roll < 0.7) meadowBits += `<rect x="${(x - 3).toFixed(0)}" y="${y.toFixed(0)}" width="6" height="14" fill="${cream}"/><path d="M ${(x - 16).toFixed(0)} ${y.toFixed(0)} Q ${x.toFixed(0)} ${(y - 26).toFixed(0)} ${(x + 16).toFixed(0)} ${y.toFixed(0)} Z" fill="${capRed}"/><circle cx="${(x - 5).toFixed(0)}" cy="${(y - 8).toFixed(0)}" r="2.4" fill="${cream}"/><circle cx="${(x + 6).toFixed(0)}" cy="${(y - 11).toFixed(0)}" r="2" fill="${cream}"/>`;
+      if (roll < 0.45) meadowBits += `<circle cx="${x.toFixed(0)}" cy="${y.toFixed(0)}" r="${4 + r() * 4}" fill="${['#ff6fd8', '#ffe36e', '#45f0d8', '#c77dff'][i % 4]}"/><circle cx="${x.toFixed(0)}" cy="${y.toFixed(0)}" r="2" fill="#f4f0fc"/>`;
+      else if (roll < 0.7) { const c = ['#c77dff', '#45f0d8', '#ff6fd8'][i % 3]; meadowBits += `<rect x="${(x - 3).toFixed(0)}" y="${y.toFixed(0)}" width="6" height="14" fill="#f4f0fc"/><path d="M ${(x - 16).toFixed(0)} ${y.toFixed(0)} Q ${x.toFixed(0)} ${(y - 26).toFixed(0)} ${(x + 16).toFixed(0)} ${y.toFixed(0)} Z" fill="${c}"/><circle cx="${(x - 5).toFixed(0)}" cy="${(y - 8).toFixed(0)}" r="2.4" fill="#f4f0fc"/><circle cx="${(x + 6).toFixed(0)}" cy="${(y - 11).toFixed(0)}" r="2" fill="#f4f0fc"/>`; }
+      else if (roll < 0.82) meadowBits += `<path d="M ${(x - 8).toFixed(0)} ${(y + 8).toFixed(0)} l 4 -26 l 5 26 Z M ${x.toFixed(0)} ${(y + 8).toFixed(0)} l 5 -18 l 5 18 Z" fill="#c77dff" stroke="#150f24" stroke-width="1.5"/>`;
       else meadowBits += `<path d="M ${x.toFixed(0)} ${(y + 8).toFixed(0)} l -6 -22 M ${x.toFixed(0)} ${(y + 8).toFixed(0)} l 2 -26 M ${x.toFixed(0)} ${(y + 8).toFixed(0)} l 9 -20" stroke="${meadowDark}" stroke-width="3" stroke-linecap="round"/>`;
     }
 
-    // ---- foreground leaves framing the corners ----
+    // ---- foreground fronds framing the corners ----
     const leaf = (x, y, rot, s, fill) => `<path d="M 0 0 C 30 -40, 90 -50, 130 -10 C 90 20, 30 30, 0 0 Z" transform="translate(${x} ${y}) rotate(${rot}) scale(${s})" fill="${fill}"/>`;
     const frame = [
-      leaf(-30, 930, -55, 2.4, '#1c3524'), leaf(40, 950, -20, 2.0, '#234230'), leaf(-10, 720, -80, 1.6, '#1a2f20'),
-      leaf(1630, 940, -125, 2.4, '#1c3524'), leaf(1560, 960, -160, 2.0, '#234230'), leaf(1610, 730, -100, 1.6, '#1a2f20'),
-      leaf(-20, -10, 55, 1.7, '#1a2f20'), leaf(1620, -10, 125, 1.7, '#1a2f20'),
+      leaf(-30, 930, -55, 2.4, '#14303a'), leaf(40, 950, -20, 2.0, '#1a4048'), leaf(-10, 720, -80, 1.6, '#122a34'),
+      leaf(1630, 940, -125, 2.4, '#14303a'), leaf(1560, 960, -160, 2.0, '#1a4048'), leaf(1610, 730, -100, 1.6, '#122a34'),
+      leaf(-20, -10, 55, 1.7, '#1a1236'), leaf(1620, -10, 125, 1.7, '#1a1236'),
     ].join('');
 
     svg.innerHTML = `
       <defs>
         <linearGradient id="ts-sky" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stop-color="#2c4468"/><stop offset="0.42" stop-color="#8a6f86"/><stop offset="0.7" stop-color="#eaa470"/><stop offset="1" stop-color="#ffd98e"/>
+          <stop offset="0" stop-color="#0e0a24"/><stop offset="0.45" stop-color="#2a1a54"/><stop offset="0.72" stop-color="#6a3a8a"/><stop offset="1" stop-color="#ff8fb0"/>
         </linearGradient>
-        <radialGradient id="ts-sun"><stop offset="0" stop-color="#fff3c8"/><stop offset="0.35" stop-color="#ffd67a" stop-opacity="0.9"/><stop offset="1" stop-color="#ffb35c" stop-opacity="0"/></radialGradient>
-        <radialGradient id="ts-glow"><stop offset="0" stop-color="#ff7a3a" stop-opacity="0.6"/><stop offset="1" stop-color="#ff7a3a" stop-opacity="0"/></radialGradient>
+        <radialGradient id="ts-sun"><stop offset="0" stop-color="#ffe8f4"/><stop offset="0.35" stop-color="#ff9ad0" stop-opacity="0.5"/><stop offset="1" stop-color="#ff6fd8" stop-opacity="0"/></radialGradient>
+        <linearGradient id="ts-planet" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7ad8ff"/><stop offset="0.5" stop-color="#4a6ad8"/><stop offset="1" stop-color="#2a1a6a"/></linearGradient>
+        <radialGradient id="ts-glow"><stop offset="0" stop-color="#9dff4a" stop-opacity="0.55"/><stop offset="1" stop-color="#9dff4a" stop-opacity="0"/></radialGradient>
         <radialGradient id="ts-warm"><stop offset="0" stop-color="#ffd678" stop-opacity="0.9"/><stop offset="1" stop-color="#ffd678" stop-opacity="0"/></radialGradient>
-        <linearGradient id="ts-blight" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#2a1f22" stop-opacity="0.85"/><stop offset="0.55" stop-color="#2a1f22" stop-opacity="0.3"/><stop offset="1" stop-color="#2a1f22" stop-opacity="0"/></linearGradient>
+        <linearGradient id="ts-blight" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#1a0e2a" stop-opacity="0.85"/><stop offset="0.55" stop-color="#1a0e2a" stop-opacity="0.3"/><stop offset="1" stop-color="#1a0e2a" stop-opacity="0"/></linearGradient>
       </defs>
       <g class="tl" data-d="0.05">
         <rect x="-120" y="-60" width="${W + 240}" height="${H + 120}" fill="url(#ts-sky)"/>
+        ${stars}
         <circle cx="1120" cy="560" r="260" fill="url(#ts-sun)"/>
-        <circle cx="1120" cy="560" r="64" fill="#fff4cc"/>
-        <g class="ts-rays"><path d="M 1120 560 L 700 -80 L 800 -80 Z M 1120 560 L 1000 -80 L 1100 -80 Z M 1120 560 L 1300 -80 L 1400 -80 Z M 1120 560 L 1600 -20 L 1680 60 Z" fill="#fff0c0" opacity="0.13"/></g>
-        <g class="ts-cloud c1" fill="#ffe7c4" opacity="0.6"><ellipse cx="200" cy="170" rx="150" ry="34"/><ellipse cx="280" cy="150" rx="100" ry="30"/><ellipse cx="130" cy="150" rx="80" ry="24"/></g>
-        <g class="ts-cloud c2" fill="#ffd9b0" opacity="0.5"><ellipse cx="700" cy="270" rx="190" ry="38"/><ellipse cx="800" cy="248" rx="110" ry="30"/></g>
-        <g class="ts-cloud c3" fill="#fff0d6" opacity="0.55"><ellipse cx="1300" cy="120" rx="130" ry="28"/><ellipse cx="1370" cy="102" rx="80" ry="24"/></g>
+        <g transform="translate(1080 250) rotate(-18)">
+          <circle r="150" fill="url(#ts-planet)"/>
+          <path d="M -150 -20 Q 0 10 150 -20 M -146 30 Q 0 60 146 30 M -120 -80 Q 0 -60 120 -80" stroke="#bff4ff" stroke-width="10" fill="none" opacity="0.25"/>
+          <ellipse rx="250" ry="38" fill="none" stroke="#e8d4ff" stroke-width="10" opacity="0.6"/>
+          <ellipse rx="230" ry="32" fill="none" stroke="#c77dff" stroke-width="4" opacity="0.5"/>
+          <path d="M -150 0 A 150 150 0 0 0 150 0" fill="url(#ts-planet)"/>
+        </g>
+        <circle cx="340" cy="170" r="36" fill="#d8d0f4"/><circle cx="352" cy="160" r="8" fill="#b8b0d8"/><circle cx="328" cy="182" r="5" fill="#b8b0d8"/>
       </g>
-      <g class="tl" data-d="0.2">${mtn(560, 150, 90, '#7a6f98', 11, true)}${mtn(640, 120, 80, '#655f8c', 29, false)}
+      <g class="tl" data-d="0.2">${mtn(560, 150, 90, '#4a3a7a', 11, '#c77dff')}${mtn(640, 120, 80, '#3a2e66', 29, '#45f0d8')}
         <rect x="-120" y="380" width="900" height="520" fill="url(#ts-blight)"/></g>
-      <g class="tl" data-d="0.45"><path d="${hillPath(690, [34, 16], [190, 71], [0.4, 1.1])}" fill="#4d8a48"/>${trees}${hollow}${bastion}</g>
+      <g class="tl" data-d="0.45"><path d="${hillPath(690, [34, 16], [190, 71], [0.4, 1.1])}" fill="#2a8078"/>${trees}${hive}${colony}</g>
       <g class="tl" data-d="0.85"><path d="${hillPath(780, [26, 12], [230, 67], [1.3, 2.0])}" fill="${meadowDark}"/>${road}</g>
       <g class="tl" data-d="1.4"><path d="${hillPath(806, [22, 10], [160, 53], [2.2, 0.3])}" fill="${meadow}"/>
         <path d="${hillPath(806, [22, 10], [160, 53], [2.2, 0.3])}" fill="none" stroke="${meadowLight}" stroke-width="5" opacity="0.7"/>${meadowBits}</g>

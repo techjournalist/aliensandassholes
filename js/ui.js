@@ -25,8 +25,8 @@ const UI = (() => {
     let main, sub = '';
     if (s.waveActive) main = `${GameState.enemiesLeft()} coming`;
     else if (s.wave === 0) main = 'Send the first wave';
-    else if (s.wave >= total) main = 'The realm is quiet';
-    else if (s.prep > 0) { main = `Send wave ${s.wave + 1}`; sub = `auto in ${Math.ceil(s.prep)}s · now for +${Math.round(s.prep * 1.5)} gold`; }
+    else if (s.wave >= total) main = 'The moon is quiet';
+    else if (s.prep > 0) { main = `Send wave ${s.wave + 1}`; sub = `auto in ${Math.ceil(s.prep)}s · now for +${Math.round(s.prep * 1.5)} credits`; }
     else main = `Send wave ${s.wave + 1}`;
     // Written to two persistent child spans via textContent, never btn.innerHTML:
     // rebuilding the button's own subtree mid-tap can drop the click on touch
@@ -78,7 +78,7 @@ const UI = (() => {
         const t = GameState.TOWER_TYPES[id];
         const afford = GameState.canAfford(id);
         return `
-        <button class="build-btn ${id === preview ? 'previewing' : ''}" data-tower="${id}" ${afford ? '' : 'disabled'} aria-label="${t.name}, ${t.cost} gold">
+        <button class="build-btn ${id === preview ? 'previewing' : ''}" data-tower="${id}" ${afford ? '' : 'disabled'} aria-label="${t.name}, ${t.cost} credits">
           <span class="build-icon">${t.icon}</span>
           <span class="build-text"><span class="build-name">${t.name}</span><span class="build-blurb">${t.blurb}</span></span>
           <span class="build-cost ${afford ? '' : 'poor'}">&#9679; ${t.cost}</span>
@@ -103,7 +103,7 @@ const UI = (() => {
       if (branching) {
         const cards = Object.entries(GameState.BRANCHES[tower.type]).map(([id, b]) => {
           const on = armed.branch === id;
-          return `<button class="branch-btn ${on ? 'armed' : ''}" data-branch="${id}" data-tower-id="${tower.id}" ${affordUp ? '' : 'disabled'} aria-label="${b.name}, ${up} gold${on ? ', tap again to confirm' : ''}">
+          return `<button class="branch-btn ${on ? 'armed' : ''}" data-branch="${id}" data-tower-id="${tower.id}" ${affordUp ? '' : 'disabled'} aria-label="${b.name}, ${up} credits${on ? ', tap again to confirm' : ''}">
             <span class="branch-head"><span class="build-icon">${b.icon}</span><span class="build-name">${b.name}</span></span>
             <span class="build-blurb">${on ? 'Tap again to confirm' : b.blurb}</span>
             <span class="build-cost ${affordUp ? '' : 'poor'}">&#9679; ${up}</span>
@@ -166,7 +166,7 @@ const UI = (() => {
       const sel = GameState.state.selected;
       const tipTile = GameState.currentLevel().tipTile;
       const p = Renderer.worldToScreen(GameState.worldX(tipTile[0]), 0, GameState.worldZ(tipTile[1]));
-      const text = sel && sel.kind === 'tile' ? 'Now pick a tower to raise' : 'Tap here to raise a tower';
+      const text = sel && sel.kind === 'tile' ? 'Now pick a tower to build' : 'Tap here to build a tower';
       if (sel && sel.kind === 'tile') {
         const bb = $('panel').getBoundingClientRect();
         tip.classList.add('up');
@@ -196,7 +196,7 @@ const UI = (() => {
         tip.style.left = p.x + 'px';
         tip.style.top = (p.y - 50) + 'px';
         tip.style.transform = 'translate(-50%, -100%)';
-        $('tip').querySelector('.tip-text').textContent = 'Gold to spare? Tap a tower';
+        $('tip').querySelector('.tip-text').textContent = 'Credits to spare? Tap a tower';
       }
     } else {
       const bb = $('wave-btn').getBoundingClientRect();
@@ -234,7 +234,7 @@ const UI = (() => {
       return `<div class="fb" title="${lv.name}"><b>${lv.index}</b><i>${[1, 2, 3].map((k) => `<span class="${k <= n ? 'on' : ''}">&#9733;</span>`).join('')}</i></div>`;
     });
     const max = LEVELS.length * 3;
-    $('finale-line').textContent = 'The Black Dragon is down and the Baron has fled back to Blackmoor. Bells ring in every village from Hollybrook to the King\'s own walls.';
+    $('finale-line').textContent = 'The Mothership is down and the last pods are limping back to orbit. Every dome on the moon is lit up from Greenhope to Terraformer Prime.';
     $('finale-badges').innerHTML = badges.join('');
     const on = bramble ? ` on ${GameState.DIFFICULTY.bramble.name}` : '';
     $('finale-total').textContent = total === max
@@ -266,13 +266,13 @@ const UI = (() => {
     // gameWon listener already did it, and it saves the win if that listener failed to run.
     if (won) { try { Progress.recordWin(level.id, GameState.stars(), s.lives, s.difficulty); } catch (e) { /* never block the win screen */ } }
     const end = $('end');
-    $('end-title').textContent = finale ? 'The realm is saved!' : won ? `${level.endpoint.properName} holds!` : `${level.endpoint.properName} has fallen`;
+    $('end-title').textContent = finale ? 'The moon is saved!' : won ? `${level.endpoint.properName} holds!` : `${level.endpoint.properName} has fallen`;
     const stars = won ? GameState.stars() : 0;
     const text = won ? level.endScreenText[stars](s) : level.endScreenText.lose(s);
     $('end-text').textContent = text;
     $('stars').classList.toggle('show', won);
     $('stars').querySelectorAll('span').forEach((el, i) => el.classList.toggle('lit', i < stars));
-    $('end-ribbon-text').textContent = finale ? 'Long live the King!' : (s.difficulty === 'bramble' ? `${GameState.DIFFICULTY.bramble.name} won!` : (RIBBON[stars] || 'Victory!'));
+    $('end-ribbon-text').textContent = finale ? 'Go home, aliens!' : (s.difficulty === 'bramble' ? `${GameState.DIFFICULTY.bramble.name} won!` : (RIBBON[stars] || 'Victory!'));
     const mapBtn = $('end-map-btn');
     if (won && next) {
       mapBtn.textContent = 'Continue';
@@ -317,9 +317,9 @@ const UI = (() => {
   }
 
   // -------- world map: pick a level, see stars/locks, commit --------
-  // Static art (land, river, hills, the Baron's occupation and Blackmoor)
+  // Static art (land, river, hills, the alien goo and the hive)
   // lives in index.html. This draws what depends on progress: roads, the
-  // ground each won battle has taken back from the Baron, and the nodes.
+  // ground each won battle has washed clean of goo, and the nodes.
   const SVGNS = 'http://www.w3.org/2000/svg';
   const svgEl = (tag, attrs = {}, cls) => {
     const el = document.createElementNS(SVGNS, tag);
@@ -335,29 +335,20 @@ const UI = (() => {
   }
   // tiny landmarks matching each level's real endpoint
   const GLYPHS = {
-    manor: '<rect class="pl" x="-11" y="-4" width="16" height="11"></rect><path class="rf" d="M -13 -4 L -3 -13 L 7 -4 Z"></path>'
-      + '<rect class="st" x="6" y="-12" width="7" height="19"></rect><path class="rs" d="M 5 -12 L 9.5 -21 L 14 -12 Z"></path><rect class="wn" x="-5" y="0" width="4" height="7"></rect>',
-    watchtower: '<rect class="st" x="-6" y="-15" width="12" height="22"></rect><path class="rs" d="M -8 -15 L 0 -22 L 8 -15 Z"></path>'
-      + '<circle class="fire" cx="9" cy="-21" r="3.2"></circle><rect class="wn" x="-1.5" y="-9" width="3" height="4"></rect><rect class="pl" x="-11" y="1" width="9" height="6"></rect>',
-    abbey: '<rect class="st" x="-12" y="-4" width="15" height="11"></rect><path class="rs" d="M -14 -4 L -4.5 -12 L 5 -4 Z"></path>'
-      + '<rect class="st" x="4" y="-10" width="7" height="17"></rect><path class="rs" d="M 3 -10 L 7.5 -22 L 12 -10 Z"></path><circle class="wn" cx="-4.5" cy="1" r="2.6"></circle>',
-    castle: '<rect class="st" x="-12" y="-5" width="24" height="12"></rect><rect class="st" x="-5" y="-14" width="10" height="10"></rect>'
-      + '<rect class="st" x="-15" y="-10" width="6" height="17"></rect><rect class="st" x="9" y="-10" width="6" height="17"></rect>'
-      + '<path class="ry" d="M -16 -10 L -12 -18 L -8 -10 Z"></path><path class="ry" d="M 8 -10 L 12 -18 L 16 -10 Z"></path><path class="ry" d="M -6 -14 L 0 -22 L 6 -14 Z"></path>'
-      + '<rect class="wn" x="-2.5" y="1" width="5" height="6"></rect>',
-    fort: '<rect class="st" x="-11" y="-6" width="14" height="13"></rect><path class="rs" d="M -13 -6 L -4 -13 L 5 -6 Z"></path><path class="pl" d="M -7 -9 L -4 -13 L -1 -9 Z"></path>'
-      + '<rect class="st" x="4" y="-12" width="7" height="19"></rect><path class="rs" d="M 3 -12 L 7.5 -22 L 12 -12 Z"></path><path class="pl" d="M 5.6 -17 L 7.5 -22 L 9.4 -17 Z"></path><rect class="wn" x="-6" y="-2" width="4" height="5"></rect>',
-    guildhall: '<rect class="pl" x="-12" y="-4" width="24" height="11"></rect><path class="wd" d="M -6 -4 V 7 M 6 -4 V 7 M -12 1 H 12"></path><path class="rf" d="M -14 -4 L 0 -14 L 14 -4 Z"></path>'
-      + '<rect class="st" x="-2" y="-20" width="4" height="6"></rect><path class="rs" d="M -3.5 -20 L 0 -25 L 3.5 -20 Z"></path><circle class="wn" cx="0" cy="-7" r="2.2"></circle>',
-    lighthouse: '<path class="pl" d="M -5 7 L -3 -14 L 3 -14 L 5 7 Z"></path><rect class="rf" x="-4.4" y="-3" width="8.8" height="3"></rect><rect class="rf" x="-3.8" y="-10" width="7.6" height="2.6"></rect>'
-      + '<rect class="wn" x="-3" y="-19" width="6" height="5"></rect><path class="rf" d="M -4.4 -19 L 0 -25 L 4.4 -19 Z"></path><rect class="st" x="5" y="1" width="8" height="6"></rect>',
-    windmill: '<path class="st" d="M -6 7 L -4 -8 L 4 -8 L 6 7 Z"></path><path class="rb" d="M -5.5 -8 L 0 -14 L 5.5 -8 Z"></path>'
-      + '<path class="wd" d="M -11 -20 L 11 2 M 11 -20 L -11 2"></path><rect class="wn" x="-1.6" y="1" width="3.2" height="6"></rect>',
-    siegecamp: '<path class="ry" d="M -13 7 L -4 -9 L 5 7 Z"></path><path class="tn" d="M 3 7 L 9 -3 L 15 7 Z"></path><path class="wd" d="M -4 -9 V -19"></path><path class="rf" d="M -4 -19 L 4 -17 L -4 -15 Z"></path>',
-    pavilion: '<rect class="pl" x="-9" y="-2" width="18" height="9"></rect><path class="ry" d="M -11 -2 L 0 -13 L 11 -2 Z"></path><circle class="wn" cx="0" cy="-13.5" r="1.6"></circle>'
-      + '<path class="wd" d="M 11 7 V -22"></path><rect class="ry" x="11" y="-22" width="9" height="6"></rect><rect class="wn" x="11" y="-20" width="9" height="1.6"></rect>',
+    homestead: '<path class="gl" d="M -13 7 A 10 10 0 0 1 7 7 Z"></path><rect class="pl" x="-4" y="0" width="16" height="7"></rect><rect class="ry" x="-4" y="-2" width="16" height="3"></rect>'
+      + '<rect class="st" x="10" y="-16" width="4" height="23"></rect><circle class="wn" cx="12" cy="-18" r="2"></circle>',
+    pump: '<path class="wd" d="M -8 7 L -6 -6 M 8 7 L 6 -6"></path><rect class="pl" x="-9" y="-16" width="18" height="11" rx="3"></rect><path class="ry" d="M -9 -16 Q 0 -24 9 -16 Z"></path><rect class="rf" x="-14" y="1" width="9" height="6"></rect>',
+    lab: '<path class="gl" d="M -14 7 A 8 8 0 0 1 2 7 Z"></path><path class="gl" d="M 0 7 A 6 6 0 0 1 12 7 Z"></path><rect class="mg" x="10" y="-12" width="4" height="19"></rect><circle class="wn" cx="12" cy="-14" r="2.4"></circle>',
+    dish: '<rect class="pl" x="-2" y="-8" width="4" height="15"></rect><path class="pl" d="M -12 -10 Q 0 -2 12 -18 Q 2 -22 -12 -10 Z"></path><circle class="rf" cx="2" cy="-14" r="2"></circle><rect class="ry" x="-10" y="1" width="20" height="6"></rect>',
+    vaporator: '<rect class="st" x="-9" y="-14" width="3" height="21"></rect><rect class="st" x="0" y="-20" width="3" height="27"></rect><rect class="st" x="8" y="-10" width="3" height="17"></rect>'
+      + '<rect class="pl" x="-11" y="-8" width="7" height="3"></rect><rect class="pl" x="-2" y="-12" width="7" height="3"></rect><rect class="pl" x="6" y="-4" width="7" height="3"></rect>',
+    tower: '<rect class="pl" x="-10" y="-14" width="5" height="21"></rect><rect class="gl" x="-13" y="-20" width="11" height="6"></rect><ellipse class="st" cx="6" cy="5" rx="9" ry="3"></ellipse><path class="pl" d="M 0 4 Q 6 -6 12 4 Z"></path>',
+    derrick: '<path class="hz" d="M -8 7 L 0 -20 L 8 7 Z" fill-opacity="0.3"></path><path class="wd" d="M -6 0 H 6 M -4 -8 H 4"></path><rect class="pl" x="6" y="-1" width="9" height="8"></rect><rect class="gl" x="-14" y="2" width="6" height="5"></rect>',
+    vault: '<path class="tl" d="M -15 7 Q 0 -18 15 7 Z"></path><circle class="st" cx="0" cy="1" r="5"></circle><circle class="hz" cx="0" cy="1" r="2"></circle>',
+    shield: '<path class="gl" d="M -15 7 A 15 15 0 0 1 15 7 Z" fill-opacity="0.45"></path><rect class="mg" x="-2" y="-12" width="4" height="19"></rect><circle class="mg" cx="0" cy="-14" r="3"></circle>',
+    terraformer: '<path class="gl" d="M -15 7 A 12 12 0 0 1 9 7 Z"></path><rect class="pl" x="7" y="-20" width="5" height="27"></rect><rect class="ry" x="5" y="-12" width="9" height="3"></rect><circle class="rf" cx="9.5" cy="-22" r="2"></circle>',
   };
-  // woods and farmsteads of the King's own lands, and the burnt stumps the Baron leaves behind
+  // moss groves round the colony's farms, and the withered stalks the goo leaves behind
   const HOME_TREES = [[730, 100], [752, 150], [712, 84], [748, 214], [700, 272], [758, 116], [640, 284], [258, 280], [284, 266], [236, 292]];
   const DEADWOOD = [[150, 168], [56, 248], [212, 262], [452, 120], [250, 208], [520, 270], [176, 74], [408, 64], [560, 180], [60, 140]];
   let artDrawn = false;
@@ -495,12 +486,12 @@ const UI = (() => {
     $('wm-play-btn').disabled = !sel;
     const here = sel && sel.id === GameState.currentLevel().id, phase = GameState.state.phase;
     $('wm-play-btn').textContent = !sel ? 'Choose a battle'
-      : !here ? `March to ${sel.name}`
-      : phase === 'title' ? `Hold ${sel.name}`
+      : !here ? `Fly to ${sel.name}`
+      : phase === 'title' ? `Defend ${sel.name}`
       : phase === 'playing' ? `Return to ${sel.name}`
       : `Play ${sel.name} again`;
   }
-  // The payoff for a first win: the Baron's occupation visibly pulls back
+  // The payoff for a first win: the goo visibly pulls back
   // from the battlefield, with a burst of gold and a chime.
   function playReclaim(id) {
     const cut = $('wm-cuts').querySelector(`[data-level="${id}"]`);
@@ -627,7 +618,7 @@ const UI = (() => {
       if (!Progress.isUnlocked(id)) {
         const target = LEVELS.find((l) => l.id === id);
         const prev = LEVELS.find((l) => l.index === target.index - 1);
-        toast(prev ? `Hold ${prev.name} first.` : 'Not open yet.', true);
+        toast(prev ? `Save ${prev.name} first.` : 'Not open yet.', true);
         return;
       }
       Audio.unlock();
@@ -821,7 +812,7 @@ const UI = (() => {
     function loadSaveCode() {
       const r = Progress.importCode($('savecode-in').value);
       if (!r.ok) {
-        codeMsg({ empty: 'Paste a code first.', format: "That doesn't look like a Knights & Knaves save code.", newer: 'That code comes from a newer version of the game. Update this one, then try again.', check: "That code doesn't match. Check for a typo or a missing character." }[r.reason], 'bad');
+        codeMsg({ empty: 'Paste a code first.', format: "That doesn't look like an Aliens & Assholes save code.", newer: 'That code comes from a newer version of the game. Update this one, then try again.', check: "That code doesn't match. Check for a typo or a missing character." }[r.reason], 'bad');
         return;
       }
       $('savecode-out').value = Progress.exportCode();
@@ -842,7 +833,7 @@ const UI = (() => {
     let gStep = 0;
     $('guide-roster').innerHTML = GameState.TOWER_ORDER.map((id) => {
       const t = GameState.TOWER_TYPES[id];
-      return `<li><span class="ico">${t.icon}</span><span><span class="nm">${t.name}</span> &middot; ${t.cost} gold${t.hitsFlying ? ' <span class="air">Hits flyers</span>' : ''}<br>${t.blurb.replace(/ (Ground only|Reaches flyers)\.$/, '')}</span></li>`;
+      return `<li><span class="ico">${t.icon}</span><span><span class="nm">${t.name}</span> &middot; ${t.cost} credits${t.hitsFlying ? ' <span class="air">Hits flyers</span>' : ''}<br>${t.blurb.replace(/ (Ground only|Reaches flyers)\.$/, '')}</span></li>`;
     }).join('');
     function showStep(n) {
       gStep = Math.max(0, Math.min(slides.length - 1, n));
@@ -893,9 +884,9 @@ const UI = (() => {
       else if (codeEl.classList.contains('show')) { e.preventDefault(); e.stopImmediatePropagation(); closeSaveCode(); }
       else if (settingsEl.classList.contains('show')) { e.preventDefault(); e.stopImmediatePropagation(); closeSettings(); }
     }, true);
-    GameState.on('enemyHit', ({ enemy, amount, armored, x, z }) => floater(x, enemy.boss ? 1.6 : enemy.flying ? 1.2 : 0.7, z, armored ? `${amount} clink` : amount, armored ? 'armored' : ''));
+    GameState.on('enemyHit', ({ enemy, amount, armored, x, z }) => floater(x, enemy.boss ? 1.6 : enemy.flying ? 1.2 : 0.7, z, armored ? `${amount} tink` : amount, armored ? 'armored' : ''));
     GameState.on('waveEnded', ({ bonus }) => floater(GameState.gate.x, 1.4, GameState.gate.z, `+${bonus} wave bonus`, 'bonus'));
-    GameState.on('earlyBonus', (b) => floater(GameState.gate.x, 1.4, GameState.gate.z, `+${b} for courage`, 'bonus'));
+    GameState.on('earlyBonus', (b) => floater(GameState.gate.x, 1.4, GameState.gate.z, `+${b} for nerve`, 'bonus'));
     GameState.on('endpointStateChanged', (st) => {
       const name = GameState.currentLevel().endpoint.properName;
       toast(st === 2 ? `${name} is crumbling!` : `${name} is taking damage!`, true);
@@ -924,12 +915,12 @@ const UI = (() => {
       const w = GameState.waveInfo(n);
       if (!w || coachDone('flyers') || !w.groups.some((g) => GameState.ENEMY_TYPES[g.type].flying && !GameState.ENEMY_TYPES[g.type].boss)) return;
       coachMark('flyers');
-      setTimeout(() => toast('Gargoyles fly over the road. Only the Court Magus and the Longbowman can hit them.', true, 6000), 1800);
+      setTimeout(() => toast('Saucers fly over the road. Only the Cryo Beam and the Missile Pod can hit them.', true, 6000), 1800);
     });
     GameState.on('goldChanged', renderPanel);
-    GameState.on('towerSold', ({ value }) => toast(`Sold for ${value} gold.`));
+    GameState.on('towerSold', ({ value }) => toast(`Sold for ${value} credits.`));
     GameState.on('towerUpgraded', (tw) => toast(tw.branch
-      ? `${GameState.TOWER_TYPES[tw.type].name} becomes a ${GameState.BRANCHES[tw.type][tw.branch].name}!`
+      ? `${GameState.TOWER_TYPES[tw.type].name} upgraded: ${GameState.BRANCHES[tw.type][tw.branch].name}!`
       : `${GameState.TOWER_TYPES[tw.type].name} rises to tier ${tw.tier}!`));
     GameState.on('tileRejected', (res) => { renderPanel(); toast(res.reason, true); });
     GameState.on('placeRejected', (res) => toast(res.reason, true));

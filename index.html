@@ -6,45 +6,45 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Knights">
-<meta name="theme-color" content="#34452e">
+<meta name="apple-mobile-web-app-title" content="Aliens">
+<meta name="theme-color" content="#1d1838">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
-<title>Knights &amp; Knaves</title>
+<title>Aliens &amp; Assholes</title>
 <style>
   :root {
-    --ink: #1b1410;
-    --cream: #f3e8d0;
-    --gold: #e8b84a;
-    --moss: #7aa652;
-    --bark: #7d5230;
-    --magic: #8a5cd6;
-    --royal: #2f5d9e;
-    --royal-light: #7d9fdc;
-    --baron-red: #d24a3c;
-    --baron: #221d24;
+    --ink: #150f24;
+    --cream: #f4f0fc;
+    --gold: #ffc84a;
+    --moss: #56c79e;
+    --bark: #5c5080;
+    --magic: #b45cff;
+    --royal: #2bb3a8;
+    --royal-light: #7ae0d8;
+    --baron-red: #9dff4a;
+    --baron: #2a1c40;
     --ember: #ff8a3d;
-    --slate: #5b6170;
+    --slate: #4c5280;
     --panel: rgba(18, 22, 38, 0.86);
     --serif: "Palatino Linotype", "Book Antiqua", Palatino, "URW Palladio L", Georgia, serif;
     /* world-map art, all straight from PALETTE in js/palette-config.js */
-    --meadow-dark: #67963f;
-    --meadow-light: #96c466;
-    --path: #c2a174;
-    --path-edge: #a6875a;
-    --stone: #a8a397;
-    --stone-dark: #7c786e;
-    --water: #4fa3c9;
-    --foam: #d8f3fb;
-    --straw: #d8b04e;
-    --cap-red: #c23b32;
-    --cap-brown: #9c4a34;
-    --hollow: #5e564d;
-    --hollow-earth: #3e3833;
-    --hollow-wood: #3b3330;
-    --spore: #d9632a;
-    --canvas: #e9dcc0;
+    --meadow-dark: #2a8a84;
+    --meadow-light: #5fd0b8;
+    --path: #cab8e6;
+    --path-edge: #a492c6;
+    --stone: #9a92ba;
+    --stone-dark: #6c6690;
+    --water: #3ce4d2;
+    --foam: #dcfff7;
+    --straw: #e8c25a;
+    --cap-red: #ff5d73;
+    --cap-brown: #c0567a;
+    --hollow: #3a2350;
+    --hollow-earth: #26163c;
+    --hollow-wood: #2e1e46;
+    --spore: #9dff4a;
+    --canvas: #eae4f6;
     --thorn: #9a3f6e;
   }
   * { box-sizing: border-box; }
@@ -53,7 +53,7 @@
   html, body, button, .screen, #hud { touch-action: manipulation; }
   html, body {
     margin: 0; padding: 0; width: 100%; height: 100%;
-    overflow: hidden; background: #34452e;
+    overflow: hidden; background: #1d1838;
     font-family: "Trebuchet MS", "Segoe UI", system-ui, -apple-system, sans-serif;
     color: var(--cream);
     -webkit-user-select: none; user-select: none;
@@ -158,7 +158,7 @@
   .actions { display: flex; gap: 8px; }
   .act-btn {
     flex: 1; min-height: 48px; padding: 0 12px; display: flex; align-items: center; justify-content: center; gap: 8px;
-    background: #2f4a33; color: var(--cream); border: 2px solid var(--moss); border-radius: 12px;
+    background: #1e4a50; color: var(--cream); border: 2px solid var(--moss); border-radius: 12px;
     font: inherit; font-size: 16px; font-weight: 800; cursor: pointer; transition: transform 0.08s ease;
   }
   .act-btn:active { transform: scale(0.96); }
@@ -168,12 +168,12 @@
   .branch-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px; }
   .branch-btn {
     display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-height: 64px; padding: 6px 10px;
-    background: #2f4a33; color: var(--cream); border: 2px solid var(--magic); border-radius: 12px;
+    background: #1e4a50; color: var(--cream); border: 2px solid var(--magic); border-radius: 12px;
     font: inherit; text-align: left; cursor: pointer; transition: transform 0.08s ease, background 0.1s ease;
   }
   .branch-btn:active { transform: scale(0.97); }
   .branch-btn:disabled { opacity: 0.55; cursor: default; border-color: #6d6e66; }
-  .branch-btn.armed { border-color: var(--gold); background: #3a5a3f; box-shadow: 0 0 0 2px var(--gold); animation: armed 0.9s ease-in-out infinite; }
+  .branch-btn.armed { border-color: var(--gold); background: #26606a; box-shadow: 0 0 0 2px var(--gold); animation: armed 0.9s ease-in-out infinite; }
   .branch-btn.armed .build-blurb { color: var(--gold); font-weight: 800; opacity: 1; }
   .branch-head { display: flex; align-items: center; gap: 6px; }
   .branch-head .build-icon { font-size: 20px; }
@@ -204,11 +204,11 @@
   .panel-blurb { font-size: 15px; margin: 0 4px 2px; opacity: 0.9; }
   .build-btn {
     display: flex; align-items: center; gap: 12px; width: 100%; min-height: 56px;
-    padding: 6px 12px; background: #2f4a33; color: var(--cream);
+    padding: 6px 12px; background: #1e4a50; color: var(--cream);
     border: 2px solid var(--moss); border-radius: 12px; font: inherit; text-align: left;
     cursor: pointer; transition: transform 0.08s ease, background 0.1s ease;
   }
-  .build-btn:active { transform: scale(0.97); background: #3a5a3f; }
+  .build-btn:active { transform: scale(0.97); background: #26606a; }
   .build-btn:disabled { opacity: 0.55; cursor: default; border-color: #6d6e66; }
   .build-icon { font-size: 26px; line-height: 1; }
   .build-text { display: flex; flex-direction: column; flex: 1; }
@@ -231,7 +231,7 @@
   #debug.show { display: block; }
   .screen {
     position: fixed; inset: 0; display: none; z-index: 15; padding: 24px;
-    background: rgba(27, 20, 16, 0.72); align-items: center; justify-content: center; text-align: center;
+    background: rgba(16, 12, 32, 0.72); align-items: center; justify-content: center; text-align: center;
   }
   .screen.show { display: flex; }
   .screen .card {
@@ -272,7 +272,7 @@
   }
   #boss-bar.show { display: block; }
   .boss-name { font-size: 13px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; font-family: var(--serif); color: var(--baron-red); text-shadow: 0 2px 0 var(--ink); }
-  .boss-track { height: 12px; border: 2px solid var(--ink); border-radius: 8px; background: rgba(27,20,16,0.7); overflow: hidden; }
+  .boss-track { height: 12px; border: 2px solid var(--ink); border-radius: 8px; background: rgba(16,12,32,0.7); overflow: hidden; }
   .boss-fill { height: 100%; width: 100%; background: linear-gradient(90deg, #7a1f1f, var(--baron-red)); transition: width 0.15s ease; }
   #wave-banner {
     position: absolute; left: 50%; top: 22%; transform: translate(-50%, 0); pointer-events: none;
@@ -327,7 +327,7 @@
   }
   #rotate {
     position: fixed; inset: 0; display: none; z-index: 20;
-    background: #2f4a33; color: var(--cream);
+    background: #1c1636; color: var(--cream);
     align-items: center; justify-content: center; text-align: center; padding: 24px;
   }
   #rotate.show { display: flex; }
@@ -350,7 +350,7 @@
   }
   #load-error {
     position: fixed; inset: 0; display: none; z-index: 30; padding: 24px;
-    background: #2f4a33; align-items: center; justify-content: center; text-align: center;
+    background: #1c1636; align-items: center; justify-content: center; text-align: center;
   }
   #load-error.show { display: flex; }
   #load-error .card { max-width: 420px; font-size: 17px; line-height: 1.45; }
@@ -444,12 +444,12 @@
      Overrides only paint (backgrounds, shadows, text-shadow). No sizes or
      layout change, so touch targets and the phone layout are untouched. */
   :root {
-    --wood-hi: #4a3323; --wood-lo: #2a1d14; --gold-hi: #ffe08a; --gold-lo: #d49a2a;
-    --moss-hi: #46704a; --moss-lo: #2a4530;
+    --wood-hi: #3a2e6a; --wood-lo: #1c1636; --gold-hi: #ffe08a; --gold-lo: #d49a2a;
+    --moss-hi: #2c8a86; --moss-lo: #1a5254;
     --trim: inset 0 0 0 2px rgba(18, 12, 8, 0.9), inset 0 3px 0 2px rgba(255, 224, 150, 0.16);
   }
   .pill, #toast, #panel {
-    background: linear-gradient(180deg, rgba(74, 51, 35, 0.95), rgba(42, 29, 20, 0.95));
+    background: linear-gradient(180deg, rgba(56, 44, 100, 0.95), rgba(28, 22, 54, 0.95));
     box-shadow: 0 3px 0 rgba(0, 0, 0, 0.5), var(--trim);
   }
   .pill.gold { text-shadow: 0 1px 0 #1b1410; }
@@ -459,7 +459,7 @@
       radial-gradient(circle at calc(100% - 12px) 12px, var(--gold-hi) 0 2px, #8a6420 3px 4px, transparent 5px),
       radial-gradient(circle at 12px calc(100% - 12px), var(--gold-hi) 0 2px, #8a6420 3px 4px, transparent 5px),
       radial-gradient(circle at calc(100% - 12px) calc(100% - 12px), var(--gold-hi) 0 2px, #8a6420 3px 4px, transparent 5px),
-      linear-gradient(180deg, rgba(74, 51, 35, 0.96), rgba(38, 26, 18, 0.97));
+      linear-gradient(180deg, rgba(56, 44, 100, 0.96), rgba(24, 18, 46, 0.97));
   }
   .screen .card { box-shadow: 0 8px 0 rgba(0, 0, 0, 0.45), var(--trim), 0 0 60px rgba(242, 193, 78, 0.12); }
   .screen h1 { text-shadow: 0 2px 0 #8a6420, 0 5px 0 #1b1410, 0 10px 18px rgba(0, 0, 0, 0.5); }
@@ -472,7 +472,7 @@
   .screen button { box-shadow: 0 5px 0 var(--ink), inset 0 2px 0 rgba(255, 255, 255, 0.55); }
   #wave-btn:active { box-shadow: 0 1px 0 var(--ink), inset 0 2px 0 rgba(255, 255, 255, 0.4); }
   .screen button:active { box-shadow: 0 1px 0 var(--ink), inset 0 2px 0 rgba(255, 255, 255, 0.4); }
-  #wave-btn:disabled { background: linear-gradient(180deg, rgba(74, 51, 35, 0.95), rgba(42, 29, 20, 0.95)); box-shadow: 0 3px 0 rgba(0, 0, 0, 0.5), var(--trim); }
+  #wave-btn:disabled { background: linear-gradient(180deg, rgba(56, 44, 100, 0.95), rgba(28, 22, 54, 0.95)); box-shadow: 0 3px 0 rgba(0, 0, 0, 0.5), var(--trim); }
   .screen button.secondary { background: linear-gradient(180deg, var(--wood-hi), var(--wood-lo)); box-shadow: 0 5px 0 rgba(0, 0, 0, 0.55), inset 0 2px 0 rgba(255, 224, 150, 0.18); }
   #wave-btn:not(:disabled) { animation: ready-glow 1.8s ease-in-out infinite; }
   @keyframes ready-glow {
@@ -484,8 +484,8 @@
     box-shadow: 0 2px 0 rgba(0, 0, 0, 0.45), inset 0 2px 0 rgba(255, 255, 255, 0.14);
   }
   .build-btn:active, .act-btn:active, .branch-btn:active { box-shadow: 0 0 0 rgba(0, 0, 0, 0.45), inset 0 2px 0 rgba(255, 255, 255, 0.08); }
-  .build-btn.previewing { background: linear-gradient(180deg, #57835a, #33553a); }
-  .branch-btn.armed { background: linear-gradient(180deg, #5f8a5b, #3a5a3f); }
+  .build-btn.previewing { background: linear-gradient(180deg, #3aa8a2, #1e6a6c); }
+  .branch-btn.armed { background: linear-gradient(180deg, #44b0a8, #26606a); }
   .build-btn:disabled, .act-btn:disabled, .branch-btn:disabled { filter: saturate(0.5) brightness(0.85); }
   .build-name, .panel-title { text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6); }
   .build-icon { filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.4)); }
@@ -508,7 +508,7 @@
   .t-clouds i:nth-child(2) { top: 62%; width: 380px; animation-duration: 110s; animation-delay: -40s; }
   .t-clouds i:nth-child(3) { top: 33%; width: 240px; animation-duration: 95s; animation-delay: -70s; opacity: 0.7; }
   @keyframes cloud-drift { to { transform: translateX(calc(100vw + 700px)); } }
-  .t-flies i { position: absolute; width: 5px; height: 5px; border-radius: 50%; background: #ffe9a0; box-shadow: 0 0 10px 3px rgba(255, 224, 138, 0.7); animation: fly-float var(--dur) ease-in-out infinite, fly-twinkle var(--tw) ease-in-out infinite; animation-delay: var(--dl), var(--dl); }
+  .t-flies i { position: absolute; width: 5px; height: 5px; border-radius: 50%; background: #8ffff0; box-shadow: 0 0 10px 3px rgba(69, 240, 216, 0.7); animation: fly-float var(--dur) ease-in-out infinite, fly-twinkle var(--tw) ease-in-out infinite; animation-delay: var(--dl), var(--dl); }
   @keyframes fly-float { 0%, 100% { transform: translate(0, 0); } 33% { transform: translate(28px, -22px); } 66% { transform: translate(-20px, -38px); } }
   @keyframes fly-twinkle { 0%, 100% { opacity: 0.15; } 50% { opacity: 1; } }
 
@@ -565,7 +565,7 @@
   .ts-cloud.c3 { animation: ts-drift 180s linear infinite; animation-delay: -40s; }
   .ts-rays { transform-origin: 1120px 560px; animation: ts-rays 14s ease-in-out infinite; }
   @keyframes ts-rays { 0%, 100% { opacity: 0.6; transform: rotate(-2deg); } 50% { opacity: 1; transform: rotate(2deg); } }
-  #title .card { background-color: rgba(34, 23, 16, 0.9); }
+  #title .card { background-color: rgba(24, 18, 46, 0.9); }
   #title h1 {
     position: relative; display: inline-block; margin: 8px 0 14px; padding: 0 6px;
     background: linear-gradient(180deg, #fff0b0 0%, #f2c14e 52%, #c98a1d 100%);
@@ -578,13 +578,13 @@
   #title h1 .amp { -webkit-text-fill-color: #f6ecd4; text-shadow: none; font-style: italic; }
   #title h1::before, #title h1::after {
     content: ""; position: absolute; top: 50%; width: 56px; height: 34px; margin-top: -17px;
-    background: no-repeat center / contain url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 56 34'><path d='M2 17 C14 17 20 8 30 6 C28 14 24 18 18 20 C26 20 32 24 38 30 C28 30 20 26 14 20 C10 18 6 18 2 17 Z' fill='%236fae4a' stroke='%231b1410' stroke-width='2' stroke-linejoin='round'/><circle cx='44' cy='17' r='5' fill='%23f2c14e' stroke='%231b1410' stroke-width='2'/></svg>");
+    background: no-repeat center / contain url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 56 34'><path d='M2 17 C14 17 20 8 30 6 C28 14 24 18 18 20 C26 20 32 24 38 30 C28 30 20 26 14 20 C10 18 6 18 2 17 Z' fill='%2345f0d8' stroke='%231b1410' stroke-width='2' stroke-linejoin='round'/><circle cx='44' cy='17' r='5' fill='%23f2c14e' stroke='%231b1410' stroke-width='2'/></svg>");
   }
   #title h1::before { left: -58px; }
   #title h1::after { right: -58px; transform: scaleX(-1); }
   #title .eyebrow {
     display: inline-block; padding: 5px 30px 6px; margin: 0 0 2px; color: #eaf5d2; text-shadow: 0 1px 0 #1b1410;
-    background: linear-gradient(180deg, #3c6a3f, #24422a);
+    background: linear-gradient(180deg, #2c8a86, #1a5254);
     clip-path: polygon(0 0, 100% 0, calc(100% - 14px) 50%, 100% 100%, 0 100%, 14px 50%);
     box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.18);
   }
@@ -606,7 +606,7 @@
   .linkbtn { min-height: 44px; padding: 0 16px; background: none; border: 0; color: var(--cream); opacity: 0.85; font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; text-decoration: underline; text-underline-offset: 4px; }
   .linkbtn:hover, .linkbtn:focus-visible { opacity: 1; color: var(--gold); }
   #settings { z-index: 20; background: rgba(10, 7, 5, 0.9); }
-  #settings .card { max-width: 480px; text-align: left; background-color: #2a1d14; }
+  #settings .card { max-width: 480px; text-align: left; background-color: #1c1636; }
   #settings h1 { text-align: center; }
   #settings .eyebrow { text-align: center; }
   .set-rows { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 18px; }
@@ -615,9 +615,9 @@
   .set-label { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
   .set-name { font-size: 18px; font-weight: 800; color: var(--cream); }
   .set-sub { font-size: 13px; opacity: 0.7; }
-  .switch { position: relative; width: 72px; height: 44px; padding: 0; background: #3a2a1e; border: 3px solid #1b1410; border-radius: 22px; cursor: pointer; box-shadow: inset 0 2px 0 rgba(0, 0, 0, 0.4); transition: background 0.15s ease; }
+  .switch { position: relative; width: 72px; height: 44px; padding: 0; background: #2a2248; border: 3px solid #150f24; border-radius: 22px; cursor: pointer; box-shadow: inset 0 2px 0 rgba(0, 0, 0, 0.4); transition: background 0.15s ease; }
   .switch .knob { position: absolute; top: 3px; left: 3px; width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(180deg, #ffe9a0, #d9a12f); border: 2px solid #1b1410; transition: transform 0.15s ease; }
-  .switch[aria-checked="true"] { background: #3c6a3f; }
+  .switch[aria-checked="true"] { background: #1e7a74; }
   .switch[aria-checked="true"] .knob { transform: translateX(28px); }
   .switch:focus-visible, .slider:focus-visible, .screen button:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
   .slider { grid-column: 1 / -1; width: 100%; height: 44px; margin: 4px 0 0; accent-color: var(--gold); cursor: pointer; }
@@ -666,7 +666,7 @@
   }
   /* ---- save code screen ---- */
   #savecode { z-index: 21; background: rgba(10, 7, 5, 0.92); }
-  #savecode .card { max-width: 520px; text-align: left; background-color: #2a1d14; max-height: calc(100vh - 16px); overflow-y: auto; overscroll-behavior: contain; }
+  #savecode .card { max-width: 520px; text-align: left; background-color: #1c1636; max-height: calc(100vh - 16px); overflow-y: auto; overscroll-behavior: contain; }
   #savecode h1, #savecode .eyebrow { text-align: center; }
   .sc-help { margin: 0 0 12px; font-size: 15px; opacity: 0.85; line-height: 1.4; }
   .sc-label { display: block; margin: 10px 0 4px; font-size: 14px; font-weight: 800; color: var(--gold); }
@@ -769,7 +769,7 @@
     #end.win .card, #end.finale .card, #end-ribbon, #end-stats, #finale, #end.finale h1 { animation: none !important; }
     #end.win #stars span.lit { animation: none !important; opacity: 1; }
   }
-  /* Knights & Knaves additions */
+  /* Aliens & Assholes additions */
   .wm-baron-flag { fill: var(--baron-red); stroke: var(--ink); stroke-width: 1.4; stroke-linejoin: round; }
   .wm-baron-gate { fill: var(--ember); opacity: 0.85; }
   .wm-field.alt { fill: var(--meadow-light); }
@@ -778,12 +778,21 @@
   .wm-glyph .fire { fill: var(--ember); }
   .wm-glyph .pl { fill: var(--cream); stroke: var(--ink); stroke-width: 1.4; }
   .wm-heart-label { font-family: var(--serif); }
+  .wm-stars circle { fill: #f4f0fc; opacity: 0.7; }
+  .wm-crater { fill: var(--stone-dark); stroke: var(--ink); stroke-width: 1.5; opacity: 0.85; }
+  .wm-crater-in { fill: var(--meadow-dark); opacity: 0.9; }
+  .wm-crystal { fill: #c77dff; stroke: var(--ink); stroke-width: 1.2; stroke-linejoin: round; }
+  .wm-crystal.teal { fill: #45f0d8; }
+  .wm-glyph .gl { fill: #bff4ff; stroke: var(--ink); stroke-width: 1.4; opacity: 0.9; }
+  .wm-glyph .tl { fill: var(--royal); stroke: var(--ink); stroke-width: 1.4; }
+  .wm-glyph .hz { fill: #ffa53d; stroke: var(--ink); stroke-width: 1.4; }
+  .wm-glyph .mg { fill: #b45cff; stroke: var(--ink); stroke-width: 1.4; }
   #wm-blurb .wm-name { font-family: var(--serif); }
   .panel-title { font-family: var(--serif); }
 </style>
 </head>
 <body>
-<canvas id="game" aria-label="Knights and Knaves game view"></canvas>
+<canvas id="game" aria-label="Aliens and Assholes game view"></canvas>
 <div id="tiltshift" aria-hidden="true"></div>
 <div id="vignette" aria-hidden="true"></div>
 
@@ -804,7 +813,7 @@
     <button id="tilt-down-btn" class="pill iconbtn cam-btn" type="button" aria-label="Lower the camera, looking more from the side ([ key)" title="Camera lower ([)"><span class="icon">&#9660;</span></button>
   </div>
   <button id="wave-btn" type="button"><span id="wave-btn-main">Send the first wave</span><span id="wave-btn-sub" class="sub"></span></button>
-  <div id="boss-bar"><div id="boss-name" class="boss-name">The Siege Ram</div><div class="boss-track"><div class="boss-fill"></div></div></div>
+  <div id="boss-bar"><div id="boss-name" class="boss-name">The Drill Tank</div><div class="boss-track"><div class="boss-fill"></div></div></div>
   <div id="wave-banner"><div class="wb-title"></div><div class="wb-flavor"></div></div>
   <div id="panel"></div>
   <div id="tip"><div class="tip-arrow"></div><div class="tip-text"></div></div>
@@ -812,7 +821,7 @@
   <div id="toast"></div>
   <div id="flash"></div>
   <div id="boss-vig"></div>
-  <div id="boss-intro" aria-live="polite"><div class="bi-kicker">A boss approaches</div><div class="bi-name" id="boss-intro-name"></div></div>
+  <div id="boss-intro" aria-live="polite"><div class="bi-kicker">Incoming boss</div><div class="bi-name" id="boss-intro-name"></div></div>
   <div id="debug"></div>
 </div>
 
@@ -822,41 +831,43 @@
   <div class="t-rays"></div><div class="t-clouds"><i></i><i></i><i></i></div><div class="t-flies" id="t-flies"></div>
   <div class="card">
     <svg class="crest" viewBox="0 0 64 72" aria-hidden="true">
-      <path d="M32 3 L58 12 V36 C58 52 46 63 32 69 C18 63 6 52 6 36 V12 Z" fill="#2f5d9e" stroke="#e8b84a" stroke-width="3"></path>
-      <path d="M32 9 L52 16 V36 C52 48 43 57 32 62 C21 57 12 48 12 36 V16 Z" fill="#244a80"></path>
-      <path d="M18 52 L44 20 M46 52 L20 20" stroke="#dfe3ea" stroke-width="4" stroke-linecap="round"></path>
-      <path d="M15 49 L21 55 M49 49 L43 55" stroke="#e8b84a" stroke-width="4" stroke-linecap="round"></path>
-      <path d="M24 16 L28 22 L32 14 L36 22 L40 16 L40 25 H24 Z" fill="#e8b84a" stroke="#1b1410" stroke-width="1.4" stroke-linejoin="round"></path>
+      <path d="M32 3 L58 12 V36 C58 52 46 63 32 69 C18 63 6 52 6 36 V12 Z" fill="#2bb3a8" stroke="#ffc84a" stroke-width="3"></path>
+      <path d="M32 9 L52 16 V36 C52 48 43 57 32 62 C21 57 12 48 12 36 V16 Z" fill="#1d1838"></path>
+      <path d="M14 48 A18 18 0 0 1 50 48 Z" fill="#bff4ff" opacity="0.55" stroke="#f4f0fc" stroke-width="2"></path>
+      <rect x="20" y="42" width="24" height="6" fill="#9dff4a"></rect>
+      <ellipse cx="32" cy="22" rx="13" ry="4" fill="#c4ccdc" stroke="#150f24" stroke-width="1.4"></ellipse>
+      <path d="M26 21 a6 5 0 0 1 12 0 Z" fill="#9dff4a" stroke="#150f24" stroke-width="1.2"></path>
+      <circle cx="22" cy="23" r="1.4" fill="#39f0ff"></circle><circle cx="32" cy="25" r="1.4" fill="#39f0ff"></circle><circle cx="42" cy="23" r="1.4" fill="#39f0ff"></circle>
     </svg>
-    <div class="eyebrow">A medieval tower defense</div>
-    <h1>Knights <span class="amp">&amp;</span> Knaves</h1>
-    <p class="stakes">The Black Baron's knaves are loose upon the realm. Raise your towers, hold the King's road and send the rascals packing.</p>
+    <div class="eyebrow">A tower defense on a very small moon</div>
+    <h1>Aliens <span class="amp">&amp;</span> Assholes</h1>
+    <p class="stakes">Rude aliens are landing all over our little farming moon. Build towers, hold the roads and send the gooey jerks back to orbit.</p>
     <ul class="howto">
-      <li><span class="ico">&#127984;</span>Tap a bright plot beside the road to raise a tower.</li>
-      <li><span class="ico">&#127993;</span>Towers fight on their own. Every knave they drop pays gold.</li>
-      <li><span class="ico">&#9873;</span>Send the next wave when you're ready and hold the line.</li>
+      <li><span class="ico">&#128752;</span>Tap a bright pad beside the road to build a tower.</li>
+      <li><span class="ico">&#128299;</span>Towers fight on their own. Every alien they pop pays credits.</li>
+      <li><span class="ico">&#128760;</span>Send the next wave when you're ready and hold the line.</li>
     </ul>
-    <button id="start-btn" type="button">Raise the Banners</button>
+    <button id="start-btn" type="button">Defend the Colony</button>
     <div class="title-links"><button id="title-guide-btn" class="linkbtn" type="button">&#128214; How to play</button><button id="title-settings-btn" class="linkbtn" type="button">&#9881; Settings and save code</button></div>
   </div>
 </div>
 
 <div id="worldmap" class="screen">
   <div class="card wide">
-    <div class="eyebrow">The Kingdom of Aldermere</div>
+    <div class="eyebrow">The moon of Tumble</div>
     <h1>Choose your battle</h1>
-    <svg id="wm-svg" viewBox="0 0 800 320" role="img" aria-label="Map of the Kingdom of Aldermere and its battle sites">
+    <svg id="wm-svg" viewBox="0 0 800 320" role="img" aria-label="Map of the moon of Tumble and its battle sites">
       <defs>
-        <linearGradient id="wm-sea-grad" x1="0" y1="0" x2="0.4" y2="1"><stop offset="0" stop-color="#1f4a63"/><stop offset="0.55" stop-color="#2a6580"/><stop offset="1" stop-color="#1b3f56"/></linearGradient>
+        <linearGradient id="wm-sea-grad" x1="0" y1="0" x2="0.4" y2="1"><stop offset="0" stop-color="#150f30"/><stop offset="0.55" stop-color="#22184a"/><stop offset="1" stop-color="#100b24"/></linearGradient>
         <radialGradient id="wm-soft">
           <stop offset="0" stop-color="#000" stop-opacity="1"></stop>
           <stop offset="0.6" stop-color="#000" stop-opacity="1"></stop>
           <stop offset="1" stop-color="#000" stop-opacity="0"></stop>
         </radialGradient>
         <linearGradient id="wm-blight-grad" x1="0" y1="0" x2="1" y2="0.6">
-          <stop offset="0" stop-color="#2a2226" stop-opacity="0.95"></stop>
-          <stop offset="0.65" stop-color="#4a3c38" stop-opacity="0.84"></stop>
-          <stop offset="1" stop-color="#5e564d" stop-opacity="0.62"></stop>
+          <stop offset="0" stop-color="#1e1030" stop-opacity="0.95"></stop>
+          <stop offset="0.65" stop-color="#34204e" stop-opacity="0.84"></stop>
+          <stop offset="1" stop-color="#3a2350" stop-opacity="0.62"></stop>
         </linearGradient>
         <clipPath id="wm-land-clip"><path d="M 60 40 C 150 10, 300 22, 420 18 C 540 14, 660 30, 740 52 C 790 70, 786 140, 772 200 C 760 260, 730 300, 640 304 C 520 310, 380 300, 260 304 C 150 308, 60 296, 34 250 C 12 200, 20 120, 30 80 C 36 58, 44 46, 60 40 Z"></path></clipPath>
         <mask id="wm-reclaim" maskUnits="userSpaceOnUse" x="-20" y="-20" width="840" height="360">
@@ -869,27 +880,32 @@
       <g class="wm-swell"><path d="M 20 150 q 20 -8 40 0 t 40 0 t 40 0"></path><path d="M 700 250 q 20 -8 40 0 t 40 0"></path><path d="M 300 314 q 20 -8 40 0 t 40 0 t 40 0"></path><path d="M 610 8 q 20 -8 40 0 t 40 0"></path></g>
       <rect class="wm-frame" x="-8" y="-8" width="816" height="336" rx="18"></rect>
       <g class="wm-corners"><path d="M -8 26 V 10 a 18 18 0 0 1 18 -18 H 26"></path><path d="M 808 26 V 10 a 18 18 0 0 0 -18 -18 H 774"></path><path d="M -8 294 V 310 a 18 18 0 0 0 18 18 H 26"></path><path d="M 808 294 V 310 a 18 18 0 0 1 -18 18 H 774"></path><circle cx="-8" cy="-8" r="5"></circle><circle cx="808" cy="-8" r="5"></circle><circle cx="-8" cy="328" r="5"></circle><circle cx="808" cy="328" r="5"></circle></g>
-      <!-- the realm: the King's castle in the east, the Baron's hold of Blackmoor in the far west -->
+      <!-- a scatter of stars in the black around the moon -->
+      <g class="wm-stars"><circle cx="14" cy="40" r="1.4"></circle><circle cx="30" cy="300" r="1.1"></circle><circle cx="120" cy="8" r="1.2"></circle><circle cx="260" cy="312" r="1.5"></circle><circle cx="420" cy="6" r="1"></circle><circle cx="560" cy="314" r="1.2"></circle><circle cx="700" cy="10" r="1.4"></circle><circle cx="786" cy="120" r="1.1"></circle><circle cx="792" cy="250" r="1.5"></circle><circle cx="8" cy="180" r="1"></circle><circle cx="350" cy="318" r="1"></circle><circle cx="640" cy="4" r="1.1"></circle></g>
+      <!-- the moon of Tumble: the colony's farms in the east, the hive the pods come from in the far west -->
       <path class="wm-coast" d="M 60 40 C 150 10, 300 22, 420 18 C 540 14, 660 30, 740 52 C 790 70, 786 140, 772 200 C 760 260, 730 300, 640 304 C 520 310, 380 300, 260 304 C 150 308, 60 296, 34 250 C 12 200, 20 120, 30 80 C 36 58, 44 46, 60 40 Z"></path>
       <path class="wm-land" d="M 60 40 C 150 10, 300 22, 420 18 C 540 14, 660 30, 740 52 C 790 70, 786 140, 772 200 C 760 260, 730 300, 640 304 C 520 310, 380 300, 260 304 C 150 308, 60 296, 34 250 C 12 200, 20 120, 30 80 C 36 58, 44 46, 60 40 Z"></path>
       <ellipse class="wm-patch" cx="690" cy="230" rx="60" ry="34"></ellipse>
       <ellipse class="wm-patch" cx="430" cy="270" rx="70" ry="24"></ellipse>
       <ellipse class="wm-patch" cx="200" cy="140" rx="80" ry="30"></ellipse>
+      <!-- the great irrigation canal -->
       <path class="wm-river" d="M 352 18 C 330 70, 296 104, 322 150 C 348 196, 300 244, 326 306"></path>
       <path class="wm-river-foam" d="M 352 18 C 330 70, 296 104, 322 150 C 348 196, 300 244, 326 306"></path>
-      <!-- the patchwork of royal farmland -->
+      <!-- the colony's crop fields -->
       <g transform="translate(600 238) rotate(-10)"><rect class="wm-field" x="-26" y="-11" width="52" height="22" rx="3"></rect><path class="wm-field-row" d="M -22 -4 H 22 M -22 3 H 22"></path></g>
       <g transform="translate(726 268) rotate(6)"><rect class="wm-field alt" x="-22" y="-10" width="44" height="20" rx="3"></rect><path class="wm-field-row" d="M -18 -3 H 18 M -18 4 H 18"></path></g>
       <g transform="translate(410 262) rotate(-12)"><rect class="wm-field" x="-30" y="-12" width="60" height="24" rx="3"></rect><path class="wm-field-row" d="M -26 -5 H 26 M -26 2 H 26 M -26 9 H 26"></path></g>
       <g transform="translate(150 262) rotate(8)"><rect class="wm-field alt" x="-24" y="-10" width="48" height="20" rx="3"></rect><path class="wm-field-row" d="M -20 -3 H 20 M -20 4 H 20"></path></g>
-      <!-- the north hills the Ridge Road and the Pilgrims' Way come down from -->
+      <!-- craters and crystal ridges -->
       <g>
-        <path class="wm-mtn" d="M 400 104 L 430 56 L 462 104 Z"></path><path class="wm-mtn-shade" d="M 430 56 L 462 104 L 436 104 Z"></path><path class="wm-snow" d="M 430 56 L 421 72 L 430 68 L 439 72 Z"></path>
-        <path class="wm-mtn" d="M 446 100 L 484 42 L 524 100 Z"></path><path class="wm-mtn-shade" d="M 484 42 L 524 100 L 492 100 Z"></path><path class="wm-snow" d="M 484 42 L 473 60 L 484 55 L 495 60 Z"></path>
-        <path class="wm-mtn" d="M 516 96 L 542 60 L 568 96 Z"></path><path class="wm-mtn-shade" d="M 542 60 L 568 96 L 548 96 Z"></path>
+        <ellipse class="wm-crater" cx="470" cy="80" rx="40" ry="20"></ellipse><ellipse class="wm-crater-in" cx="470" cy="83" rx="30" ry="13"></ellipse>
+        <ellipse class="wm-crater" cx="560" cy="150" rx="24" ry="12"></ellipse><ellipse class="wm-crater-in" cx="560" cy="152" rx="17" ry="7"></ellipse>
+        <ellipse class="wm-crater" cx="650" cy="110" rx="30" ry="15"></ellipse><ellipse class="wm-crater-in" cx="650" cy="113" rx="22" ry="9"></ellipse>
+        <path class="wm-crystal" d="M 520 60 l 6 -22 l 6 22 Z M 530 62 l 5 -14 l 5 14 Z M 512 62 l 4 -12 l 4 12 Z"></path>
+        <path class="wm-crystal teal" d="M 720 150 l 6 -20 l 6 20 Z M 730 152 l 4 -12 l 4 12 Z"></path>
       </g>
       <g id="wm-trees"></g>
-      <!-- the Baron's occupation: rolled back wherever a battle is won -->
+      <!-- the alien goo: washed back wherever a battle is won -->
       <g clip-path="url(#wm-land-clip)"><g mask="url(#wm-reclaim)">
         <path class="wm-blight" d="M 22 60 C 60 20, 200 14, 330 20 C 430 24, 520 20, 560 40 C 590 90, 548 150, 574 200 C 600 250, 560 300, 500 306 C 380 312, 230 304, 150 306 C 80 308, 40 296, 26 250 C 12 190, 16 110, 22 60 Z"></path>
         <path class="wm-crack" d="M 70 74 L 120 100 L 160 96 L 214 136 L 262 156 L 320 172 L 370 168 L 430 212 L 488 220 L 540 250"></path>
@@ -898,13 +914,14 @@
         <path class="wm-crack" d="M 430 212 L 446 168 L 494 140 L 520 96"></path>
         <g id="wm-deadwood"></g>
       </g></g>
-      <!-- Blackmoor, the Black Baron's hold: where the knaves march from -->
+      <!-- the hive: the crashed alien ship the pods come from -->
       <g transform="translate(62 62)">
         <circle class="wm-heart-glow" r="24" opacity="0.5"></circle>
-        <path class="wm-heart-stump" d="M -16 12 L -16 -6 L -12 -6 L -12 -2 L -8 -2 L -8 -14 L -4 -14 L -4 -10 L 0 -10 L 0 -14 L 4 -14 L 4 -2 L 8 -2 L 8 -6 L 12 -6 L 12 12 Z"></path>
+        <ellipse class="wm-heart-stump" cx="0" cy="2" rx="18" ry="7"></ellipse>
+        <path class="wm-heart-stump" d="M -10 0 Q 0 -18 10 0 Z"></path>
         <path class="wm-baron-flag" d="M 2 -14 L 2 -26 L 13 -22 L 2 -18"></path>
-        <rect class="wm-baron-gate" x="-4" y="4" width="6" height="8"></rect>
-        <text class="wm-heart-label" x="26" y="-8">Blackmoor, the Baron's hold</text>
+        <circle class="wm-baron-gate" cx="0" cy="-4" r="3"></circle>
+        <text class="wm-heart-label" x="26" y="-8">The Hive, where the pods come from</text>
       </g>
       <g class="wm-cloudshadows" clip-path="url(#wm-land-clip)"><ellipse cx="-120" cy="90" rx="110" ry="46"></ellipse><ellipse cx="-380" cy="220" rx="150" ry="52"></ellipse><ellipse cx="-620" cy="150" rx="90" ry="38"></ellipse></g>
       <g class="wm-ripples"><path d="M 8 24 q 8 -5 16 0 t 16 0"></path><path d="M 762 20 q 8 -5 16 0 t 16 0"></path><path d="M 6 300 q 8 -5 16 0 t 16 0"></path><path d="M 690 314 q 8 -5 16 0 t 16 0"></path></g>
@@ -915,8 +932,8 @@
     <p id="wm-blurb" class="stakes">Pick a battle on the map.</p>
     <div id="wm-actions">
       <div id="wm-tier" role="radiogroup" aria-label="Difficulty">
-        <button type="button" class="tier-btn" role="radio" data-tier="meadow" aria-checked="true"><span class="tier-name">Squire</span><span class="tier-sub">The usual fight</span></button>
-        <button type="button" class="tier-btn bramble" role="radio" data-tier="bramble" aria-checked="false"><span class="tier-name">Knight</span><span class="tier-sub">Tougher, 16 lives</span></button>
+        <button type="button" class="tier-btn" role="radio" data-tier="meadow" aria-checked="true"><span class="tier-name">Cadet</span><span class="tier-sub">The usual fight</span></button>
+        <button type="button" class="tier-btn bramble" role="radio" data-tier="bramble" aria-checked="false"><span class="tier-name">Veteran</span><span class="tier-sub">Tougher, 16 lives</span></button>
       </div>
       <button id="wm-play-btn" type="button" disabled>Choose a battle</button>
     </div>
@@ -925,11 +942,11 @@
 
 <div id="pause" class="screen">
   <div class="card">
-    <div class="eyebrow">The realm holds its breath</div>
+    <div class="eyebrow">The colony holds its breath</div>
     <h1>Paused</h1>
     <p class="stakes" id="pause-text"></p>
     <div class="row">
-      <button id="resume-btn" type="button">Back to the walls</button>
+      <button id="resume-btn" type="button">Back to the fight</button>
       <button id="pause-restart-btn" type="button" class="secondary">Start over</button>
       <button id="pause-map-btn" type="button" class="secondary">World map</button>
       <button id="pause-guide-btn" type="button" class="secondary">How to play</button>
@@ -944,11 +961,11 @@
   <canvas id="celebrate" aria-hidden="true"></canvas>
   <div class="card">
     <div id="end-ribbon" aria-hidden="true"><span class="rb-star">&#9733;</span><span id="end-ribbon-text">Victory!</span><span class="rb-star">&#9733;</span></div>
-    <h1 id="end-title">The manor holds!</h1>
+    <h1 id="end-title">The colony holds!</h1>
     <div id="stars"><span>&#9733;</span><span>&#9733;</span><span>&#9733;</span></div>
     <div id="end-stats">
       <div class="stat"><b id="stat-lives">0</b><span>Lives left</span></div>
-      <div class="stat"><b id="stat-kills">0</b><span>Foes beaten</span></div>
+      <div class="stat"><b id="stat-kills">0</b><span>Aliens popped</span></div>
       <div class="stat"><b id="stat-waves">0</b><span>Waves held</span></div>
     </div>
     <div id="finale">
@@ -967,32 +984,32 @@
 
 <div id="guide" class="screen" role="dialog" aria-modal="true" aria-labelledby="guide-title">
   <div class="card">
-    <div class="eyebrow">A squire's first lesson</div>
+    <div class="eyebrow">A cadet's first briefing</div>
     <h1 id="guide-title" class="sr-only">How to play</h1>
     <div class="g-slide" data-step="0">
-      <div class="g-art">&#127984;</div>
+      <div class="g-art">&#128760;</div>
       <h2>Hold the road</h2>
-      <p>The Black Baron's knaves march down the road toward your keep. Each one that gets through costs a <b>life</b>. Lose every life and the battle is lost.</p>
-      <p>Your keep shows the damage too: cracks, then fire. Watch it, not just the number.</p>
+      <p>The aliens crawl down the road toward your colony building. Each one that gets through costs a <b>life</b>. Lose every life and the battle is lost.</p>
+      <p>The building shows the damage too: cracks, then fire. Watch it, not just the number.</p>
     </div>
     <div class="g-slide" data-step="1">
-      <div class="g-art">&#127993;</div>
-      <h2>Raise towers</h2>
-      <p>Tap a bright <b>plot</b> beside the road, then pick a tower. Towers cost gold and fight on their own.</p>
+      <div class="g-art">&#128299;</div>
+      <h2>Build towers</h2>
+      <p>Tap a bright <b>pad</b> beside the road, then pick a tower. Towers cost credits and fight on their own.</p>
       <ul class="g-roster" id="guide-roster"></ul>
     </div>
     <div class="g-slide" data-step="2">
       <div class="g-art">&#129689;</div>
-      <h2>Gold and upgrades</h2>
-      <p>Every knave you drop pays <b>gold</b>, and each wave you hold pays a bonus.</p>
+      <h2>Credits and upgrades</h2>
+      <p>Every alien you pop pays <b>credits</b>, and each wave you hold pays a bonus.</p>
       <p>Tap a tower to <b>upgrade</b> it, or sell it to move it. At the third tier you choose one of two <b>specializations</b>, and that choice is for good.</p>
       <p>A new tower or a bigger old one? That is the question every battle asks.</p>
     </div>
     <div class="g-slide" data-step="3">
       <div class="g-art">&#9873;</div>
       <h2>Send the waves</h2>
-      <p>Press <b>Send the wave</b> when you're ready. Sending it early pays extra gold.</p>
-      <p>Red horn posts mark the roads the next wave will use. <b>Gargoyles fly</b>: only the Court Magus and the Longbowman can hit them. A boss closes most battles.</p>
+      <p>Press <b>Send the wave</b> when you're ready. Sending it early pays extra credits.</p>
+      <p>Orange beacons mark the roads the next wave will use. <b>Saucers fly</b>: only the Cryo Beam and the Missile Pod can hit them. A boss closes every battle.</p>
     </div>
     <div class="g-slide" data-step="4">
       <div class="g-art">&#128065;</div>
@@ -1012,7 +1029,7 @@
 
 <div id="settings" class="screen" role="dialog" aria-modal="true" aria-labelledby="settings-title">
   <div class="card">
-    <div class="eyebrow">Your realm, your volume</div>
+    <div class="eyebrow">Your colony, your volume</div>
     <h1 id="settings-title">Settings</h1>
     <div class="set-rows">
       <div class="set-row">
@@ -1020,7 +1037,7 @@
         <button id="set-master" class="switch" type="button" role="switch" aria-checked="true" aria-label="All sound"><span class="knob"></span></button>
       </div>
       <div class="set-row">
-        <div class="set-label"><span class="set-name">Sound effects</span><span class="set-sub">Shots, hits, horns and chimes</span></div>
+        <div class="set-label"><span class="set-name">Sound effects</span><span class="set-sub">Zaps, splats, sirens and chimes</span></div>
         <button id="set-sfx" class="switch" type="button" role="switch" aria-checked="true" aria-label="Sound effects"><span class="knob"></span></button>
         <input id="set-sfx-vol" class="slider" type="range" min="0" max="100" step="5" aria-label="Sound effects volume">
       </div>
@@ -1045,7 +1062,7 @@
   <div class="card">
     <div class="eyebrow">Take your campaign with you</div>
     <h1 id="savecode-title">Save code</h1>
-    <p class="sc-help">Your stars on Squire and Knight and your unlocked levels as a short code. Copy it somewhere safe. Paste it on another device or browser to carry on.</p>
+    <p class="sc-help">Your stars on Cadet and Veteran and your unlocked levels as a short code. Copy it somewhere safe. Paste it on another device or browser to carry on.</p>
     <label class="sc-label" for="savecode-out">Your code</label>
     <div class="sc-line">
       <textarea id="savecode-out" class="sc-field sc-out" rows="2" readonly spellcheck="false" autocomplete="off" aria-label="Your save code"></textarea>
@@ -1065,14 +1082,14 @@
   <div class="card">
     <div class="phone"></div>
     <h1>Turn your device sideways</h1>
-    <p>The realm is wide. Knights &amp; Knaves is played in landscape.</p>
+    <p>The moon is wide. Aliens &amp; Assholes is played in landscape.</p>
   </div>
 </div>
 
 <div id="load-error">
   <div class="card">
-    <h1>The realm didn't load</h1>
-    <p>Knights &amp; Knaves needs to fetch one library (three.js) from the web the first time it opens. Check your connection and reload the page.</p>
+    <h1>The colony didn't load</h1>
+    <p>Aliens &amp; Assholes needs to fetch one library (three.js) from the web the first time it opens. Check your connection and reload the page.</p>
   </div>
 </div>
 

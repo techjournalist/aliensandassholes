@@ -399,11 +399,11 @@ function progressTests() {
 }
 
 // ---- 3e. difficulty tiers (P3-D1) ----
-// Meadow golden runs: the harness mixed bot, seeded, on the Knights & Knaves
+// Meadow golden runs: the harness mixed bot, seeded, on the Aliens & Assholes
 // levels with curved roads. [lives, gold, kills] for seeds 1 and 2. A
 // deliberate change to a level's waves or economy will move these; regenerate
 // them then with `node tools/bot-runner.js all --seeds 2 --json`.
-const MEADOW_GOLDEN = {};
+const MEADOW_GOLDEN = {"greenhope":[[7,305,206],[14,349,213]],"crater-rim":[[15,305,156],[17,267,158]],"glowshroom-grove":[[15,311,146],[16,265,147]],"comms-ridge":[[18,367,243],[13,354,238]]};
 function difficultyTests(G, LEVELS) {
   const out = [];
   const add = (name, ok, detail = '') => out.push({ name: `difficulty: ${name}`, ok, detail });
