@@ -4,11 +4,11 @@
 const Audio = (() => {
   let ctx = null, master = null, noiseBuf = null, muted = false;
   let sfxOut = null, musicOut = null;   // per-kind volume buses, both feeding master
-  // Player settings, saved under kk-audio. Music defaults a little lower than
+  // Player settings, saved under aa-audio. Music defaults a little lower than
   // the effects, since it plays continuously and effects are short events.
   const settings = { sfxOn: true, sfxVol: 1, musicOn: true, musicVol: 0.6 };
   try {
-    const saved = JSON.parse(localStorage.getItem('kk-audio') || 'null');
+    const saved = JSON.parse(localStorage.getItem('aa-audio') || 'null');
     if (saved && typeof saved === 'object') {
       if (typeof saved.sfxOn === 'boolean') settings.sfxOn = saved.sfxOn;
       if (typeof saved.musicOn === 'boolean') settings.musicOn = saved.musicOn;
@@ -16,7 +16,7 @@ const Audio = (() => {
       if (Number.isFinite(saved.musicVol)) settings.musicVol = Math.max(0, Math.min(1, saved.musicVol));
     }
   } catch (e) { /* storage may be blocked or hold junk: keep the defaults */ }
-  function saveSettings() { try { localStorage.setItem('kk-audio', JSON.stringify(settings)); } catch (e) { /* ignore */ } }
+  function saveSettings() { try { localStorage.setItem('aa-audio', JSON.stringify(settings)); } catch (e) { /* ignore */ } }
   function applySettings() {
     if (!ctx || !sfxOut || rendering) return;
     sfxOut.gain.setTargetAtTime(settings.sfxOn ? settings.sfxVol : 0, ctx.currentTime, 0.03);
@@ -48,7 +48,7 @@ const Audio = (() => {
       if (!AC) return;
       ctx = new AC();
       buildGraph(ctx);
-      try { muted = localStorage.getItem('kk-muted') === '1'; } catch (e) { /* storage may be blocked */ }
+      try { muted = localStorage.getItem('aa-muted') === '1'; } catch (e) { /* storage may be blocked */ }
       master.gain.value = muted ? 0 : 0.6;
       applySettings();
       startAmbience();
@@ -60,7 +60,7 @@ const Audio = (() => {
 
   function setMuted(m) {
     muted = m;
-    try { localStorage.setItem('kk-muted', m ? '1' : '0'); } catch (e) { /* ignore */ }
+    try { localStorage.setItem('aa-muted', m ? '1' : '0'); } catch (e) { /* ignore */ }
     if (master) master.gain.setTargetAtTime(m ? 0 : 0.6, ctx.currentTime, 0.02);
     return muted;
   }

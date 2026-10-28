@@ -14,7 +14,7 @@
 // stars always opens the next one, so a half-saved win heals itself.
 // ===================================================================
 const Progress = (() => {
-  const KEY = 'kk-progress', BACKUP = 'kk-progress-session', TIER_KEY = 'kk-difficulty';
+  const KEY = 'aa-progress', BACKUP = 'aa-progress-session', TIER_KEY = 'aa-difficulty';
   const TIERS = ['meadow', 'bramble'];
   let mem = null;
 
@@ -96,16 +96,16 @@ const Progress = (() => {
   }
 
   // ---- save code: your campaign progress as a short piece of text ----
-  // "KK1-" then, per level in LEVELS order, three base-36 characters, then two
+  // "AA1-" then, per level in LEVELS order, three base-36 characters, then two
   // check characters, all uppercase in groups of four:
   //   1. the level's state and its Bramble stars together: meadow * 4 + bramble,
   //      where meadow is 0 locked, 1 open, 2 to 4 for one to three Meadow stars
   //      and bramble is 0 to 3 Bramble stars (so 0 to J);
   //   2. Meadow best lives; 3. Bramble best lives (0 when there are none).
-  // (Knights & Knaves codes start KK; Briar & Bastion's BB codes describe a
+  // (Knights & Knaves codes start AA; Briar & Bastion's BB codes describe a
   // different campaign and are refused.)
   // Loading a code only ever adds, like every other merge.
-  const CODE = 'KK1', CODES = { KK1: 3 };   // characters per level in each version
+  const CODE = 'AA1', CODES = { AA1: 3 };   // characters per level in each version
   const check = (str) => { let h = 7; for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) % 1296; return h.toString(36).toUpperCase().padStart(2, '0'); };
   const b36 = (n) => Math.max(0, Math.min(35, n || 0)).toString(36).toUpperCase();
   function exportCode() {
@@ -124,9 +124,9 @@ const Progress = (() => {
   function importCode(raw) {
     const text = String(raw || '').toUpperCase().replace(/[\s_]/g, '');
     if (!text) return { ok: false, reason: 'empty' };
-    const m = /^KK(\d+)-/.exec(text);
+    const m = /^AA(\d+)-/.exec(text);
     if (!m) return { ok: false, reason: 'format' };
-    const ver = 'KK' + m[1], per = CODES[ver];
+    const ver = 'AA' + m[1], per = CODES[ver];
     if (!per) return { ok: false, reason: +m[1] > 1 ? 'newer' : 'format' };
     const all = text.slice(m[0].length).replace(/-/g, '');
     if (!/^[0-9A-Z]+$/.test(all) || all.length < per + 2 || (all.length - 2) % per) return { ok: false, reason: 'check' };

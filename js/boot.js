@@ -7,7 +7,7 @@
     return;
   }
   let activeId = null;
-  try { activeId = sessionStorage.getItem('kk-active-level'); } catch (e) { /* storage may be blocked */ }
+  try { activeId = sessionStorage.getItem('aa-active-level'); } catch (e) { /* storage may be blocked */ }
   const level = LEVELS.find((l) => l.id === activeId) || LEVELS[0];
   // the difficulty tier the player last picked on the world map (Meadow by default)
   try { GameState.setDifficulty(Progress.tier()); } catch (e) { /* stay on Meadow */ }

@@ -17,7 +17,8 @@ const vm = require('vm');
 const FIX = require('./level-fixtures');
 
 const ROOT = path.join(__dirname, '..');
-const FILES = ['palette-config.js', 'level-common.js', 'level1-hollybrook.js', 'level2-ravensford.js', 'level3-st-wendels.js', 'level4-castle-aldermere.js', 'level5-highcrag-pass.js', 'level6-wickham-fair.js', 'level7-saltmarsh-quay.js', 'level8-amberlea-vineyards.js', 'level9-blackmoor-lines.js', 'level10-black-keep.js', 'levels.js', 'game-state.js'];
+// the game's own script list, in load order: every level file index.html loads, so a new level needs no change here
+const FILES = [...fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8').matchAll(/<script src="js\/([^"]+)"/g)].map((m) => m[1]).filter((f) => /^(palette-config|level|levels|game-state)/.test(f));
 
 // Every level's mixed plan lives in tools/level-fixtures.js (botPlan).
 const PLANS = {};

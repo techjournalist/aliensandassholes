@@ -10,17 +10,17 @@ const GameState = (() => {
 
   // Every tower is a character with a job. The ids are the engine's role
   // names, kept from the original game so its tests and tooling carry over:
-  //   slinger   = Javelin Squire   (fast, cheap, single target, ground only)
-  //   warden    = Pitchpot Friar   (sticky splash that roots, ground only)
-  //   druid     = Court Magus      (chilling frost, reaches flyers)
-  //   golem     = Hammer Knight    (one huge slow hit, ground only)
-  //   artillery = Longbowman       (long arcing volleys, splash, reaches flyers)
+  //   slinger   = Laser Turret  (fast, cheap, single target, ground only)
+  //   warden    = Goo Cannon    (sticky splash that roots, ground only)
+  //   druid     = Cryo Beam     (chilling frost, reaches flyers)
+  //   golem     = Mech Walker   (one huge slow hit, ground only)
+  //   artillery = Missile Pod   (long arcing salvos, splash, reaches flyers)
   const TOWER_TYPES = {
-    slinger:   { id: 'slinger',   name: 'Javelin Squire',  cost: 70,  range: 2.6, damage: 8,  cooldown: 0.62, windup: 0.16, projectileSpeed: 7.5, projectile: 'acorn',   splash: 0,   hitsFlying: false, icon: '&#128481;', blurb: 'Quick javelins. Cheap. Ground only.' },
-    warden:    { id: 'warden',    name: 'Pitchpot Friar',  cost: 110, range: 2.3, damage: 16, cooldown: 1.5,  windup: 0.3,  projectileSpeed: 5.5, projectile: 'thorn',   splash: 0.9, hitsFlying: false, icon: '&#127855;', blurb: 'Pots of sticky pitch glue a crowd in place. Ground only.', effect: { root: 0.9 } },
-    druid:     { id: 'druid',     name: 'Court Magus',     cost: 90,  range: 2.9, damage: 5,  cooldown: 0.8,  windup: 0.2,  projectileSpeed: 9,   projectile: 'wisp',    splash: 0,   hitsFlying: true,  icon: '&#10052;',  blurb: 'Frost bolts that chill. Reaches flyers.', effect: { chill: 2.2, chillMul: 0.55 } },
-    golem:     { id: 'golem',     name: 'Hammer Knight',   cost: 130, range: 2.2, damage: 46, cooldown: 2.4,  windup: 0.45, projectileSpeed: 8,   projectile: 'boulder', splash: 0,   hitsFlying: false, icon: '&#128296;', blurb: 'Hurls one huge hammer, slow to wind up. Ground only.' },
-    artillery: { id: 'artillery', name: 'Longbowman',      cost: 120, range: 4.2, minRange: 1.4, damage: 15, cooldown: 2.4, windup: 0.35, projectileSpeed: 5, projectile: 'bigacorn', splash: 0.7, hitsFlying: true, icon: '&#127993;', blurb: 'Arcing volleys, far but not near. Splashes. Reaches flyers.' },
+    slinger:   { id: 'slinger',   name: 'Laser Turret',  cost: 70,  range: 2.6, damage: 8,  cooldown: 0.62, windup: 0.16, projectileSpeed: 7.5, projectile: 'acorn',   splash: 0,   hitsFlying: false, icon: '&#128299;', blurb: 'Quick laser bolts. Cheap. Ground only.' },
+    warden:    { id: 'warden',    name: 'Goo Cannon',    cost: 110, range: 2.3, damage: 16, cooldown: 1.5,  windup: 0.3,  projectileSpeed: 5.5, projectile: 'thorn',   splash: 0.9, hitsFlying: false, icon: '&#129440;', blurb: 'Lobs sticky goo that glues a crowd in place. Ground only.', effect: { root: 0.9 } },
+    druid:     { id: 'druid',     name: 'Cryo Beam',     cost: 90,  range: 2.9, damage: 5,  cooldown: 0.8,  windup: 0.2,  projectileSpeed: 9,   projectile: 'wisp',    splash: 0,   hitsFlying: true,  icon: '&#10052;',  blurb: 'Freezing bolts that slow. Reaches flyers.', effect: { chill: 2.2, chillMul: 0.55 } },
+    golem:     { id: 'golem',     name: 'Mech Walker',   cost: 130, range: 2.2, damage: 46, cooldown: 2.4,  windup: 0.45, projectileSpeed: 8,   projectile: 'boulder', splash: 0,   hitsFlying: false, icon: '&#129302;', blurb: 'Fires one huge rocket fist, slow to wind up. Ground only.' },
+    artillery: { id: 'artillery', name: 'Missile Pod',   cost: 120, range: 4.2, minRange: 1.4, damage: 15, cooldown: 2.4, windup: 0.35, projectileSpeed: 5, projectile: 'bigacorn', splash: 0.7, hitsFlying: true, icon: '&#128640;', blurb: 'Arcing missiles, far but not near. Splashes. Reaches flyers.' },
   };
   const TOWER_ORDER = ['slinger', 'warden', 'druid', 'golem', 'artillery'];
   // Tier 3 is a permanent choice between two specializations. Each is about
@@ -33,24 +33,24 @@ const GameState = (() => {
   // original engine's too; only names and blurbs are this game's.)
   const BRANCHES = {
     slinger: {
-      marksman: { name: 'Huntsman',     icon: '&#127919;', blurb: 'One slow, heavy spear that pierces armor.', damage: 5, cooldown: 1.7, range: 1.1, pierce: true },
-      bloom:    { name: 'Skirmisher',   icon: '&#9876;',   blurb: 'Fast throws at two targets. Weak vs armor.', damage: 1.25, cooldown: 0.6, range: 0.3, shots: 2 },
+      marksman: { name: 'Railgun',      icon: '&#127919;', blurb: 'One slow, heavy slug that pierces armor.', damage: 5, cooldown: 1.7, range: 1.1, pierce: true },
+      bloom:    { name: 'Twin Blaster', icon: '&#9889;',   blurb: 'Fast bolts at two targets. Weak vs armor.', damage: 1.25, cooldown: 0.6, range: 0.3, shots: 2 },
     },
     warden: {
-      thicket: { name: 'Tar Abbot',      icon: '&#9962;',   blurb: 'Wide pitch pools that glue a crowd for long.', damage: 1.3, cooldown: 1.0, range: 0.3, splash: 1.2, effect: { root: 1.4 } },
-      briarstorm: { name: 'Firepot Friar', icon: '&#128293;', blurb: 'Burning pitch blasts. Sticks only briefly.', damage: 3.4, cooldown: 0.8, range: 0.3, splash: 1.15, effect: { root: 0.4 } },
+      thicket: { name: 'Glue Bomber',    icon: '&#129514;', blurb: 'Wide goo puddles that glue a crowd for long.', damage: 1.3, cooldown: 1.0, range: 0.3, splash: 1.2, effect: { root: 1.4 } },
+      briarstorm: { name: 'Acid Mortar', icon: '&#9763;',   blurb: 'Fizzing acid blasts. Sticks only briefly.', damage: 3.4, cooldown: 0.8, range: 0.3, splash: 1.15, effect: { root: 0.4 } },
     },
     druid: {
-      hoarfrost: { name: 'Winter Magus', icon: '&#10052;', blurb: 'Frost bursts that slow a whole crowd.', damage: 1.2, cooldown: 0.95, range: 0.2, splash: 1.0, groundSplash: true, effect: { chill: 2.2, chillMul: 0.45 } },
-      seer: { name: 'Star Seer', icon: '&#10024;', blurb: 'Sharp star-bolts, long reach. Kills flyers.', damage: 5, cooldown: 0.7, range: 0.8, effect: { chill: 1.0, chillMul: 0.75 } },
+      hoarfrost: { name: 'Blizzard Array', icon: '&#127784;', blurb: 'Frost bursts that slow a whole crowd.', damage: 1.2, cooldown: 0.95, range: 0.2, splash: 1.0, groundSplash: true, effect: { chill: 2.2, chillMul: 0.45 } },
+      seer: { name: 'Ice Lance', icon: '&#129482;', blurb: 'Sharp ice spears, long reach. Kills flyers.', damage: 5, cooldown: 0.7, range: 0.8, effect: { chill: 1.0, chillMul: 0.75 } },
     },
     golem: {
-      earthshaker: { name: 'Thunder Knight', icon: '&#9889;', blurb: 'The hammer quakes the ground and staggers a crowd.', damage: 1.5, cooldown: 1, range: 0.3, splash: 1.0, effect: { root: 0.4 } },
-      mountainheart: { name: 'Armorbreaker', icon: '&#128737;', blurb: 'A crushing blow that ignores armor.', damage: 4.2, cooldown: 1.0, range: 0.3, pierce: true },
+      earthshaker: { name: 'Quake Stomper', icon: '&#128165;', blurb: 'The fist quakes the ground and staggers a crowd.', damage: 1.5, cooldown: 1, range: 0.3, splash: 1.0, effect: { root: 0.4 } },
+      mountainheart: { name: 'Hull Breaker', icon: '&#128297;', blurb: 'A crushing punch that ignores armor.', damage: 4.2, cooldown: 1.0, range: 0.3, pierce: true },
     },
     artillery: {
-      oakfall: { name: 'Fire Archers', icon: '&#9732;', blurb: 'A flaming volley with a huge blast. Slow.', damage: 3.2, cooldown: 1.2, range: 1.0, splash: 1.4, groundSplash: true },
-      squirrel: { name: 'Volley Captain', icon: '&#127993;', blurb: 'Three volleys at three targets. Small blasts.', damage: 1.3, cooldown: 0.75, range: 0.5, splash: 0.35, shots: 3 },
+      oakfall: { name: 'Big Boomer', icon: '&#9732;', blurb: 'One fat warhead with a huge blast. Slow.', damage: 3.2, cooldown: 1.2, range: 1.0, splash: 1.4, groundSplash: true },
+      squirrel: { name: 'Swarm Rockets', icon: '&#127878;', blurb: 'Three salvos at three targets. Small blasts.', damage: 1.3, cooldown: 0.75, range: 0.5, splash: 0.35, shots: 3 },
     },
   };
   // Tier progression. Tier 2 is a flat step up. Tier 3's stats here are only a
@@ -62,23 +62,26 @@ const GameState = (() => {
     { damage: 2.25, cooldown: 0.84, range: 0.5,  costMul: 1.3 },
   ];
   const SELL_REFUND = 0.6;
-  // The knaves. Role ids as above: grunt = Brigand, trickster = Cutpurse,
-  // troll = Black Knight, bat = Gargoyle. Three bosses close the campaign's
-  // acts: a ground boss the whole tower roster can hit, then two flyers.
+  // The invaders. Role ids as above: grunt = Blob Drone, trickster = Skitter
+  // Crawler, troll = Armored Brute, bat = Saucer Scout. Every level closes
+  // on a boss. Ground bosses walk or roll the road like everyone else, so
+  // every tower can hit them; flying bosses need the Cryo Beam and the
+  // Missile Pod.
   const ENEMY_TYPES = {
-    grunt:     { id: 'grunt',     name: 'Brigand',          hp: 30,  speed: 1.25, bounty: 8,   flying: false, armor: 0 },
-    trickster: { id: 'trickster', name: 'Cutpurse',         hp: 16,  speed: 2.3,  bounty: 6,   flying: false, armor: 0, wobble: true },
-    troll:     { id: 'troll',     name: 'Black Knight',     hp: 170, speed: 0.72, bounty: 25,  flying: false, armor: 4 },
-    bat:       { id: 'bat',       name: 'Gargoyle',         hp: 22,  speed: 1.75, bounty: 10,  flying: true,  armor: 0 },
-    ram:       { id: 'ram',       name: 'The Siege Ram',    hp: 1300, speed: 0.5,  bounty: 150, flying: false, armor: 5, boss: true },
-    stonelord: { id: 'stonelord', name: 'The Gargoyle Lord', hp: 520, speed: 0.78, bounty: 150, flying: true, armor: 1, boss: true },
-    dragon:    { id: 'dragon',    name: 'The Black Dragon', hp: 700, speed: 0.72, bounty: 200, flying: true,  armor: 2, boss: true },
-    giant:     { id: 'giant',     name: 'The Hill Giant',   hp: 1100, speed: 0.5,  bounty: 150, flying: false, armor: 3, boss: true },
-    ravens:    { id: 'ravens',    name: 'The Raven Host',   hp: 400, speed: 0.75, bounty: 150, flying: true,  armor: 0, boss: true },
-    wyvern:    { id: 'wyvern',    name: 'The Sea Wyvern',   hp: 500, speed: 0.8,  bounty: 160, flying: true,  armor: 1, boss: true },
-    siegetower: { id: 'siegetower', name: 'The Siege Tower', hp: 1900, speed: 0.42, bounty: 160, flying: false, armor: 4, boss: true },
-    warlock:   { id: 'warlock',   name: 'The Warlock',      hp: 370, speed: 0.72, bounty: 160, flying: true,  armor: 1, boss: true },
-    baron:     { id: 'baron',     name: 'The Black Baron',  hp: 1400, speed: 0.62, bounty: 200, flying: false, armor: 4, boss: true },
+    grunt:      { id: 'grunt',      name: 'Blob Drone',      hp: 30,  speed: 1.25, bounty: 8,   flying: false, armor: 0 },
+    trickster:  { id: 'trickster',  name: 'Skitter Crawler', hp: 16,  speed: 2.3,  bounty: 6,   flying: false, armor: 0, wobble: true },
+    troll:      { id: 'troll',      name: 'Armored Brute',   hp: 170, speed: 0.72, bounty: 25,  flying: false, armor: 4 },
+    bat:        { id: 'bat',        name: 'Saucer Scout',    hp: 22,  speed: 1.75, bounty: 10,  flying: true,  armor: 0 },
+    drilltank:  { id: 'drilltank',  name: 'The Drill Tank',  hp: 1300, speed: 0.5,  bounty: 150, flying: false, armor: 5, boss: true },
+    gloopking:  { id: 'gloopking',  name: 'The Gloop King',  hp: 900, speed: 0.52, bounty: 140, flying: false, armor: 2, boss: true },
+    hivequeen:  { id: 'hivequeen',  name: 'The Hive Queen',  hp: 1100, speed: 0.5,  bounty: 150, flying: false, armor: 3, boss: true },
+    manta:      { id: 'manta',      name: 'The Sky Manta',   hp: 700, speed: 0.72, bounty: 200, flying: true,  armor: 2, boss: true },
+    sandworm:   { id: 'sandworm',   name: 'The Sand Worm',   hp: 1500, speed: 0.48, bounty: 160, flying: false, armor: 3, boss: true },
+    sporecloud: { id: 'sporecloud', name: 'The Spore Cloud', hp: 400, speed: 0.75, bounty: 150, flying: true,  armor: 0, boss: true },
+    tripod:     { id: 'tripod',     name: 'The Tripod',      hp: 1300, speed: 0.52, bounty: 160, flying: false, armor: 4, boss: true },
+    harvester:  { id: 'harvester',  name: 'The Harvester',   hp: 1900, speed: 0.42, bounty: 160, flying: false, armor: 4, boss: true },
+    brain:      { id: 'brain',      name: 'The Big Brain',   hp: 370, speed: 0.72, bounty: 160, flying: true,  armor: 1, boss: true },
+    mothership: { id: 'mothership', name: 'The Mothership',  hp: 900, speed: 0.6,  bounty: 220, flying: true,  armor: 2, boss: true },
   };
 
   // Difficulty tiers. Meadow is the game as tuned: every multiplier is 1 and
@@ -89,8 +92,8 @@ const GameState = (() => {
   // draft (hp 1.25, speed 1.1, gold 0.85, 15 lives, bounty 0.9) lost all 200
   // runs by wave 9. These numbers win 192 of 300 (AGENTS.md P3-D1).
   const DIFFICULTY = {
-    meadow:  { id: 'meadow',  name: 'Squire',  hp: 1,    speed: 1, gold: 1, lives: null, bounty: 1 },
-    bramble: { id: 'bramble', name: 'Knight', hp: 1.05, speed: 1, gold: 1, lives: 16,   bounty: 0.95 },
+    meadow:  { id: 'meadow',  name: 'Cadet',  hp: 1,    speed: 1, gold: 1, lives: null, bounty: 1 },
+    bramble: { id: 'bramble', name: 'Veteran', hp: 1.05, speed: 1, gold: 1, lives: 16,   bounty: 0.95 },
   };
   let difficulty = DIFFICULTY.meadow;
 
@@ -108,8 +111,8 @@ const GameState = (() => {
     cost: { grunt: 1, trickster: 0.8, troll: 5, bat: 1.6 },
     gap: { grunt: 0.85, trickster: 0.55, troll: 2.1, bat: 0.95 },
     weight: { grunt: 4, trickster: 3, troll: 2, bat: 2 },
-    bosses: ['ram', 'stonelord', 'dragon'],
-    names: ['The Baron sends more', 'More boots on the road', 'A thicker rabble', 'The long dusk', 'Torches in the dark', 'No end in sight', 'The war camps empty', 'Another push', 'Fresh from Blackmoor', 'The roads fill up'],
+    bosses: ['drilltank', 'sporecloud', 'manta'],
+    names: ['The pods keep landing', 'More goo on the road', 'A thicker swarm', 'The long moon night', 'Lights in the sky', 'No end in sight', 'The hive empties', 'Another push', 'Fresh from orbit', 'The roads fill up'],
   };
   let endless = false, refBudget = 1;
   const genCache = new Map();
@@ -418,7 +421,7 @@ const GameState = (() => {
       return { ok: true, c, r, tower };
     }
     let reason = null;
-    if (isPath(c, r)) reason = "Can't build on the road, the knaves march there.";
+    if (isPath(c, r)) reason = "Can't build on the road, the invaders crawl there.";
     else if (isStream(c, r)) reason = "Can't build in the water.";
     else if (isBastion(c, r)) reason = `That's ${level.endpoint.name}. Build around it.`;
     else if (isSpawn(c, r)) reason = level.spawnBlockedText;

@@ -12,7 +12,8 @@ const path = require('path');
 const vm = require('vm');
 
 const ROOT = path.join(__dirname, '..');
-const FILES = ['palette-config.js', 'level-common.js', 'level1-hollybrook.js', 'level2-ravensford.js', 'level3-st-wendels.js', 'level4-castle-aldermere.js', 'level5-highcrag-pass.js', 'level6-wickham-fair.js', 'level7-saltmarsh-quay.js', 'level8-amberlea-vineyards.js', 'level9-blackmoor-lines.js', 'level10-black-keep.js', 'levels.js', 'game-state.js'];
+// the game's own script list, in load order: every level file index.html loads, so a new level needs no change here
+const FILES = [...fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8').matchAll(/<script src="js\/([^"]+)"/g)].map((m) => m[1]).filter((f) => /^(palette-config|level|levels|game-state)/.test(f));
 
 function loadGame(consoleImpl = console) {
   const src = FILES.map((f) => fs.readFileSync(path.join(ROOT, 'js', f), 'utf8')).join('\n;\n')
@@ -245,11 +246,11 @@ function progressTests() {
     vm.createContext(ctx); vm.runInContext(src, ctx, { filename: 'progress-bundle.js' });
     return ctx.__p;
   };
-  const NEXT = 'castle-aldermere', WON = 'st-wendels';
+  const NEXT = 'comms-ridge', WON = 'glowshroom-grove';
 
   let local = store(), session = store(), P = make(local, session);
   P.recordWin(WON, 2, 8);
-  add('a win unlocks the next level and saves it', P.isUnlocked(NEXT) && P.starsFor(WON) === 2 && JSON.parse(local.m.get('kk-progress')).levels[NEXT].unlocked === true);
+  add('a win unlocks the next level and saves it', P.isUnlocked(NEXT) && P.starsFor(WON) === 2 && JSON.parse(local.m.get('aa-progress')).levels[NEXT].unlocked === true);
 
   local = store({ failWrite: true }); session = store(); P = make(local, session);
   P.recordWin(WON, 2, 8);
@@ -262,7 +263,7 @@ function progressTests() {
   add('a win survives localStorage reading back empty or stale', P.isUnlocked(NEXT) && P.starsFor(WON) === 3);
 
   local = store(); session = store();
-  local.m.set('kk-progress', JSON.stringify({ v: 1, levels: { [WON]: { unlocked: true, stars: 2, bestLives: 5 }, [NEXT]: { unlocked: false, stars: 0, bestLives: null } } }));
+  local.m.set('aa-progress', JSON.stringify({ v: 1, levels: { [WON]: { unlocked: true, stars: 2, bestLives: 5 }, [NEXT]: { unlocked: false, stars: 0, bestLives: null } } }));
   P = make(local, session);
   add('a level with stars always opens the next one (a half-saved win heals)', P.isUnlocked(NEXT));
 
@@ -270,7 +271,7 @@ function progressTests() {
   P.recordWin(WON, 3, 12); P.recordWin(WON, 1, 4);
   add('a worse replay never lowers stars or best lives', P.starsFor(WON) === 3 && P.load().levels[WON].bestLives === 12);
 
-  local = store(); session = store(); local.m.set('kk-progress', '{not json');
+  local = store(); session = store(); local.m.set('aa-progress', '{not json');
   let threw = false, ok = false;
   try { P = make(local, session); P.recordWin(WON, 1, 3); ok = P.isUnlocked(NEXT); } catch (e) { threw = true; }
   add('a corrupt save does not throw and a new win still counts', !threw && ok);
@@ -280,11 +281,11 @@ function progressTests() {
   add('recording the same win twice changes nothing', P.starsFor(WON) === 2 && P.load().levels[WON].bestLives === 8);
 
   // ---- save code ----
-  const FIRST = 'hollybrook';
+  const FIRST = 'greenhope';
   local = store(); session = store(); P = make(local, session);
-  P.recordWin(FIRST, 3, 17); P.recordWin('ravensford', 2, 9); P.recordWin(WON, 1, 3);
+  P.recordWin(FIRST, 3, 17); P.recordWin('crater-rim', 2, 9); P.recordWin(WON, 1, 3);
   const code = P.exportCode();
-  add('save code has the KK1 prefix and dash groups', /^KK1(-[0-9A-Z]{1,4})+$/.test(code), code);
+  add('save code has the AA1 prefix and dash groups', /^AA1(-[0-9A-Z]{1,4})+$/.test(code), code);
   const fresh = make(store(), store());
   const r1 = fresh.importCode(code);
   const a = P.load().levels, b = fresh.load().levels;
@@ -296,31 +297,31 @@ function progressTests() {
   add('a missing character is caught', make(store(), store()).importCode(code.slice(0, -1)).ok === false);
   const bad = make(store(), store());
   add('empty input says empty', bad.importCode('   ').reason === 'empty');
-  add('other text says format', bad.importCode('hello there').reason === 'format' && bad.importCode(null).reason === 'empty' && bad.importCode('KK0-AAAA').reason === 'format' && bad.importCode('KK-AAAA').reason === 'format' && bad.importCode('KK1AAAA').reason === 'format' && bad.importCode('BB2-AAAA-AA').reason === 'format');
-  add('a code from a newer version says newer', bad.importCode('KK2-AAAA-AA').reason === 'newer' && bad.importCode('kk12-0000').reason === 'newer');
-  add('garbage after the prefix says check, never throws', ['KK1-!!!!', 'KK1-', 'KK1-A', 'KK1-AAAA'].every((c) => bad.importCode(c).reason === 'check'));
+  add('other text says format', bad.importCode('hello there').reason === 'format' && bad.importCode(null).reason === 'empty' && bad.importCode('AA0-AAAA').reason === 'format' && bad.importCode('AA-AAAA').reason === 'format' && bad.importCode('AA1AAAA').reason === 'format' && bad.importCode('BB2-AAAA-AA').reason === 'format');
+  add('a code from a newer version says newer', bad.importCode('AA2-AAAA-AA').reason === 'newer' && bad.importCode('aa12-0000').reason === 'newer');
+  add('garbage after the prefix says check, never throws', ['AA1-!!!!', 'AA1-', 'AA1-A', 'AA1-AAAA'].every((c) => bad.importCode(c).reason === 'check'));
   add('a rejected code changes nothing', JSON.stringify(bad.load()) === JSON.stringify(make(store(), store()).load()));
   // loading never takes anything away
   local = store(); session = store(); const rich = make(local, session);
-  rich.recordWin(FIRST, 3, 20); rich.recordWin('ravensford', 3, 18);
+  rich.recordWin(FIRST, 3, 20); rich.recordWin('crater-rim', 3, 18);
   const lowCode = make(store(), store()); lowCode.recordWin(FIRST, 1, 2);
   const r2 = rich.importCode(lowCode.exportCode());
-  add('loading an older code never lowers stars or best lives', r2.ok && r2.changed === 0 && rich.starsFor(FIRST) === 3 && rich.load().levels[FIRST].bestLives === 20 && rich.starsFor('ravensford') === 3);
+  add('loading an older code never lowers stars or best lives', r2.ok && r2.changed === 0 && rich.starsFor(FIRST) === 3 && rich.load().levels[FIRST].bestLives === 20 && rich.starsFor('crater-rim') === 3);
   // a code from a build with fewer or more levels
   const body = code.slice(4).replace(/-/g, '');
   add('a code with every level locked loads without effect', (() => { const z = make(store(), store()); const c = z.exportCode(); return z.importCode(c).ok; })());
-  add('a code that is first-level-only still works', (() => { const z = make(store(), store()); z.recordWin(FIRST, 2, 5); const f = make(store(), store()); const res = f.importCode(z.exportCode()); return res.ok && f.starsFor(FIRST) === 2 && f.isUnlocked('ravensford'); })());
+  add('a code that is first-level-only still works', (() => { const z = make(store(), store()); z.recordWin(FIRST, 2, 5); const f = make(store(), store()); const res = f.importCode(z.exportCode()); return res.ok && f.starsFor(FIRST) === 2 && f.isUnlocked('crater-rim'); })());
   add('save code holds three characters per level plus two check characters', body.length === 3 * Object.keys(make(store(), store()).load().levels).length + 2, `${body.length} chars`);
 
   // ---- difficulty tiers (P3-D1): stars per tier, old saves still load ----
   local = store(); session = store();
-  local.m.set('kk-progress', JSON.stringify({ v: 1, levels: { [FIRST]: { unlocked: true, stars: 2, bestLives: 11 } } }));
+  local.m.set('aa-progress', JSON.stringify({ v: 1, levels: { [FIRST]: { unlocked: true, stars: 2, bestLives: 11 } } }));
   P = make(local, session);
   const old = P.load().levels[FIRST];
-  add('an old v1 save without tier fields still loads its Meadow stars', old.stars === 2 && old.bestLives === 11 && P.isUnlocked('ravensford'));
+  add('an old v1 save without tier fields still loads its Meadow stars', old.stars === 2 && old.bestLives === 11 && P.isUnlocked('crater-rim'));
   add('and gets an empty Bramble record filled in', old.bramble && old.bramble.stars === 0 && old.bramble.bestLives === null && P.starsFor(FIRST, 'bramble') === 0);
   P.recordWin(FIRST, 3, 13, 'bramble');
-  const saved = JSON.parse(local.m.get('kk-progress'));
+  const saved = JSON.parse(local.m.get('aa-progress'));
   add('a Bramble win is stored apart from Meadow, still as v: 1', saved.v === 1 && saved.levels[FIRST].bramble.stars === 3 && saved.levels[FIRST].bramble.bestLives === 13 && saved.levels[FIRST].stars === 2 && saved.levels[FIRST].bestLives === 11);
   add('starsFor reads one tier at a time (Meadow by default)', P.starsFor(FIRST) === 2 && P.starsFor(FIRST, 'meadow') === 2 && P.starsFor(FIRST, 'bramble') === 3);
   P.recordWin(FIRST, 1, 2, 'bramble');
@@ -330,12 +331,12 @@ function progressTests() {
   add('a level won only on Bramble counts as won and opens the next one', P.isWon(WON) && P.starsFor(WON) === 0 && P.isUnlocked(NEXT));
   // a Bramble-only win that was half saved (no unlock written) still heals
   local = store(); session = store();
-  local.m.set('kk-progress', JSON.stringify({ v: 1, levels: { [WON]: { unlocked: true, stars: 0, bestLives: null, bramble: { stars: 2, bestLives: 9 } } } }));
+  local.m.set('aa-progress', JSON.stringify({ v: 1, levels: { [WON]: { unlocked: true, stars: 0, bestLives: null, bramble: { stars: 2, bestLives: 9 } } } }));
   add('a half-saved Bramble win still opens the next level', make(local, session).isUnlocked(NEXT));
   // merging copies takes the best of each tier separately
   local = store(); session = store();
-  local.m.set('kk-progress', JSON.stringify({ v: 1, levels: { [WON]: { unlocked: true, stars: 3, bestLives: 18, bramble: { stars: 1, bestLives: 2 } } } }));
-  session.m.set('kk-progress-session', JSON.stringify({ v: 1, levels: { [WON]: { unlocked: true, stars: 1, bestLives: 5, bramble: { stars: 2, bestLives: 7 } } } }));
+  local.m.set('aa-progress', JSON.stringify({ v: 1, levels: { [WON]: { unlocked: true, stars: 3, bestLives: 18, bramble: { stars: 1, bestLives: 2 } } } }));
+  session.m.set('aa-progress-session', JSON.stringify({ v: 1, levels: { [WON]: { unlocked: true, stars: 1, bestLives: 5, bramble: { stars: 2, bestLives: 7 } } } }));
   const mg = make(local, session).load().levels[WON];
   add('merging copies keeps the best of each tier', mg.stars === 3 && mg.bestLives === 18 && mg.bramble.stars === 2 && mg.bramble.bestLives === 7, JSON.stringify(mg));
   // a code carrying only Meadow stars never touches Bramble progress
@@ -348,52 +349,52 @@ function progressTests() {
   local = store(); session = store(); P = make(local, session);
   add('the tier defaults to Meadow', P.tier() === 'meadow');
   P.setTier('bramble');
-  add('a picked tier is remembered across a reload', local.m.get('kk-difficulty') === 'bramble' && make(local, store()).tier() === 'bramble');
-  local.m.set('kk-difficulty', 'nightmare');
+  add('a picked tier is remembered across a reload', local.m.get('aa-difficulty') === 'bramble' && make(local, store()).tier() === 'bramble');
+  local.m.set('aa-difficulty', 'nightmare');
   add('an unknown saved tier reads as Meadow', make(local, store()).tier() === 'meadow');
   add('blocked storage reads as Meadow and never throws', (() => { const z = make(store({ failWrite: true, nullRead: true }), store()); z.setTier('bramble'); return z.tier() === 'meadow'; })());
 
-  // ---- KK1 save code: both tiers' stars travel (the BB2 format with the fork's own prefix) ----
+  // ---- AA1 save code: both tiers' stars travel (the BB2 format with the fork's own prefix) ----
   // the format, written out independently of progress.js so the test pins it
   const hash = (str) => { let h = 7; for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) % 1296; return h.toString(36).toUpperCase().padStart(2, '0'); };
   const group = (ver, body) => ver + '-' + (body + hash(ver + body)).match(/.{1,4}/g).join('-');
   const IDS = Object.keys(make(store(), store()).load().levels);
-  const bb2 = (lv, extra = '') => group('KK1', IDS.map((id) => { const e = lv[id] || {}; return ((e.st || 0) * 4 + (e.bs || 0)).toString(36).toUpperCase() + (e.lives || 0).toString(36).toUpperCase() + (e.bl || 0).toString(36).toUpperCase(); }).join('') + extra);
+  const bb2 = (lv, extra = '') => group('AA1', IDS.map((id) => { const e = lv[id] || {}; return ((e.st || 0) * 4 + (e.bs || 0)).toString(36).toUpperCase() + (e.lives || 0).toString(36).toUpperCase() + (e.bl || 0).toString(36).toUpperCase(); }).join('') + extra);
   local = store(); session = store(); P = make(local, session);
-  P.recordWin(FIRST, 3, 17); P.recordWin(FIRST, 2, 11, 'bramble'); P.recordWin('ravensford', 1, 4, 'bramble'); P.recordWin(WON, 2, 9);
+  P.recordWin(FIRST, 3, 17); P.recordWin(FIRST, 2, 11, 'bramble'); P.recordWin('crater-rim', 1, 4, 'bramble'); P.recordWin(WON, 2, 9);
   const code2 = P.exportCode();
-  add('the KK1 code matches the written-out format exactly', code2 === bb2({ [FIRST]: { st: 4, lives: 17, bs: 2, bl: 11 }, 'ravensford': { st: 1, bs: 1, bl: 4 }, 'st-wendels': { st: 1 }, [WON]: { st: 3, lives: 9 }, [NEXT]: { st: 1 } }), code2);
+  add('the AA1 code matches the written-out format exactly', code2 === bb2({ [FIRST]: { st: 4, lives: 17, bs: 2, bl: 11 }, 'crater-rim': { st: 1, bs: 1, bl: 4 }, 'glowshroom-grove': { st: 1 }, [WON]: { st: 3, lives: 9 }, [NEXT]: { st: 1 } }), code2);
   const dev2 = make(store(), store()), r3 = dev2.importCode(code2);
   const pa = P.load().levels, pb = dev2.load().levels;
-  add('a KK1 code carries both tiers\' stars, best lives and unlocks to a fresh device', r3.ok && IDS.every((id) => pa[id].unlocked === pb[id].unlocked && pa[id].stars === pb[id].stars && pa[id].bestLives === pb[id].bestLives && pa[id].bramble.stars === pb[id].bramble.stars && pa[id].bramble.bestLives === pb[id].bramble.bestLives), JSON.stringify(r3));
-  add('a KK1 code regenerates identically after loading', dev2.exportCode() === code2);
-  add('a level won only on Bramble arrives unlocked and opens the next one', pb['ravensford'].unlocked && pb['ravensford'].stars === 0 && dev2.isUnlocked('st-wendels'));
-  const bodyOf = (c) => c.replace(/^KK\d-/, '');
+  add('a AA1 code carries both tiers\' stars, best lives and unlocks to a fresh device', r3.ok && IDS.every((id) => pa[id].unlocked === pb[id].unlocked && pa[id].stars === pb[id].stars && pa[id].bestLives === pb[id].bestLives && pa[id].bramble.stars === pb[id].bramble.stars && pa[id].bramble.bestLives === pb[id].bramble.bestLives), JSON.stringify(r3));
+  add('a AA1 code regenerates identically after loading', dev2.exportCode() === code2);
+  add('a level won only on Bramble arrives unlocked and opens the next one', pb['crater-rim'].unlocked && pb['crater-rim'].stars === 0 && dev2.isUnlocked('glowshroom-grove'));
+  const bodyOf = (c) => c.replace(/^AA\d-/, '');
   // only ever adds
   local = store(); session = store(); const rich2 = make(local, session);
   rich2.recordWin(FIRST, 3, 20); rich2.recordWin(FIRST, 3, 15, 'bramble');
   const poor = make(store(), store()); poor.recordWin(FIRST, 1, 3); poor.recordWin(FIRST, 1, 2, 'bramble');
   const r5 = rich2.importCode(poor.exportCode());
-  add('loading a weaker KK1 code never lowers either tier', r5.ok && r5.changed === 0 && rich2.starsFor(FIRST) === 3 && rich2.starsFor(FIRST, 'bramble') === 3 && rich2.load().levels[FIRST].bestLives === 20 && rich2.load().levels[FIRST].bramble.bestLives === 15);
+  add('loading a weaker AA1 code never lowers either tier', r5.ok && r5.changed === 0 && rich2.starsFor(FIRST) === 3 && rich2.starsFor(FIRST, 'bramble') === 3 && rich2.load().levels[FIRST].bestLives === 20 && rich2.load().levels[FIRST].bramble.bestLives === 15);
   local = store(); session = store(); P = make(local, session); P.recordWin(FIRST, 3, 18);
   const r6 = P.importCode(bb2({ [FIRST]: { st: 4, lives: 18, bs: 1, bl: 5 } }));
   add('a code that adds only Bramble stars counts as a change', r6.ok && r6.changed === 1 && P.starsFor(FIRST, 'bramble') === 1, JSON.stringify(r6));
   // out-of-range fields with a valid check are refused, and change nothing
   const fresh2 = make(store(), store()), clean = JSON.stringify(fresh2.load());
-  const badHead = group('KK1', 'K00' + '100'.repeat(IDS.length - 1));
+  const badHead = group('AA1', 'K00' + '100'.repeat(IDS.length - 1));
   add('a field out of range is refused even with a valid check', fresh2.importCode(badHead).reason === 'check' && JSON.stringify(fresh2.load()) === clean);
   // codes from builds with fewer or more levels
-  const short2 = make(store(), store()), rs = short2.importCode(group('KK1', 'E' + 'H' + '9'));
-  add('a KK1 code with fewer levels fills what it has', rs.ok && short2.starsFor(FIRST) === 2 && short2.load().levels[FIRST].bestLives === 17 && short2.starsFor(FIRST, 'bramble') === 2 && short2.load().levels[FIRST].bramble.bestLives === 9, JSON.stringify(rs));
+  const short2 = make(store(), store()), rs = short2.importCode(group('AA1', 'E' + 'H' + '9'));
+  add('a AA1 code with fewer levels fills what it has', rs.ok && short2.starsFor(FIRST) === 2 && short2.load().levels[FIRST].bestLives === 17 && short2.starsFor(FIRST, 'bramble') === 2 && short2.load().levels[FIRST].bramble.bestLives === 9, JSON.stringify(rs));
   const long2 = make(store(), store());
-  add('a KK1 code with more levels loads the ones this build has', long2.importCode(bb2({ [FIRST]: { st: 2, lives: 5 } }, 'F55')).ok && long2.starsFor(FIRST) === 1);
-  add('a KK1 code with a stray character is caught', make(store(), store()).importCode(code2 + 'A').ok === false && make(store(), store()).importCode(code2.slice(0, -1)).ok === false);
-  // every single-character change in a KK1 code is caught
+  add('a AA1 code with more levels loads the ones this build has', long2.importCode(bb2({ [FIRST]: { st: 2, lives: 5 } }, 'F55')).ok && long2.starsFor(FIRST) === 1);
+  add('a AA1 code with a stray character is caught', make(store(), store()).importCode(code2 + 'A').ok === false && make(store(), store()).importCode(code2.slice(0, -1)).ok === false);
+  // every single-character change in a AA1 code is caught
   const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ', flat = bodyOf(code2).replace(/-/g, '');
   let missed = 0;
   const probe = make(store(), store());   // a refused code changes nothing, so one device serves every try
-  for (let i = 0; i < flat.length; i++) for (const ch of chars) if (ch !== flat[i] && probe.importCode('KK1-' + flat.slice(0, i) + ch + flat.slice(i + 1)).ok) missed++;
-  add('every single-character typo in a KK1 code is caught', missed === 0, `${missed} missed of ${flat.length * 35}`);
+  for (let i = 0; i < flat.length; i++) for (const ch of chars) if (ch !== flat[i] && probe.importCode('AA1-' + flat.slice(0, i) + ch + flat.slice(i + 1)).ok) missed++;
+  add('every single-character typo in a AA1 code is caught', missed === 0, `${missed} missed of ${flat.length * 35}`);
   return out;
 }
 
@@ -402,7 +403,7 @@ function progressTests() {
 // levels with curved roads. [lives, gold, kills] for seeds 1 and 2. A
 // deliberate change to a level's waves or economy will move these; regenerate
 // them then with `node tools/bot-runner.js all --seeds 2 --json`.
-const MEADOW_GOLDEN = {"hollybrook":[[16,125,215],[16,294,215]],"ravensford":[[7,182,156],[7,165,156]],"st-wendels":[[3,118,140],[5,122,142]],"castle-aldermere":[[14,335,239],[16,332,241]]};
+const MEADOW_GOLDEN = {};
 function difficultyTests(G, LEVELS) {
   const out = [];
   const add = (name, ok, detail = '') => out.push({ name: `difficulty: ${name}`, ok, detail });

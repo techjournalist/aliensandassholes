@@ -34,7 +34,7 @@ const RendererFX = (() => {
   // Blight: the level's corruption falloff is re-evaluated per pixel (same
   // formula as GameState.zoneFalloff, but continuous instead of per tile),
   // and where it's strong the ground splits into dark cracks that smolder
-  // with a faint ember glow (the Baron's war camps burn what they cross).
+  // with a faint acid-lime glow (the alien goo eats what it spreads over).
   function patchGround(material, zone, timeUniform) {
     material.onBeforeCompile = (shader) => {
       shader.uniforms.uTime = timeUniform;
@@ -50,7 +50,7 @@ const RendererFX = (() => {
           float fxFine = fxFbm(vFxWorld.xz * 3.4 + 7.3);
           float fxStroke = fxNoise(vec2(vFxWorld.x * 7.0 + vFxWorld.z * 2.0, vFxWorld.z * 1.4));
           diffuseColor.rgb *= 0.85 + 0.26 * fxBroad + 0.14 * (fxFine - 0.5) + 0.07 * (fxStroke - 0.5);
-          diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 1.05, 0.86), smoothstep(0.58, 0.82, fxBroad));
+          diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.94, 1.06, 1.1), smoothstep(0.58, 0.82, fxBroad));
           vec2 fxCell = vec2(vFxWorld.x + uZone2.z * 0.5 - 0.5, vFxWorld.z + uZone2.w * 0.5 - 0.5);
           vec2 fxD = (fxCell - uZone.xy) / uZone.zw;
           float fxH = clamp((uZone2.x - length(fxD)) / uZone2.y, 0.0, 1.0);
@@ -59,7 +59,7 @@ const RendererFX = (() => {
           float fxCore = (1.0 - smoothstep(0.0, 0.03, fxCr)) * smoothstep(0.3, 0.75, fxH);
           diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 0.4, fxCrack);`)
         .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
-          totalEmissiveRadiance += vec3(1.0, 0.42, 0.12) * (fxCrack * 0.25 + fxCore * 0.6) * (0.55 + 0.45 * sin(uTime * 1.7 + vFxWorld.x * 1.3 + vFxWorld.z));`);
+          totalEmissiveRadiance += vec3(0.55, 1.0, 0.25) * (fxCrack * 0.25 + fxCore * 0.6) * (0.55 + 0.45 * sin(uTime * 1.7 + vFxWorld.x * 1.3 + vFxWorld.z));`);
     };
     material.customProgramCacheKey = () => 'fx-ground';
     return material;
@@ -153,11 +153,11 @@ const RendererFX = (() => {
   // Ambient motes: GPU-animated points (fireflies blink and wander, spores
   // and embers rise, leaves tumble down, dust drifts). One draw call each.
   const MOTE_KINDS = {
-    fireflies: { color: 0xfff1a0, size: 0.11, additive: true },
-    spores:    { color: 0xb07ae0, size: 0.09, additive: true },
-    embers:    { color: 0xffa04a, size: 0.08, additive: true },
-    leaves:    { color: 0xd9953c, size: 0.12, additive: false },
-    dust:      { color: 0xe8dcc0, size: 0.06, additive: false },
+    fireflies: { color: 0x8ffff0, size: 0.11, additive: true },
+    spores:    { color: 0xd58cff, size: 0.09, additive: true },
+    embers:    { color: 0x9dff4a, size: 0.08, additive: true },
+    leaves:    { color: 0xff8fd8, size: 0.12, additive: false },
+    dust:      { color: 0xdcd0f4, size: 0.06, additive: false },
   };
   function motes(kind, positions, scaleUniform, timeUniform) {
     const spec = MOTE_KINDS[kind];

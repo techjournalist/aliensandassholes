@@ -145,8 +145,8 @@ const UI = (() => {
   }
 
   // Onboarding: one tip at a time, anchored to the thing to tap next.
-  const coachDone = (k) => { try { return localStorage.getItem('kk-coach-' + k) === '1'; } catch (e) { return false; } };
-  const coachMark = (k) => { try { localStorage.setItem('kk-coach-' + k, '1'); } catch (e) { /* storage may be blocked */ } };
+  const coachDone = (k) => { try { return localStorage.getItem('aa-coach-' + k) === '1'; } catch (e) { return false; } };
+  const coachMark = (k) => { try { localStorage.setItem('aa-coach-' + k, '1'); } catch (e) { /* storage may be blocked */ } };
   function tipState() {
     const s = GameState.state;
     if (s.phase !== 'playing' || s.paused) return null;
@@ -552,8 +552,8 @@ const UI = (() => {
     // this level once, so the reload should drop them straight into play,
     // not replay the title screen and world map a second time.
     try {
-      sessionStorage.setItem('kk-active-level', id);
-      sessionStorage.setItem('kk-enter-play', '1');
+      sessionStorage.setItem('aa-active-level', id);
+      sessionStorage.setItem('aa-enter-play', '1');
     } catch (e) { /* ignore */ }
     location.reload();
   }
@@ -617,7 +617,7 @@ const UI = (() => {
       wb.addEventListener('click', send);
     }
     let skipToPlay = false;
-    try { skipToPlay = sessionStorage.getItem('kk-enter-play') === '1'; sessionStorage.removeItem('kk-enter-play'); } catch (e) { /* ignore */ }
+    try { skipToPlay = sessionStorage.getItem('aa-enter-play') === '1'; sessionStorage.removeItem('aa-enter-play'); } catch (e) { /* ignore */ }
     if (skipToPlay) GameState.startGame(); else $('title').classList.add('show');
     $('start-btn').addEventListener('click', () => { Audio.unlock(); goFullscreen(); $('title').classList.remove('show'); enterWorldMap(); });
     const pickNode = (e) => {
@@ -738,7 +738,7 @@ const UI = (() => {
     });
     const syncMute = () => { const m = Audio.isMuted(); $('mute-btn').classList.toggle('muted', m); $('mute-btn').querySelector('.icon').innerHTML = m ? '&#128263;' : '&#128266;'; $('mute-btn').setAttribute('aria-label', m ? 'Sound off' : 'Sound on'); };
     $('mute-btn').addEventListener('click', () => { Audio.unlock(); Audio.setMuted(!Audio.isMuted()); syncMute(); });
-    try { if (localStorage.getItem('kk-muted') === '1') { Audio.setMuted(true); } } catch (e) { /* ignore */ }
+    try { if (localStorage.getItem('aa-muted') === '1') { Audio.setMuted(true); } } catch (e) { /* ignore */ }
     syncMute();
 
     // ---- settings: master mute, effects and music each get a switch and a volume ----
@@ -757,7 +757,7 @@ const UI = (() => {
       syncMute();
     }
     // the camera buttons in the top bar can be hidden; the choice is saved (keys and gestures stay on)
-    const CAMUI_KEY = 'kk-camui';
+    const CAMUI_KEY = 'aa-camui';
     function setCamUi(show, save) {
       document.body.classList.toggle('hide-camui', !show);
       setChecked($('set-camui'), show);
@@ -773,7 +773,7 @@ const UI = (() => {
     // the first battle on a touch screen names the gestures once
     GameState.on('gameStarted', () => {
       if (!touchFirst) return;
-      try { if (localStorage.getItem('kk-gesture-hint')) return; localStorage.setItem('kk-gesture-hint', '1'); } catch (e) { /* show it anyway */ }
+      try { if (localStorage.getItem('aa-gesture-hint')) return; localStorage.setItem('aa-gesture-hint', '1'); } catch (e) { /* show it anyway */ }
       setTimeout(() => toast('Pinch to zoom. Two fingers: twist to turn, slide up or down to tilt.', false, 6000), 1200);
     });
     $('set-camui').addEventListener('click', () => { Audio.unlock(); setCamUi(document.body.classList.contains('hide-camui'), true); try { Audio.sfx.select(); } catch (e) { /* audio is optional */ } });
@@ -861,7 +861,7 @@ const UI = (() => {
     }
     function closeGuide() {
       guideEl.classList.remove('show');
-      try { localStorage.setItem('kk-guide-seen', '1'); } catch (e) { /* storage may be blocked */ }
+      try { localStorage.setItem('aa-guide-seen', '1'); } catch (e) { /* storage may be blocked */ }
     }
     $('guide-next').addEventListener('click', () => { try { Audio.sfx.select(); } catch (e) { /* audio is optional */ } if (gStep === slides.length - 1) closeGuide(); else showStep(gStep + 1); });
     $('guide-back').addEventListener('click', () => showStep(gStep - 1));
@@ -879,7 +879,7 @@ const UI = (() => {
     // the first press of Raise the Banners opens it over the map (never under automation)
     $('start-btn').addEventListener('click', () => {
       let seen = true;
-      try { seen = localStorage.getItem('kk-guide-seen') === '1'; } catch (e) { /* treat as seen */ }
+      try { seen = localStorage.getItem('aa-guide-seen') === '1'; } catch (e) { /* treat as seen */ }
       if (!seen && !navigator.webdriver) openGuide();
     });
     window.addEventListener('keydown', (e) => {

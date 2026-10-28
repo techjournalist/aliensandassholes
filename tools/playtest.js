@@ -3,7 +3,7 @@ const { chromium } = (() => { try { return require('playwright'); } catch (e) { 
 const fs = require('fs');
 const path = require('path');
 const LEVEL_FIXTURES = require('./level-fixtures.js');
-const F1 = LEVEL_FIXTURES.hollybrook;
+const F1 = LEVEL_FIXTURES.greenhope;
 const THREE_LOCAL = process.env.THREE_LOCAL || path.join(__dirname, '..', 'node_modules/three/build/three.min.js');
 const PAGE = 'file://' + path.resolve(__dirname, '..', 'index.html') + '?debug=1';
 const OUT = path.join(__dirname, 'shots');
@@ -70,13 +70,13 @@ async function enterLevel(page, levelId) {
   await page.screenshot({ path: `${OUT}/title.png` });
   check('title screen shows on load', await page.locator('#title').isVisible());
   check('game does not run behind the title', (await S(page)).wave === 0 && await page.evaluate(() => GameState.state.phase === 'title'));
-  await enterLevel(page, 'hollybrook');
+  await enterLevel(page, 'greenhope');
   check('start button + world map begins play', await page.evaluate(() => GameState.state.phase === 'playing'));
   // sound: mute toggle persists, ticks fire in the last prep seconds
   const mb = await page.locator('#mute-btn').boundingBox();
   check('mute button is a 44px target', mb && mb.height >= 44 && mb.width >= 44);
   await page.locator('#mute-btn').click(); await page.waitForTimeout(100);
-  check('mute toggles and persists', await page.evaluate(() => Audio.isMuted() && localStorage.getItem('kk-muted') === '1'));
+  check('mute toggles and persists', await page.evaluate(() => Audio.isMuted() && localStorage.getItem('aa-muted') === '1'));
   await page.locator('#mute-btn').click(); await page.waitForTimeout(100);
   check('unmute toggles back', await page.evaluate(() => !Audio.isMuted()));
   const ticks = await page.evaluate(() => { const S = GameState.state; let n = 0; GameState.on('prepTick', () => n++); S.wave = 1; S.prep = 3.5; for (let i = 0; i < 60 * 4 && S.prep > 0; i++) GameState.update(1 / 60); const started = S.waveActive; S.waveActive = false; S.schedule = []; S.waveQueue = []; S.enemies.length = 0; S.wave = 0; S.prep = 0; return { n, started }; });
@@ -141,7 +141,7 @@ async function enterLevel(page, levelId) {
   const mus = await page.evaluate(async () => {
     const r = {};
     for (const [st, secs] of [['calm', 8], ['combat', 8], ['boss', 8], ['end', 2]]) {
-      const { buffer } = await Audio.renderMusic(st, secs, 'hollybrook');
+      const { buffer } = await Audio.renderMusic(st, secs, 'greenhope');
       const d = buffer.getChannelData(0); let peak = 0, sum = 0, bad = 0;
       for (let i = 0; i < d.length; i++) { const v = d[i]; if (v !== v) bad++; peak = Math.max(peak, Math.abs(v)); sum += v * v; }
       r[st] = { peak: +peak.toFixed(3), rms: +Math.sqrt(sum / d.length).toFixed(4), bad };
@@ -157,7 +157,7 @@ async function enterLevel(page, levelId) {
   await page.locator('#settings-btn').click(); await page.waitForTimeout(250);
   check('settings gear opens Settings and pauses the game', await page.evaluate(() => document.getElementById('settings').classList.contains('show') && GameState.state.paused));
   await page.locator('#set-music').click();
-  const a1 = await page.evaluate(() => ({ s: Audio.getSettings(), saved: JSON.parse(localStorage.getItem('kk-audio') || '{}'), sw: document.getElementById('set-music').getAttribute('aria-checked') }));
+  const a1 = await page.evaluate(() => ({ s: Audio.getSettings(), saved: JSON.parse(localStorage.getItem('aa-audio') || '{}'), sw: document.getElementById('set-music').getAttribute('aria-checked') }));
   check('music switch turns music off without touching effects, and saves it', a1.s.musicOn === false && a1.s.sfxOn === true && a1.saved.musicOn === false && a1.sw === 'false', JSON.stringify(a1.s));
   await page.locator('#set-music').click();
   await page.locator('#set-sfx').click();
@@ -174,18 +174,18 @@ async function enterLevel(page, levelId) {
   const camShown = () => page.evaluate((ids) => ids.map((id) => getComputedStyle(document.getElementById(id)).display !== 'none'), camIds);
   check('Settings has a Camera buttons switch, on by default, with the buttons showing', (await page.locator('#set-camui').getAttribute('aria-checked')) === 'true' && (await page.locator('#set-camui').boundingBox()).height >= 44 && (await camShown()).every(Boolean));
   await page.locator('#set-camui').click(); await page.waitForTimeout(150);
-  check('switching it off hides every camera button and saves the choice', (await camShown()).every((v) => !v) && (await page.locator('#set-camui').getAttribute('aria-checked')) === 'false' && await page.evaluate(() => localStorage.getItem('kk-camui')) === '0');
+  check('switching it off hides every camera button and saves the choice', (await camShown()).every((v) => !v) && (await page.locator('#set-camui').getAttribute('aria-checked')) === 'false' && await page.evaluate(() => localStorage.getItem('aa-camui')) === '0');
   await page.keyboard.press('e');
   await page.waitForFunction(() => !Renderer.viewTurning(), null, { timeout: 30000 }).catch(() => {});
   check('the camera keys still work with the buttons hidden', await page.evaluate(() => Renderer.viewIndex()) === 1);
   await page.keyboard.press('q');
   await page.waitForFunction(() => !Renderer.viewTurning(), null, { timeout: 30000 }).catch(() => {});
   await page.locator('#set-camui').click(); await page.waitForTimeout(150);
-  check('switching it back on shows the buttons again and saves it', (await camShown()).every(Boolean) && await page.evaluate(() => localStorage.getItem('kk-camui')) === '1' && await page.evaluate(() => Renderer.viewIndex()) === 0);
+  check('switching it back on shows the buttons again and saves it', (await camShown()).every(Boolean) && await page.evaluate(() => localStorage.getItem('aa-camui')) === '1' && await page.evaluate(() => Renderer.viewIndex()) === 0);
   // save code: campaign progress as text; typing in it must never reach the game's hotkeys
   await page.locator('#savecode-btn').click(); await page.waitForTimeout(200);
   const sc0 = await page.evaluate(() => { const o = document.getElementById('savecode-out'); return { open: document.getElementById('savecode').classList.contains('show'), code: o.value, fits: o.scrollWidth <= o.clientWidth && o.scrollHeight <= o.clientHeight + 1, h: ['savecode-copy', 'savecode-load', 'savecode-done', 'savecode-in', 'savecode-out'].map((id) => document.getElementById(id).getBoundingClientRect().height) }; });
-  check('Settings opens a Save code panel with a KK1 code and 44px controls', sc0.open && /^KK1-/.test(sc0.code) && sc0.h.every((v) => v >= 44), JSON.stringify(sc0));
+  check('Settings opens a Save code panel with a AA1 code and 44px controls', sc0.open && /^AA1-/.test(sc0.code) && sc0.h.every((v) => v >= 44), JSON.stringify(sc0));
   check('the whole save code shows in its box, with no scrolling', sc0.fits, JSON.stringify(sc0));
   const viewBefore = await page.evaluate(() => Renderer.viewIndex());
   await page.locator('#savecode-in').click(); await page.keyboard.type('eq0 -+[]f', { delay: 5 });
@@ -196,12 +196,12 @@ async function enterLevel(page, levelId) {
   const scTypo = scCode.slice(0, 6) + (scCode[6] === '2' ? '3' : '2') + scCode.slice(7);
   await page.fill('#savecode-in', scTypo); await page.locator('#savecode-load').click();
   check('a mistyped code is caught and changes nothing', (await page.locator('#savecode-msg').innerText()).includes("doesn't match") && await page.evaluate((c) => Progress.exportCode() === c, scCode));
-  await page.fill('#savecode-in', 'KK2-ABCD-EF'); await page.locator('#savecode-load').click();
+  await page.fill('#savecode-in', 'AA2-ABCD-EF'); await page.locator('#savecode-load').click();
   check('a code from a newer version says so and changes nothing', (await page.locator('#savecode-msg').innerText()).includes('newer version') && await page.evaluate((c) => Progress.exportCode() === c, scCode));
-  // a hand-built KK1 code (Level 1 open, the rest locked: adds nothing to this run) loads
+  // a hand-built AA1 code (Level 1 open, the rest locked: adds nothing to this run) loads
   const kkHash = (str) => { let h = 7; for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) % 1296; return h.toString(36).toUpperCase().padStart(2, '0'); };
   const kkBody = '400' + '000'.repeat(await page.evaluate(() => LEVELS.length - 1));
-  await page.fill('#savecode-in', 'KK1-' + (kkBody + kkHash('KK1' + kkBody)).match(/.{1,4}/g).join('-')); await page.locator('#savecode-load').click();
+  await page.fill('#savecode-in', 'AA1-' + (kkBody + kkHash('AA1' + kkBody)).match(/.{1,4}/g).join('-')); await page.locator('#savecode-load').click();
   check('a valid code that adds nothing loads and changes nothing', (await page.locator('#savecode-msg').innerText()).includes('nothing new') && await page.evaluate((c) => Progress.exportCode() === c, scCode));
   // a Briar & Bastion code belongs to a different campaign
   await page.fill('#savecode-in', 'BB2-4000-0000'); await page.locator('#savecode-load').click();
@@ -279,7 +279,7 @@ async function enterLevel(page, levelId) {
   check('rotate buttons are 44px targets', await page.evaluate(() => ['rot-left-btn', 'rot-right-btn'].every((id) => { const r = document.getElementById(id).getBoundingClientRect(); return r.width >= 44 && r.height >= 44; })));
   const gate0 = await page.evaluate(() => Renderer.worldToScreen(GameState.gate.x, 0, GameState.gate.z));
   await page.locator('#rot-right-btn').click(); await turned();
-  const v1 = await page.evaluate(() => ({ idx: Renderer.viewIndex(), cam: Renderer.debugCamera(), saved: localStorage.getItem('kk-view'), gate: Renderer.worldToScreen(GameState.gate.x, 0, GameState.gate.z) }));
+  const v1 = await page.evaluate(() => ({ idx: Renderer.viewIndex(), cam: Renderer.debugCamera(), saved: localStorage.getItem('aa-view'), gate: Renderer.worldToScreen(GameState.gate.x, 0, GameState.gate.z) }));
   check('the clockwise button turns to the next view and remembers it', v1.idx === 1 && Math.abs(v1.cam.deg - 90) < 1e-6 && v1.saved === '1', JSON.stringify({ idx: v1.idx, deg: v1.cam.deg, saved: v1.saved }));
   const vp = page.viewportSize();
   check('the Bastion moves clockwise on screen (bottom right to bottom left)', gate0.x > vp.width / 2 && v1.gate.x < gate0.x && v1.gate.y > vp.height / 2 - 40, JSON.stringify({ from: gate0, to: v1.gate }));
@@ -306,7 +306,7 @@ async function enterLevel(page, levelId) {
     return !!sel && sel.kind === 'tile' && sel.c === 11 && sel.r === 4;
   })());
   await page.evaluate(() => GameState.clearSelection && GameState.clearSelection());
-  check('the view ends back at the default so later checks are unaffected', await page.evaluate(() => Renderer.viewIndex() === 0 && localStorage.getItem('kk-view') === '0'));
+  check('the view ends back at the default so later checks are unaffected', await page.evaluate(() => Renderer.viewIndex() === 0 && localStorage.getItem('aa-view') === '0'));
 
   // ---- P3-V15: zoom and pan ----
   const lookNow = () => page.evaluate(() => Renderer.debugLook());
@@ -372,7 +372,7 @@ async function enterLevel(page, levelId) {
   for (let i = 0; i < 25; i++) await page.locator('#tilt-up-btn').click();
   await tiltDone();
   check('the camera cannot go higher than 80 degrees, and picking is right there too', Math.abs((await camNow()).tilt - 80) < 1e-6 && await pickOk());
-  check('the tilt is remembered', await page.evaluate(() => localStorage.getItem('kk-tilt')) === '80');
+  check('the tilt is remembered', await page.evaluate(() => localStorage.getItem('aa-tilt')) === '80');
   await page.keyboard.press('0'); await tiltDone();
   const tr = await camNow();
   check('the 0 key puts the tilt (and its fog distance) back to the start', Math.abs(tr.tilt - t0.tilt) < 0.01 && Math.abs(tr.fogNear - t0.fogNear) < 0.01, JSON.stringify({ tr, t0 }));
@@ -401,7 +401,7 @@ async function enterLevel(page, levelId) {
   check('turning the view keeps the tilt, and picking is right in the turned, tilted view', Math.abs((await camNow()).tilt - 44) < 1e-6 && await pickOk());
   await page.locator('#rot-left-btn').click(); await turned();
   await page.keyboard.press('0'); await tiltDone(); await page.keyboard.press('0'); await settled();
-  check('tilt ends back at the default so later checks are unaffected', Math.abs((await camNow()).tilt - 50) < 1e-6 && await page.evaluate(() => localStorage.getItem('kk-tilt')) === '50');
+  check('tilt ends back at the default so later checks are unaffected', Math.abs((await camNow()).tilt - 50) < 1e-6 && await page.evaluate(() => localStorage.getItem('aa-tilt')) === '50');
   await page.evaluate(() => GameState.clearSelection && GameState.clearSelection());
 
   // wave: start, watch goblins walk, let them all leak
@@ -722,45 +722,45 @@ async function enterLevel(page, levelId) {
   check('win screen offers Continue now that the next level is unlocked', (await page.locator('#end-map-btn').innerText()) === 'Continue');
   await page.locator('#end-map-btn').click(); await page.waitForTimeout(250);
   check('Continue jumps straight to the world map, no title-screen detour', await page.locator('#worldmap').isVisible() && !(await page.locator('#title').isVisible()));
-  check('Continue pre-selects the next level', await page.evaluate(() => document.querySelector('.wm-node.selected')?.dataset.level) === 'ravensford');
+  check('Continue pre-selects the next level', await page.evaluate(() => document.querySelector('.wm-node.selected')?.dataset.level) === 'crater-rim');
   // ---- P3-M3a overworld: positions from level data, blight recedes, roads show progress ----
   check('world-map nodes sit where each level\'s map data puts them', await page.evaluate(() => LEVELS.every((lv) => {
     const n = document.querySelector(`.wm-node[data-level="${lv.id}"]`);
     return n && lv.map && n.getAttribute('transform') === `translate(${lv.map.x}, ${lv.map.y})`;
   })));
   const wm1 = await page.evaluate(() => ({
-    cut: !!document.querySelector('#wm-cuts .wm-cut[data-level="hollybrook"]'),
-    otherCuts: document.querySelectorAll('#wm-cuts .wm-cut:not([data-level="hollybrook"])').length,
-    seg: document.querySelector('.wm-seg[data-from="hollybrook"][data-to="ravensford"]')?.getAttribute('class'),
+    cut: !!document.querySelector('#wm-cuts .wm-cut[data-level="greenhope"]'),
+    otherCuts: document.querySelectorAll('#wm-cuts .wm-cut:not([data-level="greenhope"])').length,
+    seg: document.querySelector('.wm-seg[data-from="greenhope"][data-to="ravensford"]')?.getAttribute('class'),
     next: document.querySelector('.wm-node.next')?.dataset.level,
   }));
   check('winning Level 1 cuts its ground out of the blight, and only its ground', wm1.cut && wm1.otherCuts === 0, JSON.stringify(wm1));
-  check('the road to the next battle is open and that node is marked next', /\bopen\b/.test(wm1.seg || '') && wm1.next === 'ravensford', JSON.stringify(wm1));
+  check('the road to the next battle is open and that node is marked next', /\bopen\b/.test(wm1.seg || '') && wm1.next === 'crater-rim', JSON.stringify(wm1));
   // the recession is time-based (a requestAnimationFrame loop, ~1.1s of real
   // time), not frame-based; wait for it to finish rather than sleeping a fixed
   // time. Under headless CPU contention rAF ticks can go sparse for seconds at
   // a stretch (observed directly: r plateaus, then jumps straight to full on
   // the next tick), so this margin is generous on purpose, not a fixed cost.
-  await page.waitForFunction(() => { const c = document.querySelector('#wm-cuts .wm-cut[data-level="hollybrook"]'); return c && +c.getAttribute('r') >= 109.5; }, null, { timeout: 20000 }).catch(() => {});
-  const cutR = await page.evaluate(() => ({ r: +document.querySelector('#wm-cuts .wm-cut[data-level="hollybrook"]').getAttribute('r'), full: LEVELS.find((l) => l.id === 'hollybrook').map.reclaim }));
+  await page.waitForFunction(() => { const c = document.querySelector('#wm-cuts .wm-cut[data-level="greenhope"]'); return c && +c.getAttribute('r') >= 109.5; }, null, { timeout: 20000 }).catch(() => {});
+  const cutR = await page.evaluate(() => ({ r: +document.querySelector('#wm-cuts .wm-cut[data-level="greenhope"]').getAttribute('r'), full: LEVELS.find((l) => l.id === 'greenhope').map.reclaim }));
   check('the blight finishes receding to the level\'s reclaim radius', Math.abs(cutR.r - cutR.full) <= 0.5, JSON.stringify(cutR));
   await page.evaluate(() => { document.getElementById('worldmap').classList.remove('show'); });
 
   // ---- progress persistence: the win must survive a reload, via localStorage ----
   check('the win recorded stars to localStorage', await page.evaluate((expected) => {
-    try { const d = JSON.parse(localStorage.getItem('kk-progress')); return d && d.levels['hollybrook'] && d.levels['hollybrook'].stars >= expected; } catch (e) { return false; }
+    try { const d = JSON.parse(localStorage.getItem('aa-progress')); return d && d.levels['greenhope'] && d.levels['greenhope'].stars >= expected; } catch (e) { return false; }
   }, mixed.stars));
   await page.reload();
   await page.waitForTimeout(1000);
   await page.locator('#start-btn').click(); await page.waitForTimeout(300);
-  const litStars = await page.locator('.wm-node[data-level="hollybrook"] .wm-star.lit').count();
+  const litStars = await page.locator('.wm-node[data-level="greenhope"] .wm-star.lit').count();
   check('world map reflects saved stars after reload', litStars === mixed.stars, `lit=${litStars} expected=${mixed.stars}`);
   check('an unrecognized level id is never "unlocked"', await page.evaluate(() => Progress.isUnlocked('does-not-exist') === false));
-  try { await page.evaluate(() => sessionStorage.setItem('kk-active-level', 'does-not-exist')); } catch (e) { /* ignore */ }
+  try { await page.evaluate(() => sessionStorage.setItem('aa-active-level', 'does-not-exist')); } catch (e) { /* ignore */ }
   await page.reload();
   await page.waitForTimeout(1000);
-  check('an unknown active-level id falls back to the first level', await page.evaluate(() => GameState.currentLevel().id === 'hollybrook'));
-  await enterLevel(page, 'hollybrook');
+  check('an unknown active-level id falls back to the first level', await page.evaluate(() => GameState.currentLevel().id === 'greenhope'));
+  await enterLevel(page, 'greenhope');
 
   for (const type of ['slinger', 'warden', 'druid', 'golem', 'artillery']) for (const pick of [0, 1]) {
     const br = Object.keys(BRANCH_KEYS[type])[pick];
@@ -924,7 +924,7 @@ async function enterLevel(page, levelId) {
   page = await ctx.newPage();
   watch(page, log);
   // a save from before tiers existed (no bramble fields), plus Level 1 won on Bramble
-  await page.addInitScript(() => { if (!sessionStorage.getItem('tier-seeded')) { sessionStorage.setItem('tier-seeded', '1'); localStorage.setItem('kk-progress', JSON.stringify({ v: 1, levels: { 'hollybrook': { unlocked: true, stars: 3, bestLives: 18, bramble: { stars: 2, bestLives: 9 } }, 'ravensford': { unlocked: true, stars: 2, bestLives: 10 } } })); } });
+  await page.addInitScript(() => { if (!sessionStorage.getItem('tier-seeded')) { sessionStorage.setItem('tier-seeded', '1'); localStorage.setItem('aa-progress', JSON.stringify({ v: 1, levels: { 'greenhope': { unlocked: true, stars: 3, bestLives: 18, bramble: { stars: 2, bestLives: 9 } }, 'crater-rim': { unlocked: true, stars: 2, bestLives: 10 } } })); } });
   await page.goto(PAGE);
   await page.waitForTimeout(1500);
   check('tiers: a fresh visit starts on Meadow with the level\'s own gold and lives', await page.evaluate(() => GameState.state.difficulty === 'meadow' && GameState.state.lives === 20 && GameState.state.gold === GameState.currentLevel().startGold));
@@ -932,16 +932,16 @@ async function enterLevel(page, levelId) {
   const tierBoxes = await page.evaluate(() => ['meadow', 'bramble'].map((t) => { const r = document.querySelector(`.tier-btn[data-tier="${t}"]`).getBoundingClientRect(); return { w: r.width, h: r.height, bottom: r.bottom }; }).concat([(() => { const r = document.getElementById('wm-play-btn').getBoundingClientRect(); return { w: r.width, h: r.height, bottom: r.bottom }; })()]));
   check('tiers: the picker sits beside Play, every button 44px and on screen at 844x390', tierBoxes.every((b) => b.w >= 44 && b.h >= 44 && b.bottom <= 390) && await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), JSON.stringify(tierBoxes));
   check('tiers: Meadow is checked by default', (await page.locator('.tier-btn[data-tier="meadow"]').getAttribute('aria-checked')) === 'true');
-  check('tiers: a level beaten on Bramble shows the thorn ring, others do not', await page.evaluate(() => !!document.querySelector('.wm-node[data-level="hollybrook"] .wm-thorn') && !document.querySelector('.wm-node[data-level="ravensford"] .wm-thorn')));
-  check('tiers: an old save without tier fields keeps its Meadow stars', await page.evaluate(() => Progress.starsFor('ravensford') === 2 && Progress.starsFor('ravensford', 'bramble') === 0));
+  check('tiers: a level beaten on Bramble shows the thorn ring, others do not', await page.evaluate(() => !!document.querySelector('.wm-node[data-level="greenhope"] .wm-thorn') && !document.querySelector('.wm-node[data-level="ravensford"] .wm-thorn')));
+  check('tiers: an old save without tier fields keeps its Meadow stars', await page.evaluate(() => Progress.starsFor('crater-rim') === 2 && Progress.starsFor('crater-rim', 'bramble') === 0));
   await page.locator('.tier-btn[data-tier="bramble"]').tap(); await page.waitForTimeout(200);
-  const br = await page.evaluate(() => ({ checked: document.querySelector('.tier-btn[data-tier="bramble"]').getAttribute('aria-checked'), saved: localStorage.getItem('kk-difficulty'), s: GameState.state.difficulty, lives: GameState.state.lives, gold: GameState.state.gold, want: Math.round(GameState.currentLevel().startGold * GameState.DIFFICULTY.bramble.gold), wantLives: GameState.DIFFICULTY.bramble.lives, lit: document.querySelectorAll('.wm-node[data-level="hollybrook"] .wm-star.lit').length }));
+  const br = await page.evaluate(() => ({ checked: document.querySelector('.tier-btn[data-tier="bramble"]').getAttribute('aria-checked'), saved: localStorage.getItem('aa-difficulty'), s: GameState.state.difficulty, lives: GameState.state.lives, gold: GameState.state.gold, want: Math.round(GameState.currentLevel().startGold * GameState.DIFFICULTY.bramble.gold), wantLives: GameState.DIFFICULTY.bramble.lives, lit: document.querySelectorAll('.wm-node[data-level="greenhope"] .wm-star.lit').length }));
   check('tiers: tapping Bramble picks it, saves it and applies it to the waiting level', br.checked === 'true' && br.saved === 'bramble' && br.s === 'bramble' && br.lives === br.wantLives && br.gold === br.want, JSON.stringify(br));
   check('tiers: node stars follow the picked tier', br.lit === 2, JSON.stringify(br));
   await page.reload(); await page.waitForTimeout(1500);
   check('tiers: the picked tier is remembered after a reload', await page.evaluate(() => GameState.state.difficulty === 'bramble' && GameState.state.lives === GameState.DIFFICULTY.bramble.lives));
   await page.locator('#start-btn').click(); await page.waitForTimeout(300);
-  await page.locator('.wm-node[data-level="hollybrook"]').tap(); await page.waitForTimeout(150);
+  await page.locator('.wm-node[data-level="greenhope"]').tap(); await page.waitForTimeout(150);
   await page.locator('#wm-play-btn').tap(); await page.waitForTimeout(300);
   check('tiers: the HUD lives pill marks a Bramble battle', await page.evaluate(() => GameState.state.phase === 'playing' && document.getElementById('hud-lives').parentElement.classList.contains('bramble')));
   await page.evaluate(() => GameState.pause()); await page.waitForTimeout(150);
@@ -951,9 +951,9 @@ async function enterLevel(page, levelId) {
   await page.evaluate(() => { document.getElementById('pause').classList.remove('show'); GameState.resume(); });
   // a Bramble win goes to the Bramble record only
   await page.evaluate(() => { GameState.state.lives = 14; GameState.state.phase = 'won'; GameState.emit('gameWon'); });
-  check('tiers: a Bramble win is stored as Bramble stars and leaves Meadow stars alone', await page.evaluate(() => Progress.starsFor('hollybrook', 'bramble') === 3 && Progress.starsFor('hollybrook') === 3 && Progress.load().levels['hollybrook'].bestLives === 18 && Progress.load().levels['hollybrook'].bramble.bestLives === 14));
+  check('tiers: a Bramble win is stored as Bramble stars and leaves Meadow stars alone', await page.evaluate(() => Progress.starsFor('greenhope', 'bramble') === 3 && Progress.starsFor('greenhope') === 3 && Progress.load().levels['greenhope'].bestLives === 18 && Progress.load().levels['greenhope'].bramble.bestLives === 14));
   // Level 1: Meadow 3 stars (state 4) and Bramble 3 stars give 4 * 4 + 3 = J, then 18 and 14 lives in base 36
-  check('tiers: the KK1 save code carries the Bramble stars', await page.evaluate(() => Progress.exportCode().startsWith('KK1-JIE')), await page.evaluate(() => Progress.exportCode()));
+  check('tiers: the AA1 save code carries the Bramble stars', await page.evaluate(() => Progress.exportCode().startsWith('AA1-JIE')), await page.evaluate(() => Progress.exportCode()));
   await page.locator('#end.show').waitFor({ timeout: 10000 }).catch(() => {});
   check('tiers: the Bramble win screen says so', await page.evaluate(() => document.getElementById('end').classList.contains('show') && document.getElementById('end-ribbon-text').textContent === 'Knight won!'));
   await page.screenshot({ path: `${OUT}/tiers-bramble-win.png` });
@@ -974,9 +974,9 @@ async function enterLevel(page, levelId) {
   const sb = await page.locator('#start-btn').boundingBox();
   check('start button fits on a phone', sb && sb.y + sb.height <= 390 && sb.height >= 44, JSON.stringify(sb));
   await page.locator('#start-btn').click(); await page.waitForTimeout(250);
-  const wmNode = await page.locator('.wm-node[data-level="hollybrook"]').boundingBox();
+  const wmNode = await page.locator('.wm-node[data-level="greenhope"]').boundingBox();
   check('world map node is a touch target', wmNode && wmNode.height >= 44);
-  await page.locator('.wm-node[data-level="hollybrook"]').click(); await page.waitForTimeout(150);
+  await page.locator('.wm-node[data-level="greenhope"]').click(); await page.waitForTimeout(150);
   const wmPlay = await page.locator('#wm-play-btn').boundingBox();
   check('world map play button fits on a phone', wmPlay && wmPlay.height >= 44);
   await page.locator('#wm-play-btn').click(); await page.waitForTimeout(300);

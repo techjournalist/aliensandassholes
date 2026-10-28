@@ -3,89 +3,109 @@
 // Level-agnostic only: grid size, path, waves, etc. live per-level in
 // js/level*.js (see js/levels.js for the registry).
 //
-// Knights & Knaves: a sunny storybook kingdom in royal blue, heraldic red
-// and gold, limestone castles and thatched villages. The "hollow*" keys are
-// the engine's danger-zone colors; here they are the ravaged land around
-// the Black Baron's war camps: ash, char and smoking embers.
+// Aliens & Assholes: a little farming colony on a far moon. Teal moonmoss,
+// lilac dust roads, violet rock and neon crystal outcrops under an indigo
+// sky; the colony itself is white hull plating with teal trim and warm
+// windows. The engine's "hollow*" keys are its danger-zone colors; here
+// they are the crust of alien goo that spreads out of every landing pod,
+// dark violet with an acid-lime glow.
+// The key names are the engine's (meadow, wood, acorn and so on); the
+// comments say what each one paints in this game.
 // ===================================================================
 const PALETTE = {
-  backdrop:     0x34452e,
-  meadow:       0x7fae4e,
-  meadowDark:   0x67963f,
-  meadowLight:  0x96c466,
-  earth:        0x6b4a2b,
-  path:         0xc2a174,
-  pathEdge:     0xa6875a,
-  cobble:       0x9a968c,
-  cobbleDark:   0x7a766e,
-  stone:        0xa8a397,     // pale limestone, the kingdom's building stone
-  stoneDark:    0x7c786e,
-  moss:         0x7aa652,
-  wood:         0x7d5230,
-  woodLight:    0xa8763f,
-  water:        0x4fa3c9,
-  waterDeep:    0x3b86ad,
-  waterFoam:    0xd8f3fb,
-  streamBed:    0x4a6f7a,
-  gold:         0xe8b84a,
-  cream:        0xf3e8d0,
-  skin:         0xf2c8a0,
-  tunic:        0x2f5d9e,     // royal blue: the King's livery
-  capRed:       0xc23b32,     // heraldic red
-  capBrown:     0x9c4a34,
-  acorn:        0x9c6b3c,     // light leather
-  acornCap:     0x6b4423,     // dark leather
-  flowerPink:   0xe58ab8,
-  flowerYellow: 0xf7d35e,
-  magic:        0x8a5cd6,     // royal purple: the Court Magus and every specialization burst
-  magicGlow:    0x9f7ff0,
-  // the ravaged land around the Baron's camps
-  hollowGround: 0x5e564d,
-  hollowEarth:  0x3e3833,
-  hollowPath:   0x6e6458,
-  hollowWood:   0x3b3330,
-  hollowRock:   0x85807a,
-  spore:        0xd9632a,     // embers
-  // the knaves
-  goblin:       0x8a6a4a,     // brigand rags and leather
-  goblinDark:   0x5a4430,
-  bat:          0x7d7f86,     // gargoyle stone
-  batDark:      0x55575e,
-  batWing:      0x6a6c74,     // gargoyle wing membrane
-  trickster:    0x7a3f5e,     // cutpurse plum
-  tricksterDark: 0x522a3f,
-  troll:        0x3f434c,     // black-knight plate
-  trollDark:    0x2a2d33,
-  cloak:        0x4e6b3a,     // yeoman green
-  cloakDark:    0x34492a,
-  frost:        0x9fdcf0,
-  frostRobe:    0xdfeef5,
-  outline:      0x1b1410,
+  backdrop:     0x1d1838,     // the indigo sky at the edge of the world
+  meadow:       0x3aa89a,     // teal moonmoss
+  meadowDark:   0x2a8a84,
+  meadowLight:  0x5fd0b8,
+  earth:        0x47386a,     // violet regolith under the moss
+  path:         0xcab8e6,     // lilac dust roads
+  pathEdge:     0xa492c6,
+  cobble:       0x9ea8bf,     // colony deck plating near the domes
+  cobbleDark:   0x78829c,
+  stone:        0x9a92ba,     // moon rock
+  stoneDark:    0x6c6690,
+  moss:         0x56c79e,
+  wood:         0x5c5080,     // composite struts, posts and frames
+  woodLight:    0x8a7cb4,
+  water:        0x3ce4d2,     // glowing irrigation water
+  waterDeep:    0x1fa2b2,
+  waterFoam:    0xdcfff7,
+  streamBed:    0x24546c,
+  gold:         0xffc84a,     // credits, highlights and trim
+  cream:        0xf4f0fc,
+  skin:         0xf2c8a0,     // the colonists
+  tunic:        0x2bb3a8,     // colony teal: the uniform and the flags
+  capRed:       0xff5d73,     // neon coral accents
+  capBrown:     0xc0567a,
+  acorn:        0x9a6ac0,     // soft violet gear (straps, pads, satchels)
+  acornCap:     0x5e4482,
+  flowerPink:   0xff6fd8,
+  flowerYellow: 0xffe36e,
+  magic:        0xb45cff,     // neon purple: the cryo coils, every specialization burst
+  magicGlow:    0xd58cff,
+  // the alien goo crust around the landing pods
+  hollowGround: 0x3a2350,
+  hollowEarth:  0x26163c,
+  hollowPath:   0x5c3d7a,
+  hollowWood:   0x2e1e46,
+  hollowRock:   0x6c5a8e,
+  spore:        0x9dff4a,     // acid-lime alien glow
+  // the invaders
+  goblin:       0x8fe04c,     // blob drone lime
+  goblinDark:   0x55a02c,
+  bat:          0xbfc7dc,     // saucer scout hull
+  batDark:      0x7c84a0,
+  batWing:      0x9aa2be,
+  trickster:    0xd64ad6,     // skitter crawler magenta
+  tricksterDark: 0x8a2a96,
+  troll:        0x5e4c8e,     // armored brute shell
+  trollDark:    0x3a2e5e,
+  cloak:        0x2f6f9a,     // missile crew blue
+  cloakDark:    0x1f4a6a,
+  frost:        0x9ff0ff,
+  frostRobe:    0xe2f6ff,
+  outline:      0x150f24,
   windowWarm:   0xffd36b,
   shadow:       0x000000,
-  straw:        0xd8b04e,
-  autumn:       0xd9822b,
-  autumnDark:   0xa8561f,
-  canvas:       0xe9dcc0,
-  pine:         0x2f5548,
-  snow:         0xeef4f2,
-  // medieval additions
-  steel:        0xb7bcc4,
-  steelDark:    0x7e848e,
-  plaster:      0xeee2c4,
-  timber:       0x4a3426,
-  roofTile:     0xb5543a,
-  thatch:       0xc79c4a,
-  slate:        0x5b6170,
-  pitch:        0x24201e,
+  straw:        0xe8c25a,     // ripe crops and hay bales
+  autumn:       0xff9a4a,
+  autumnDark:   0xc8602a,
+  canvas:       0xeae4f6,
+  pine:         0x245a6a,
+  snow:         0xeef6ff,
+  // colony hardware
+  steel:        0xc4ccdc,
+  steelDark:    0x7e88a2,
+  plaster:      0xeef1f8,     // white hull panels
+  timber:       0x3e3a5e,     // dark panel seams
+  roofTile:     0xff8a4c,     // hazard orange roofs and stripes
+  thatch:       0x48c0b0,     // teal solar roofs
+  slate:        0x4c5280,
+  pitch:        0x2a1c3e,     // goo-cannon goo, dark
   ember:        0xff8a3d,
-  baron:        0x221d24,     // the Black Baron's colors: black...
-  baronRed:     0x9e2a2a,     // ...and blood red
-  habit:        0x7a5a3a,     // friar brown
-  heraldWhite:  0xf1ece0,
-  dragon:       0x7a2f2f,
-  dragonBelly:  0xd9a25a,
-  dragonWing:   0x4e1f24,
+  baron:        0x2a1c40,     // the invaders' colors: deep violet...
+  baronRed:     0x9dff4a,     // ...and acid lime
+  habit:        0x6a7aa0,     // mech and cannon gunmetal
+  heraldWhite:  0xf2f4fa,
+  dragon:       0x3a6ad8,     // sky manta
+  dragonBelly:  0x9ff0ff,
+  dragonWing:   0x6a3ad0,
+  // new for this game
+  glass:        0xbff4ff,     // dome glass
+  neon:         0x39f0ff,     // cyan running lights
+  crystal:      0xc77dff,     // violet crystal outcrops
+  crystalTeal:  0x45f0d8,
+  hull:         0xe6eaf4,
+  hullDark:     0xa4aec8,
+  hazard:       0xffa53d,
+  solar:        0x3a4c9a,
+  goo:          0x9dff4a,
+  gooDark:      0x4c9a24,
+  visor:        0xff9a3d,     // colonists' orange visors
+  sand:         0xe4c08a,
+  sandDark:     0xb88c5a,
+  ice:          0xcdf4ff,
+  lava:         0xff4fd0,     // the plasma rift's hot pink
 };
 
 const CONFIG = {
