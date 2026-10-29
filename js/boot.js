@@ -8,6 +8,9 @@
   }
   let activeId = null;
   try { activeId = sessionStorage.getItem('aa-active-level'); } catch (e) { /* storage may be blocked */ }
+  // a level switch also writes the id into the hash (see UI's level switch)
+  const hashId = location.hash.replace(/^#/, '').replace(/-go$/, '');
+  if (LEVELS.some((l) => l.id === hashId)) activeId = hashId;
   const level = LEVELS.find((l) => l.id === activeId) || LEVELS[0];
   // the difficulty tier the player last picked on the world map (Meadow by default)
   try { GameState.setDifficulty(Progress.tier()); } catch (e) { /* stay on Meadow */ }
@@ -26,7 +29,23 @@
   const governor = !navigator.webdriver && !/[?&]gov=0\b/.test(location.search);
   let govSlow = 0, govFast = 0;
   let last = performance.now();
+  // A thrown error inside one frame must not stop the loop (a frozen
+  // battlefield looks like a level that never loaded): report it once on
+  // screen and keep going.
+  let reported = false;
+  function report(err) {
+    if (reported) return; reported = true;
+    console.error(err);
+    const el = document.getElementById('run-error');
+    if (el) { el.querySelector('code').textContent = String(err && (err.stack || err.message) || err).split('\n').slice(0, 3).join('\n'); el.classList.add('show'); }
+  }
+  window.addEventListener('error', (e) => report(e.error || e.message));
+  canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); report('The graphics context was lost. Reload the page to continue.'); });
   function frame(now) {
+    try { step(now); } catch (err) { report(err); }
+    requestAnimationFrame(frame);
+  }
+  function step(now) {
     const raw = now - last;
     const dt = Math.min(0.05, raw / 1000);
     last = now;
@@ -48,7 +67,6 @@
     Renderer.render(GameState.state.time, GameState.state.paused ? 0 : gdt);
     UI.frame(dt);
     Audio.update(dt);
-    requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
 })();

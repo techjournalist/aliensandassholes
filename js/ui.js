@@ -546,6 +546,9 @@ const UI = (() => {
       sessionStorage.setItem('aa-active-level', id);
       sessionStorage.setItem('aa-enter-play', '1');
     } catch (e) { /* ignore */ }
+    // the level also rides in the address hash, for hosts (some embedded
+    // frames) where session storage does not survive a reload
+    try { history.replaceState(null, '', '#' + id + '-go'); } catch (e) { /* ignore */ }
     location.reload();
   }
 
@@ -609,6 +612,10 @@ const UI = (() => {
     }
     let skipToPlay = false;
     try { skipToPlay = sessionStorage.getItem('aa-enter-play') === '1'; sessionStorage.removeItem('aa-enter-play'); } catch (e) { /* ignore */ }
+    if (/-go$/.test(location.hash)) {
+      skipToPlay = true;
+      try { history.replaceState(null, '', '#' + location.hash.slice(1, -3)); } catch (e) { /* ignore */ }
+    }
     if (skipToPlay) GameState.startGame(); else $('title').classList.add('show');
     $('start-btn').addEventListener('click', () => { Audio.unlock(); goFullscreen(); $('title').classList.remove('show'); enterWorldMap(); });
     const pickNode = (e) => {
