@@ -1218,7 +1218,7 @@ const Renderer = (() => {
         ring.rotation.x = Math.PI / 2; ring.position.y = 0.055; ring.scale.set(rs, rs, 2.2); g.add(ring);
       }
       const glowPad = new THREE.Mesh(GEO.circle, new THREE.MeshBasicMaterial({ color: PALETTE.neon, transparent: true, opacity: 0.3, depthWrite: false }));
-      glowPad.rotation.x = -Math.PI / 2; glowPad.position.y = 0.012; glowPad.scale.setScalar(0.56); g.add(glowPad);
+      glowPad.position.y = 0.012; glowPad.scale.setScalar(0.56); g.add(glowPad);
       const deck = new THREE.Mesh(GEO.cyl, toon(PALETTE.hull));
       deck.scale.set(0.32, 0.04, 0.32); deck.position.y = 0.07; g.add(deck);
       const chev = [];
@@ -1272,7 +1272,7 @@ const Renderer = (() => {
       g.add(d); discs.push(d);
     }
     const pad = new THREE.Mesh(GEO.circle, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.45, depthWrite: false }));
-    pad.rotation.x = -Math.PI / 2; pad.position.y = 0.02; pad.scale.set(0.5, 0.5, 0.5); g.add(pad);
+    pad.position.y = 0.02; pad.scale.set(0.5, 0.5, 0.5); g.add(pad);
     scene.add(g);
     animated.push({ update(t) {
       discs.forEach((d, i) => { d.rotation.z = t * (2.2 + i * 1.1) * (i % 2 ? -1 : 1) + i * 2; });
@@ -2995,14 +2995,26 @@ const Renderer = (() => {
       v.frost.add(c);
     }
     v.frost.visible = false; g.add(v.frost);
-    // stuck in a goo cannon's goo: a lime puddle with a few bubbles
+    // stuck in a goo cannon's goo: a wide lime puddle with a dark rim, pale
+    // strands of goo stretched up the body and bubbles, big enough to read
+    // under a lime blob drone (it used to look like the enemy just froze)
     v.roots = new THREE.Group();
+    const rim = new THREE.Mesh(GEO.circle, unlit(PALETTE.gooDark));
+    rim.position.y = 0.018; rim.scale.setScalar(0.5);
+    v.roots.add(rim);
     const pool = new THREE.Mesh(GEO.circle, unlit(PALETTE.goo));
-    pool.position.y = 0.02; pool.scale.setScalar(0.3);
+    pool.position.y = 0.022; pool.scale.setScalar(0.42);
     v.roots.add(pool);
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 4; i++) {
+      const a = i * 1.57 + 0.4;
+      const st = new THREE.Mesh(GEO.cyl, unlit(0xe8ffc8));
+      st.position.set(Math.cos(a) * 0.17, 0.16, Math.sin(a) * 0.17); st.scale.set(0.035, 0.3, 0.035);
+      st.rotation.set(Math.sin(a) * 0.35, 0, -Math.cos(a) * 0.35);
+      v.roots.add(st);
+    }
+    for (let i = 0; i < 4; i++) {
       const b = new THREE.Mesh(GEO.bead, toon(PALETTE.gooDark));
-      b.position.set(Math.cos(i * 2.3) * 0.2, 0.04, Math.sin(i * 2.3) * 0.18); b.scale.set(0.05, 0.035, 0.05);
+      b.position.set(Math.cos(i * 2.3) * 0.3, 0.04, Math.sin(i * 2.3) * 0.27); b.scale.set(0.06, 0.04, 0.06);
       v.roots.add(b);
     }
     v.roots.visible = false; g.add(v.roots);

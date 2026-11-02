@@ -134,7 +134,7 @@ const UI = (() => {
 
   // Floating numbers: damage in cream, gold in gold, anchored to a world point.
   function floater(x, y, z, text, cls) {
-    const p = Renderer.worldToScreen(x, y, z);
+    const p = Renderer.worldToScreen(x, y + GameState.groundHeight(x, z), z);
     const el = document.createElement('div');
     el.className = 'floater' + (cls ? ' ' + cls : '');
     el.textContent = text;
@@ -901,6 +901,14 @@ const UI = (() => {
       toast(st === 2 ? `${name} is crumbling!` : `${name} is taking damage!`, true);
     });
     GameState.on('enemyKilled', (e) => floater(e.x, 0.9, e.z, `+${e.bounty}`, 'gold'));
+    // glue from a Goo Cannon: say so, at most once a second and a half per enemy
+    const stuckSaid = new WeakMap();
+    GameState.on('enemyRooted', (e) => {
+      const now = GameState.state.time;
+      if (now - (stuckSaid.get(e) ?? -9) < 1.5) return;
+      stuckSaid.set(e, now);
+      floater(e.x, 1.05, e.z, 'Stuck!', 'stuck');
+    });
     GameState.on('gameWon', () => {
       celebrateFresh = true;
       firstWin = Progress.isWon(GameState.currentLevel().id) ? null : GameState.currentLevel().id;
