@@ -1,8 +1,8 @@
 // ===================================================================
 // LEVEL 5 — The Dune Sea
 // Out in the Dune Sea the moisture farm pulls water out of thin air. The
-// caravan road snakes between the dunes and the dry wash runs straight up
-// from the south; they meet before the pipeline that bridges the
+// pods landed in the southern dunes. The caravan road and the dry wash
+// wind north and meet before the pipeline that bridges the river of
 // quicksand. Something very big swims under the sand on the last wave.
 // ===================================================================
 const LEVEL_5 = (() => {
@@ -28,16 +28,16 @@ const LEVEL_5 = (() => {
     const { P, M, GEO, PALETTE, batchPart, batchDecal, liveProp, srand, scene, animated, puff, glow, worldX, worldZ, level } = kit;
     const LC = LevelCommon;
     LC.standardScene(kit, { channel: 'quicksand', bridge: 'pipe', outpost: 'moisture', flag: PALETTE.hazard, seed: 505, mix: [[6, 'tree'], [14, 'rock'], [8, 'crystal'], [6, 'crater'], [4, 'tuft'], [4, 'bush'], [3, 'barrel'], [3, 'cart'], [3, 'solar'], [2, 'well'], [24, null]], edge: [[16, 'rock'], [12, 'crystal'], [8, 'tree'], [6, 'crater'], [30, null]] });
-    // the pipeline running north and south from the bridge, on little trestles
-    const sx = worldX(level.chokepoint.streamCol), bz = worldZ(level.chokepoint.cell[1]);
-    for (let r = -2; r < level.grid.rows + 2; r++) {
-      const z = worldZ(r); if (Math.abs(z - bz) < 0.6) continue;
-      batchPart(P(GEO.cyl, PALETTE.steel, M(sx + 0.62, 0.22, z, { sx: 0.1, sy: 1.0, sz: 0.1, rx: Math.PI / 2 }), false));
-      batchPart(P(GEO.box, PALETTE.steelDark, M(sx + 0.62, 0.08, z, { sx: 0.04, sy: 0.16, sz: 0.04 }), false));
+    // the pipeline running east and west from the bridge along the quicksand, on little trestles
+    const sz = worldZ(level.chokepoint.streamRow), bx = worldX(level.chokepoint.cell[0]);
+    for (let c = -2; c < level.grid.cols + 2; c++) {
+      const x = worldX(c); if (Math.abs(x - bx) < 0.6) continue;
+      batchPart(P(GEO.cyl, PALETTE.steel, M(x, 0.22, sz - 0.62, { sx: 0.1, sy: 1.0, sz: 0.1, rz: Math.PI / 2 }), false));
+      batchPart(P(GEO.box, PALETTE.steelDark, M(x, 0.08, sz - 0.62, { sx: 0.04, sy: 0.16, sz: 0.04 }), false));
     }
   }
 
-  const tail = [[9, 7], [13, 7], [13, 2], [17, 2], [17, 11], [15, 11]];
+  const tail = [[9, 9], [9, 5], [13, 5], [13, 2], [6, 2], [6, 5], [2, 5]];
   return {
     id: 'dune-sea',
     index: 5,
@@ -45,23 +45,23 @@ const LEVEL_5 = (() => {
     subtitle: 'Two roads across the sand. Mind the quicksand.',
     map: { x: 300, y: 214, reclaim: 98, icon: 'vaporator' },
     grid: { cols: 20, rows: 13 },
-    spawn: [0, 3],
+    spawn: [2, 12],
     routes: [
-      { id: 'caravan', waypoints: [[0, 3], [4, 3], [4, 1], [8, 1], [8, 5], [5, 5], [5, 9], [9, 9], ...tail] },
-      { id: 'wash',    waypoints: [[0, 11], [10, 11], [10, 7], ...tail.slice(1)] },
+      { id: 'caravan', waypoints: [[2, 12], [2, 10], [6, 10], [6, 9], ...tail] },
+      { id: 'wash',    waypoints: [[16, 12], [16, 10], [12, 10], [12, 9], ...tail] },
     ],
-    chokepoint: { cell: [11, 7], streamCol: 11 },
+    chokepoint: { cell: [9, 7], streamRow: 7 },
     endpoint: {
       name: 'the moisture farm', properName: 'The Moisture Farm',
-      cells: [[15, 8], [16, 8], [15, 9], [16, 9], [15, 10], [16, 10]], gateCell: [15, 10],
+      cells: [[2, 2], [3, 2], [2, 3], [3, 3], [2, 4], [3, 4]], gateCell: [2, 4],
     },
     cobbleTailCells: 3,
     curvyRoads: true,   // the road is a smooth ribbon and enemies follow the curve
     curveKeepsPace: true,   // shorter road, proportionally slower walkers: same time spawn to gate as the straight road
-    theme: { center: [0, 7], radiusOut: { x: 3.4, z: 6.5 }, radiusIn: 1.1, falloffWidth: 0.42, backdrop: 0x2a1c34, groundMeadow: 0xc8a272, groundMeadowDark: 0xb08a5c, sky: 0xfff0e0, motes: { dust: 30, embers: 14 } },
+    theme: { center: [9, 12.6], radiusOut: { x: 9, z: 3.2 }, radiusIn: 1.1, falloffWidth: 0.42, backdrop: 0x2a1c34, groundMeadow: 0xc8a272, groundMeadowDark: 0xb08a5c, sky: 0xfff0e0, motes: { dust: 30, embers: 14 } },
     spawnBlockedText: "That's a landing pod. Nothing of ours stands there.",
     waves, prepSeconds: 14, startGold: 165, startLives: 20, starThresholds: [16, 8],
-    tipTile: [3, 2],
+    tipTile: [3, 11],
     endScreenText: {
       3: () => 'Not a drop lost. The vaporators hum on across the dunes.',
       2: (s) => `The moisture farm holds with ${s.lives} lives to spare. There is sand in everything.`,

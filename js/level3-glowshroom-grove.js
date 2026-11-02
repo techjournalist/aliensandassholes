@@ -1,9 +1,9 @@
 // ===================================================================
 // LEVEL 3 — Glowshroom Grove
 // The colony's research lab sits in a grove of giant glowing mushrooms.
-// Three roads wind in through the caps: the lane from the west, the ridge
-// path that switchbacks down from the north and the fen track from the
-// south. They meet before a fallen mushroom stalk over the goo creek.
+// The pods came down in the north woods, so three roads wind south through
+// the caps: the lane, the ridge path and the fen track. They meet before a
+// fallen mushroom stalk over the goo creek that cuts the grove in two.
 // The Hive Queen stalks in on the last wave.
 // ===================================================================
 const LEVEL_3 = (() => {
@@ -31,7 +31,7 @@ const LEVEL_3 = (() => {
 
   }
 
-  const tail = [[10, 7], [15, 7], [15, 3], [18, 3], [18, 11], [16, 11]];
+  const tail = [[10, 4], [10, 7], [4, 7], [4, 11], [14, 11]];
   return {
     id: 'glowshroom-grove',
     index: 3,
@@ -39,24 +39,24 @@ const LEVEL_3 = (() => {
     subtitle: 'Three roads through the mushrooms. Guard the lab.',
     map: { x: 486, y: 214, reclaim: 98, icon: 'lab' },
     grid: { cols: 20, rows: 13 },
-    spawn: [0, 6],
+    spawn: [3, 0],
     routes: [
-      { id: 'lane',  waypoints: [[0, 6], [3, 6], [3, 3], [7, 3], [7, 7], ...tail] },
-      { id: 'ridge', waypoints: [[11, 0], [11, 2], [9, 2], [9, 5], [10, 5], ...tail] },
-      { id: 'fen',   waypoints: [[0, 12], [6, 12], [6, 9], [10, 9], ...tail] },
+      { id: 'lane',  waypoints: [[3, 0], [3, 2], [6, 2], [6, 4], ...tail] },
+      { id: 'ridge', waypoints: [[11, 0], [11, 2], [9, 2], [9, 4], ...tail] },
+      { id: 'fen',   waypoints: [[17, 0], [17, 3], [14, 3], [14, 4], ...tail] },
     ],
-    chokepoint: { cell: [13, 7], streamCol: 13 },
+    chokepoint: { cell: [10, 5], streamRow: 5 },
     endpoint: {
       name: 'the lab', properName: 'The Research Lab',
-      cells: [[16, 8], [17, 8], [16, 9], [17, 9], [16, 10], [17, 10]], gateCell: [16, 10],
+      cells: [[14, 8], [15, 8], [14, 9], [15, 9], [14, 10], [15, 10]], gateCell: [14, 10],
     },
     cobbleTailCells: 3,
     curvyRoads: true,   // the road is a smooth ribbon and enemies follow the curve
     curveKeepsPace: true,   // shorter road, proportionally slower walkers: same time spawn to gate as the straight road
-    theme: { center: [2, 9], radiusOut: { x: 4, z: 7 }, radiusIn: 1.12, falloffWidth: 0.42, backdrop: 0x1a1430, groundMeadow: 0x3a9c96, groundMeadowDark: 0x2a7e80, ambient: 0.34, motes: { embers: 22, spores: 20, fireflies: 16 } },
+    theme: { center: [10, -0.6], radiusOut: { x: 9, z: 3.2 }, radiusIn: 1.12, falloffWidth: 0.42, backdrop: 0x1a1430, groundMeadow: 0x7a58b0, groundMeadowDark: 0x644498, ambient: 0.34, motes: { embers: 22, spores: 20, fireflies: 16 } },
     spawnBlockedText: "That's a landing pod. Nothing of ours stands there.",
     waves, prepSeconds: 14, startGold: 170, startLives: 20, starThresholds: [16, 8],
-    tipTile: [2, 5],
+    tipTile: [4, 3],
     endScreenText: {
       3: () => 'Not one sample jar broken. The lab names a new mushroom after you.',
       2: (s) => `The lab holds with ${s.lives} lives to spare. Something escaped from a jar, but it was probably fine.`,

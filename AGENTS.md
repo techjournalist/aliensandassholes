@@ -60,7 +60,8 @@ Ground-boss walk poses live in `BOSS_GAIT`. Boss stats were set from the
 Knights & Knaves boss each one replaces, then tuned: the Mothership's hp was
 cut to 600 (its first runs leaked at about a third of its hp every seed,
 a damage ceiling) and it comes down the longer north-west road; the Spore
-Cloud is 330 and comes down the west road, the Sky Manta 600.
+Cloud is 330 and comes down the west road, the Sky Manta 440 (600 and 480
+both leaked on Comms Ridge once its layout changed).
 
 **Levels** (`js/level*.js`). Level 1 builds its own scene; Levels 2 to 10
 are mostly data and call `LevelCommon.standardScene(kit, {...})`, which picks
@@ -73,21 +74,32 @@ vault, shield generator, Terraformer Prime). Shared set dressing in
 `js/level-common.js`: crashed landing pods at every road mouth
 (`alienPods`), habs, greenhouses, silos, solar arrays, rovers, crates, crop
 rows, glass domes (`glassDome`, a transparent mesh) and a terraformer stack
-with turning fans. Layouts:
+with turning fans. No two levels share a plan: the spawn side, the
+outpost's spot, the road shape and the ground color (`theme.groundMeadow`)
+all change level to level (the user found Levels 2 to 4 near identical
+when they all spawned west, crossed a north-south channel and looped round
+an outpost on the east). Layouts:
 1. Greenhope Homestead: one long lane that doubles back three times, a
-   canal footbridge. 12 waves.
-2. Crater Rim: the zigzag rim road and the gully track meet before a
-   girder bridge over a crevasse. 12 waves.
-3. Glowshroom Grove: three roads (one a switchback) meet before a fallen
-   mushroom stalk over a goo creek. 12 waves.
-4. Comms Ridge: three looping roads meet before a cable span. 14 waves.
-5. The Dune Sea: a winding caravan road and a straight dry wash meet before
-   the pipeline over quicksand. 13 waves.
+   canal footbridge. Teal moss. 12 waves.
+2. Crater Rim: the pods land on the east rim; the zigzag rim road and the
+   gully track meet before a girder bridge and run west to the pump station.
+   Grey regolith, craters. 12 waves.
+3. Glowshroom Grove: three roads come south from pods along the north edge
+   and meet before a mushroom stalk over a goo creek that runs east-west
+   (`streamRow`); the lab sits bottom right. Violet moss. 12 waves.
+4. Comms Ridge: roads from the west and the south meet before a cable span,
+   then climb north to the dish in the top right. Rust mesa. 14 waves.
+5. The Dune Sea: pods in the southern dunes; both roads cross an east-west
+   river of quicksand on the pipeline and wind to the farm, top left.
+   Sand. 13 waves.
 6. Spaceport Bazaar: two western roads cross a coolant canal under the
    monorail; the east road comes round behind. 13 waves.
 7. The Glacier Shelf: two roads cross meltwater on an ice arch; the ridge
    road comes off the ice to the north-east. 13 waves.
-8. Bloomfruit Orchard: three lanes meet before an aqueduct. 13 waves.
+8. Bloomfruit Orchard: the seed vault stands in the middle of the map;
+   two east lanes cross the aqueduct and spiral in around it, the orchard
+   lane comes from the west and joins for the last lap (it skips the
+   bridge). Coral orchard. 13 waves.
 9. The Hive Front: five roads meet before a gantry over a plasma trench,
    a sixth flanks from the east. 13 waves.
 10. Terraformer Prime: three roads cross a plasma rift on a hard-light
@@ -97,7 +109,26 @@ All ten set `curvyRoads` and `curveKeepsPace`, and every gate faces south
 (the last road cell sits directly south of `gateCell`). One lesson from the
 layouts: Chaikin smoothing cuts a quarter of each segment, so a corner
 between two long segments cuts too wide for the validator's 0.75-cell
-rule; Bloomfruit's tail needed collinear waypoints at [16,2] and [17,3].
+rule; Bloomfruit's spiral needed collinear waypoints one cell from its long
+corners.
+
+**Wormholes**: a route's waypoints may hold the string `'warp'` between two
+cells. The road ends in a portal at the first and goes on from a second
+portal at the next (`buildPortals()` in `js/renderer.js`: standing ring
+gates, violet in, teal out). In `GameState.loadLevel` each stretch between
+warps is its own piece (its own cells and its own curve); a trip through
+counts as `WARP_LEN` (0.9) of road, so `curveKeepsPace` still holds. A route
+carries `warps` ([{d0, d1, from, to}]) and `spans` (point-index ranges of
+each piece). While `inWarp(route, e.dist)` an enemy has `e.warping`: hidden,
+no health bar, and no tower can pick it, keep it, splash it or land a
+projectile on it. `enemyWarpIn` and `enemyWarpOut` fire for the flashes. The
+validator walks warps as jumps and checks a test enemy goes through and
+cannot be targeted inside. Spaceport Bazaar's west road uses one: in at
+[1, 8], out behind the spaceport at [16, 7]. A stream runs down a column (`chokepoint.streamCol`) or, with
+`chokepoint.streamRow`, across the map along a row
+(`GameState.onStreamLine` covers both, border included; the water mesh,
+bank stones and bridge deck turn to match). Spaceport is steel blue,
+Glacier Shelf ice, the Hive Front plum and Terraformer Prime green.
 
 **Storage and codes**: every localStorage and sessionStorage key is `aa-*`
 (progress, mute, audio, view, tilt, camera buttons, difficulty, coaching,

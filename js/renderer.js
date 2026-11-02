@@ -394,7 +394,7 @@ const Renderer = (() => {
   // board reads as a valley. Everything placed outside the grid follows it.
   function rimHeight(c, r) {
     if (GameState.inGrid(c, r)) return 0;
-    if (c === GameState.currentLevel().chokepoint.streamCol) return 0;
+    if (GameState.onStreamLine(c, r)) return 0;
     const dc = Math.max(-c, c - (cols - 1), 0), dr = Math.max(-r, r - (rows - 1), 0);
     const d = Math.max(dc, dr);
     const base = d <= 1 ? 0.1 : d === 2 ? 0.22 : 0.32;
@@ -901,7 +901,7 @@ const Renderer = (() => {
     for (let r = rowsMin; r < rowsMax; r++) {
       for (let c = colsMin; c < colsMax; c++) {
         const inGrid = GameState.inGrid(c, r);
-        const kind = inGrid ? GameState.cellKind(c, r) : (c === GameState.currentLevel().chokepoint.streamCol ? 'stream' : 'ground');
+        const kind = inGrid ? GameState.cellKind(c, r) : (GameState.onStreamLine(c, r) ? 'stream' : 'ground');
         const h = GameState.zoneFalloff(c, r);
         let top, side, height = tileHeight, yTop = 0;
         if (!inGrid && kind === 'ground') { yTop = rimHeight(c, r); height = tileHeight + yTop; }
@@ -1121,11 +1121,14 @@ const Renderer = (() => {
   const roadSamples = [];      // every smoothed point of every route, for roadDist
   const roadGrid = new Map();
   function roadKey(x, z) { return Math.floor(x) + ',' + Math.floor(z); }
+  // indices i where a route's segment i -> i+1 is a wormhole jump, not road
+  function warpSegs(rt) { return new Set(rt.spans.slice(1).map(([s0]) => s0 - 1)); }
   function indexRoad() {
     roadSamples.length = 0; roadGrid.clear();
     for (const rt of GameState.routes) {
-      const pts = rt.points;
+      const pts = rt.points, jumps = warpSegs(rt);
       for (let i = 0; i < pts.length - 1; i++) {
+        if (jumps.has(i)) continue;
         const a = pts[i], b = pts[i + 1], n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / 0.15));
         for (let k = 0; k <= n; k++) {
           const p = { x: a.x + (b.x - a.x) * k / n, z: a.z + (b.z - a.z) * k / n };
@@ -1149,6 +1152,65 @@ const Renderer = (() => {
       for (const p of list) best = Math.min(best, Math.hypot(p.x - x, p.z - z));
     }
     return best;
+  }
+  // -------- wormholes --------
+  // Each route's 'warp' is a pair of portals: a swirling violet mouth where
+  // the road ends and a teal one where it starts again. Roads that share a
+  // wormhole share its portals (keyed by position).
+  function buildPortals() {
+    const seen = new Set();
+    for (const rt of GameState.routes) rt.warps.forEach((w, k) => {
+      const [, e0] = rt.spans[k], [s1] = rt.spans[k + 1], P_ = rt.points;
+      const ends = [
+        [w.from, Math.atan2(P_[e0].x - P_[e0 - 1].x, P_[e0].z - P_[e0 - 1].z), PALETTE.magic],
+        [w.to, Math.atan2(P_[s1 + 1].x - P_[s1].x, P_[s1 + 1].z - P_[s1].z), PALETTE.crystalTeal],
+      ];
+      for (const [pt, heading, color] of ends) {
+        const key = pt.x.toFixed(2) + ',' + pt.z.toFixed(2);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        portal(pt.x, pt.z, heading, color);
+      }
+    });
+  }
+  let swirlGeo = null;
+  // a standing ring gate across the road: hull plating with running lights
+  // round a turning swirl, a glowing pad under it
+  function portal(x, z, heading, color) {
+    const g = new THREE.Group();
+    g.position.set(x, 0, z); g.rotation.y = heading; g.scale.setScalar(1.25);
+    const R0 = 0.44, cy = 0.5;
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(R0, 0.07, 8, 28), toon(PALETTE.hullDark));
+    ring.position.y = cy; addOutline(ring); g.add(ring);
+    const trim = new THREE.Mesh(new THREE.TorusGeometry(R0 - 0.06, 0.02, 6, 28), unlit(color));
+    trim.position.y = cy; g.add(trim);
+    for (let i = 0; i < 10; i++) {
+      const a = (i / 10) * Math.PI * 2;
+      const b = new THREE.Mesh(GEO.bead, unlit(PALETTE.neon));
+      b.position.set(Math.cos(a) * R0, cy + Math.sin(a) * R0, 0.07); b.scale.setScalar(0.028); g.add(b);
+    }
+    // two feet so the ring stands
+    for (const sd of [-1, 1]) {
+      const foot = new THREE.Mesh(GEO.box, toon(PALETTE.hull));
+      foot.position.set(sd * 0.36, 0.06, 0); foot.scale.set(0.16, 0.12, 0.3); addOutline(foot); g.add(foot);
+    }
+    // the swirl: stacked broken rings turning at different speeds
+    swirlGeo = swirlGeo || new THREE.RingGeometry(0.12, 1, 28, 1, 0, Math.PI * 1.35);
+    const discs = [];
+    for (let i = 0; i < 3; i++) {
+      const m = new THREE.MeshBasicMaterial({ color: i === 1 ? 0xffffff : color, transparent: true, opacity: [0.85, 0.35, 0.6][i], depthWrite: false, side: THREE.DoubleSide });
+      const d = new THREE.Mesh(swirlGeo, m);
+      d.position.set(0, cy, (i - 1) * 0.01); d.scale.setScalar((R0 - 0.07) * [1, 0.7, 0.45][i]);
+      g.add(d); discs.push(d);
+    }
+    const pad = new THREE.Mesh(GEO.circle, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.45, depthWrite: false }));
+    pad.rotation.x = -Math.PI / 2; pad.position.y = 0.02; pad.scale.set(0.5, 0.5, 0.5); g.add(pad);
+    scene.add(g);
+    animated.push({ update(t) {
+      discs.forEach((d, i) => { d.rotation.z = t * (2.2 + i * 1.1) * (i % 2 ? -1 : 1) + i * 2; });
+      pad.material.opacity = 0.32 + 0.14 * Math.sin(t * 3 + x);
+    } });
+    return g;
   }
   function buildCurvyRoad(vt) {
     indexRoad();
@@ -1189,11 +1251,17 @@ const Renderer = (() => {
       }
     };
     for (const rt of GameState.routes) {
-      const pts = rt.points, total = rt.length;
-      ribbon(layers.lip, pts, rt.lens, total, 0.47, 0.010, 0, lip);
-      ribbon(layers.dirt, pts, rt.lens, total, 0.4, 0.014, 0, dirt, lv.cobbleTailCells);
-      for (const off of [-0.17, 0.17]) ribbon(layers.rut, pts, rt.lens, total, 0.028, 0.017, off, rut);
+      const total = rt.length;
+      // one ribbon per stretch of road between wormholes
+      for (const [s0, s1] of rt.spans) {
+        const pts = rt.points.slice(s0, s1 + 1), lens = rt.lens.slice(s0, s1 + 1);
+        if (pts.length < 2) continue;
+        ribbon(layers.lip, pts, lens, total, 0.47, 0.010, 0, lip);
+        ribbon(layers.dirt, pts, lens, total, 0.4, 0.014, 0, dirt, lv.cobbleTailCells);
+        for (const off of [-0.17, 0.17]) ribbon(layers.rut, pts, lens, total, 0.028, 0.017, off, rut);
+      }
     }
+    buildPortals();
     const meshOf = (list, name) => {
       if (!list.length) return null;
       const pos = new Float32Array(list.length / 6 * 3), colr = new Float32Array(list.length / 6 * 3);
@@ -1211,8 +1279,9 @@ const Renderer = (() => {
     // mud, puddles and pebbles along the curve (deterministic, off the bridge)
     const rng = srand(311), geos = [];
     for (const rt of GameState.routes.slice(0, 1).concat(GameState.routes.slice(1))) {
-      const pts = rt.points;
+      const pts = rt.points, jumps = warpSegs(rt);
       for (let i = 2; i < pts.length - 2; i += 3) {
+        if (jumps.has(i)) continue;
         const a = pts[i], b = pts[i + 1];
         let tx = b.x - a.x, tz = b.z - a.z; const m = Math.hypot(tx, tz) || 1; tx /= m; tz /= m;
         if (inBridge(a.x, a.z)) continue;
@@ -1243,14 +1312,13 @@ const Renderer = (() => {
   function buildGrass() {
     const vt = levelTheme();
     const rng = srand(4242);
-    const streamCol = GameState.currentLevel().chokepoint.streamCol;
     const blades = [];
     for (let r = -border; r < rows + border; r++) {
       for (let c = -border; c < cols + border; c++) {
         const inGrid = GameState.inGrid(c, r);
         if (inGrid) {
           if (GameState.cellKind(c, r) !== 'ground' || GameState.isBuildable(c, r) || GameState.isSpawn(c, r)) continue;
-        } else if (c === streamCol) continue;
+        } else if (GameState.onStreamLine(c, r)) continue;
         const h = GameState.zoneFalloff(c, r);
         if (h > 0.62) continue;
         const tufts = Math.floor((inGrid ? 3.4 : 2.4) * (1 - h * 0.9) * QUALITY + rng());
@@ -1309,11 +1377,12 @@ const Renderer = (() => {
 
   // Shared animated water for any level: a stream, a millrace, or (slowed and
   // recolored) the Cairnwatch's corrupted ooze.
-  function water({ x, z = 0, width = 0.98, length, y = -0.12, shallow = PALETTE.water, deep = PALETTE.waterDeep, foam = PALETTE.waterFoam, speed, stripe, foamAmt }) {
+  function water({ x, z = 0, width = 0.98, length, y = -0.12, across = false, shallow = PALETTE.water, deep = PALETTE.waterDeep, foam = PALETTE.waterFoam, speed, stripe, foamAmt }) {
     const mat = RendererFX.waterMaterial({ shallow, deep, foam, speed, stripe, foamAmt });
     mat.uniforms.uTime = fxTime;
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, length), mat);
     mesh.rotation.x = -Math.PI / 2;
+    if (across) mesh.rotation.z = Math.PI / 2;   // flows along x instead of z
     mesh.position.set(x, y, z);
     mesh.name = 'water';
     scene.add(mesh);
@@ -2542,7 +2611,7 @@ const Renderer = (() => {
       if (v.barT === undefined || v.barT <= 0) continue;
       v.barT -= dt;
       const e = v.e;
-      if (e.boss || n >= BAR_POOL) continue;
+      if (e.boss || e.warping || n >= BAR_POOL) continue;
       const w = BAR_W[e.type] || 0.6, hgt = 0.11;
       const frac = Math.max(0, Math.min(1, e.hp / e.maxHp));
       const open = Math.min(1, v.barT / 0.35, (BAR_SHOW - v.barT) / 0.12 + 0.2);   // grows in fast, shrinks out at the end
@@ -2893,6 +2962,7 @@ const Renderer = (() => {
   function updateEnemyViews(t, dt) {
     for (const v of enemyViews.values()) {
       const e = v.e, g = v.group;
+      g.visible = !e.warping;   // inside a wormhole
       v.frost.visible = !!e.chilled;
       v.roots.visible = !!e.rooted;
       if (e.chilled) v.frost.rotation.y = t * 2;
@@ -3248,6 +3318,9 @@ const Renderer = (() => {
     });
     GameState.on('towerPlaced', addTowerView);
     GameState.on('enemySpawned', addEnemyView);
+    // a wormhole swallows an enemy in a violet flash and spits it out in a teal one
+    GameState.on('enemyWarpIn', (e) => puff(e.x, 0.25, e.z, { count: e.boss ? 14 : 7, color: PALETTE.magic, speed: 1.1, size: 0.09, up: 0.9, ttl: 0.45 }));
+    GameState.on('enemyWarpOut', (e) => puff(e.x, 0.25, e.z, { count: e.boss ? 14 : 7, color: PALETTE.crystalTeal, speed: 1.1, size: 0.09, up: 0.9, ttl: 0.45 }));
     GameState.on('enemyLeaked', (e) => removeEnemyView(e, leakExit));
     GameState.on('enemyKilled', (e) => { removeEnemyView(e, deathExit); if (e.boss) zoomPunch(0.16, 0.8); });
     GameState.on('enemySpawned', (e) => { if (e.boss) { bossShot(e); shakeCamera(0.14, 1.1); } });

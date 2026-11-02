@@ -25,15 +25,23 @@ function loadGame(consoleImpl = console) {
 }
 
 // Grid cells walked along a waypoint list, the way the engine does it.
+// a route's cells; a 'warp' (wormhole) jumps to the next waypoint with no road between
 function walk(wps) {
   const cells = [];
-  for (let i = 0; i < wps.length - 1; i++) {
-    const [ax, az] = wps[i], [bx, bz] = wps[i + 1];
-    const dx = Math.sign(bx - ax), dz = Math.sign(bz - az);
-    let x = ax, z = az;
-    if (i === 0) cells.push([x, z]);
-    while (x !== bx || z !== bz) { x += dx; z += dz; cells.push([x, z]); }
-  }
+  let piece = [];
+  const flush = () => {
+    for (let i = 0; i < piece.length - 1; i++) {
+      const [ax, az] = piece[i], [bx, bz] = piece[i + 1];
+      const dx = Math.sign(bx - ax), dz = Math.sign(bz - az);
+      let x = ax, z = az;
+      if (i === 0) cells.push([x, z]);
+      while (x !== bx || z !== bz) { x += dx; z += dz; cells.push([x, z]); }
+    }
+    if (piece.length === 1) cells.push(piece[0]);
+    piece = [];
+  };
+  for (const w of wps) { if (w === 'warp') flush(); else piece.push(w); }
+  flush();
   return cells;
 }
 const same = (a, b) => a[0] === b[0] && a[1] === b[1];
@@ -44,15 +52,20 @@ function checkLevel(def) {
   const add = (name, ok, detail = '') => out.push({ name: `${def.id}: ${name}`, ok, detail });
   const routes = def.routes || [{ id: 'main', waypoints: def.pathWaypoints }];
   const { cols, rows } = def.grid;
-  const [cc, cr] = def.chokepoint.cell, streamCol = def.chokepoint.streamCol;
+  const [cc, cr] = def.chokepoint.cell, streamCol = def.chokepoint.streamCol, streamRow = def.chokepoint.streamRow;
+  const onLine = ([c, r]) => (streamRow !== undefined ? r === streamRow : c === streamCol);
   const endpoint = def.endpoint.cells;
   for (const rt of routes) {
     const w = rt.waypoints;
-    const diag = w.slice(1).findIndex((p, i) => p[0] !== w[i][0] && p[1] !== w[i][1]);
+    const diag = w.slice(1).findIndex((p, i) => p !== 'warp' && w[i] !== 'warp' && p[0] !== w[i][0] && p[1] !== w[i][1]);
+    if (w.includes('warp')) {
+      const ends = []; w.forEach((p, i) => { if (p === 'warp') ends.push(w[i - 1], w[i + 1]); });
+      add(`route ${rt.id}: every wormhole joins two road cells`, w[0] !== 'warp' && w[w.length - 1] !== 'warp' && ends.every((p) => Array.isArray(p)));
+    }
     add(`route ${rt.id}: every waypoint pair is a straight run`, diag < 0, diag >= 0 ? `pair ${diag}` : '');
     const cells = walk(w);
     add(`route ${rt.id}: stays on the grid`, cells.every(([c, r]) => c >= 0 && r >= 0 && c < cols && r < rows));
-    const wet = cells.filter(([c]) => c === streamCol).filter(([c, r]) => !(c === cc && r === cr));
+    const wet = cells.filter(onLine).filter(([c, r]) => !(c === cc && r === cr));
     add(`route ${rt.id}: crosses the stream only at the chokepoint`, wet.length === 0, JSON.stringify(wet));
     add(`route ${rt.id}: never walks through the endpoint`, !cells.some((p) => endpoint.some((e) => same(p, e))));
     const last = cells[cells.length - 1], gc = def.endpoint.gateCell;
@@ -184,6 +197,38 @@ function legacyTests(G, LEVELS) {
       && cells.every(([c, r]) => G.isCobble(c, r) === cobbleOld.some((p) => same(p, [c, r])))
       && G.isSpawn(def.spawn[0], def.spawn[1]);
     out.push({ name: `${def.id}: single-route level derives exactly the pre-route path`, ok });
+  }
+  return out;
+}
+
+// ---- 3a. wormholes: a 'warp' waypoint hides an enemy and moves it to the exit ----
+function warpTests(G, LEVELS) {
+  const out = [];
+  for (const def of LEVELS) {
+    G.loadLevel(def);
+    const rt = G.routes.find((r) => r.warps.length);
+    if (!rt) continue;
+    const w = rt.warps[0], S = G.state;
+    G.startGame(); S.gold = 9999; S.prep = 0;
+    // a Laser Turret right beside the entry portal
+    let tile = null;
+    for (let c = 0; c < def.grid.cols && !tile; c++) for (let r = 0; r < def.grid.rows && !tile; r++) {
+      if (G.isBuildable(c, r) && Math.hypot(G.worldX(c) - w.from.x, G.worldZ(r) - w.from.z) < 1.5) tile = [c, r];
+    }
+    S.selected = { kind: 'tile', c: tile[0], r: tile[1] }; G.placeTower('slinger');
+    const tower = S.towers[S.towers.length - 1];
+    const e = G.spawnEnemy('grunt', rt.id);
+    e.hp = e.maxHp = 1e6; e.lane = 0;
+    let sawWarp = false, targetedInWarp = false, exitOk = false, t = 0;
+    while (S.enemies.includes(e) && t < 120) {
+      const wasWarping = !!e.warping;   // towers act before enemies move in a frame
+      G.update(1 / 60); t += 1 / 60;
+      if (e.warping) sawWarp = true;
+      if (wasWarping && e.warping && tower.targetId === e.id) targetedInWarp = true;
+      if (sawWarp && !e.warping && !exitOk) exitOk = Math.hypot(e.x - w.to.x, e.z - w.to.z) < 0.2;
+    }
+    out.push({ name: `${def.id}: route ${rt.id} carries enemies through its wormhole`, ok: sawWarp && exitOk, detail: `warp ${sawWarp} exit ${exitOk}` });
+    out.push({ name: `${def.id}: no tower can target an enemy inside a wormhole`, ok: sawWarp && !targetedInWarp });
   }
   return out;
 }
@@ -403,7 +448,7 @@ function progressTests() {
 // levels with curved roads. [lives, gold, kills] for seeds 1 and 2. A
 // deliberate change to a level's waves or economy will move these; regenerate
 // them then with `node tools/bot-runner.js all --seeds 2 --json`.
-const MEADOW_GOLDEN = {"greenhope":[[7,305,206],[14,349,213]],"crater-rim":[[15,305,156],[17,267,158]],"glowshroom-grove":[[15,311,146],[16,265,147]],"comms-ridge":[[18,367,243],[13,354,238]]};
+const MEADOW_GOLDEN = {"greenhope":[[7,305,206],[14,349,213]],"crater-rim":[[19,265,160],[14,309,155]],"glowshroom-grove":[[20,311,151],[19,303,150]],"comms-ridge":[[10,329,235],[11,337,236]]};
 function difficultyTests(G, LEVELS) {
   const out = [];
   const add = (name, ok, detail = '') => out.push({ name: `difficulty: ${name}`, ok, detail });
@@ -506,6 +551,7 @@ function validate() {
   const results = [];
   for (const def of LEVELS) results.push(...checkLevel(def));
   results.push(...legacyTests(GameState, LEVELS));
+  results.push(...warpTests(GameState, LEVELS));
   results.push(...curveTests(GameState, LEVELS));
   results.push(...paceTests(GameState, LEVELS));
   results.push(...progressTests());

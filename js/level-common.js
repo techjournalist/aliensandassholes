@@ -369,7 +369,7 @@ const LevelCommon = (() => {
         const inGrid = GameState.inGrid(c, r);
         if (inGrid) {
           if (GameState.cellKind(c, r) !== 'ground' || GameState.isBuildable(c, r) || GameState.isSpawn(c, r)) continue;
-        } else if (c === level.chokepoint.streamCol) continue;
+        } else if (GameState.onStreamLine(c, r)) continue;
         // leave room for the landing pods around every road mouth
         if (mouths.some(([mc, mr]) => Math.max(Math.abs(c - mc), Math.abs(r - mr)) <= (inGrid ? 1 : 2))) continue;
         const h = GameState.zoneFalloff(c, r);
@@ -428,20 +428,29 @@ const LevelCommon = (() => {
   // goo, coolant, meltwater, quicksand), with bank stones and glowing reeds
   // kept clear of the crossing.
   function stream(kit, { seed = 21, speed, stripe, shallow, deep, foam, foamAmt, reeds = true, rock = PALETTE.stone } = {}) {
-    const { P, M, GEO, batchPart, srand, worldX, worldZ, rows, border, level } = kit;
-    const x = worldX(level.chokepoint.streamCol), length = rows + border * 2;
-    kit.water({ x, length, speed, stripe, shallow, deep, foam, foamAmt });
+    const { P, M, GEO, batchPart, srand, worldX, worldZ, rows, cols, border, level } = kit;
+    // a stream runs down a column, or across the map along a row (streamRow):
+    // u is the distance along it, v across it
+    const across = level.chokepoint.streamRow !== undefined;
+    const length = (across ? cols : rows) + border * 2;
+    const line = across ? worldZ(level.chokepoint.streamRow) : worldX(level.chokepoint.streamCol);
+    const crossU = across ? worldX(level.chokepoint.cell[0]) : worldZ(level.chokepoint.cell[1]);
+    const at = (v, u) => (across ? [u, line + v] : [line + v, u]);
+    if (across) kit.water({ x: 0, z: line, length, across: true, speed, stripe, shallow, deep, foam, foamAmt });
+    else kit.water({ x: line, length, speed, stripe, shallow, deep, foam, foamAmt });
     const rng = srand(seed);
     for (let i = 0; i < 22; i++) {
       const side = rng() < 0.5 ? -1 : 1;
-      const z = -length / 2 + 0.3 + rng() * (length - 0.6);
-      if (Math.abs(z - worldZ(level.chokepoint.cell[1])) < 0.9) continue;
+      const u = -length / 2 + 0.3 + rng() * (length - 0.6);
+      if (Math.abs(u - crossU) < 0.9) continue;
       const s = 0.06 + rng() * 0.07;
-      batchPart(P(GEO.rock, rock, M(x + side * (0.5 + s * 0.6), -0.02, z, { sx: s * 1.4, sy: s, sz: s, ry: rng() * 3 }), false));
+      const [x, z] = at(side * (0.5 + s * 0.6), u);
+      batchPart(P(GEO.rock, rock, M(x, -0.02, z, { sx: s * 1.4, sy: s, sz: s, ry: rng() * 3 }), false));
       if (reeds && rng() < 0.5) for (let k = 0; k < 3; k++) {
-        const rx = x + side * (0.42 + rng() * 0.08), rz = z + (rng() - 0.5) * 0.2, h = 0.24 + rng() * 0.1;
-        batchPart(P(GEO.cyl, PALETTE.meadowDark, M(rx, 0.06, rz, { sx: 0.012, sy: h, sz: 0.012, rz: side * 0.15 }), false));
-        if (k === 0) batchPart(P(GEO.bead, PALETTE.crystalTeal, M(rx - side * h * 0.07, 0.06 + h / 2, rz, { s: 0.022 }), false, { unlit: true }));
+        const [rx, rz] = at(side * (0.42 + rng() * 0.08), u + (rng() - 0.5) * 0.2), h = 0.24 + rng() * 0.1;
+        const [bx, bz] = at(side * (0.42 - h * 0.07), 0);
+        batchPart(P(GEO.cyl, PALETTE.meadowDark, M(rx, 0.06, rz, across ? { sx: 0.012, sy: h, sz: 0.012, rx: -side * 0.15 } : { sx: 0.012, sy: h, sz: 0.012, rz: side * 0.15 }), false));
+        if (k === 0) batchPart(P(GEO.bead, PALETTE.crystalTeal, M(across ? rx : bx, 0.06 + h / 2, across ? bz : rz, { s: 0.022 }), false, { unlit: true }));
       }
     }
   }
@@ -565,7 +574,8 @@ const LevelCommon = (() => {
   function bridge(kit, style) {
     const { P, M, GEO, batchPart, worldX, worldZ, level, liveProp, animated, scene, glow } = kit;
     const [bc, br] = level.chokepoint.cell;
-    const x = worldX(bc), z = worldZ(br), wm = M(x, 0, z);
+    // the deck spans the stream: along x for a column stream, along z for a row one
+    const x = worldX(bc), z = worldZ(br), wm = M(x, 0, z, { ry: level.chokepoint.streamRow !== undefined ? Math.PI / 2 : 0 });
     const deck = { girder: PALETTE.steelDark, log: PALETTE.cream, span: PALETTE.hullDark, pipe: PALETTE.steel, mono: PALETTE.hull, ice: PALETTE.ice, aqueduct: PALETTE.stone, gantry: PALETTE.slate, force: PALETTE.hullDark }[style] || PALETTE.hullDark;
     batchPart(P(GEO.box, deck, M(0, 0, 0, { sx: 1.16, sy: 0.08, sz: 0.84 })), wm);
     const rail = (col, y = 0.2, lights = true) => {

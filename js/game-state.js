@@ -75,7 +75,7 @@ const GameState = (() => {
     drilltank:  { id: 'drilltank',  name: 'The Drill Tank',  hp: 1300, speed: 0.5,  bounty: 150, flying: false, armor: 5, boss: true },
     gloopking:  { id: 'gloopking',  name: 'The Gloop King',  hp: 900, speed: 0.52, bounty: 140, flying: false, armor: 2, boss: true },
     hivequeen:  { id: 'hivequeen',  name: 'The Hive Queen',  hp: 1100, speed: 0.5,  bounty: 150, flying: false, armor: 3, boss: true },
-    manta:      { id: 'manta',      name: 'The Sky Manta',   hp: 600, speed: 0.72, bounty: 200, flying: true,  armor: 2, boss: true },
+    manta:      { id: 'manta',      name: 'The Sky Manta',   hp: 440, speed: 0.72, bounty: 200, flying: true,  armor: 2, boss: true },
     sandworm:   { id: 'sandworm',   name: 'The Sand Worm',   hp: 1500, speed: 0.48, bounty: 160, flying: false, armor: 3, boss: true },
     sporecloud: { id: 'sporecloud', name: 'The Spore Cloud', hp: 330, speed: 0.75, bounty: 150, flying: true,  armor: 0, boss: true },
     tripod:     { id: 'tripod',     name: 'The Tripod',      hp: 1300, speed: 0.52, bounty: 160, flying: false, armor: 4, boss: true },
@@ -102,6 +102,9 @@ const GameState = (() => {
   // the wave number and a seed, never Math.random, so a map's endless run is
   // the same every time. Only endless runs read any of this; the campaign
   // plays exactly as before.
+  // a trip through a wormhole (a route's 'warp' waypoint) counts as this much road
+  const WARP_LEN = 0.9;
+
   const ENDLESS = {
     cap: 45,          // enemies alive at once; later spawns wait for room
     hpSlope: 0.04,    // extra hpScale per wave past the level's own waves
@@ -150,10 +153,19 @@ const GameState = (() => {
   // the chokepoint, so nothing else needs bounding). A path that visits its
   // own column's rows more than once (a spiral) needs the water bounded to
   // a short stretch instead, via optional chokepoint.streamRows: [r0, r1].
+  // A level may instead run its stream across the map along one row
+  // (chokepoint.streamRow, optionally bounded by streamCols: [c0, c1]).
+  // onStreamLine is the whole line, decorative border included.
+  function onStreamLine(c, r) {
+    const ck = level.chokepoint;
+    return ck.streamRow !== undefined ? r === ck.streamRow : c === ck.streamCol;
+  }
   function isStream(c, r) {
-    if (c !== level.chokepoint.streamCol) return false;
-    if (c === level.chokepoint.cell[0] && r === level.chokepoint.cell[1]) return false;
-    const rows = level.chokepoint.streamRows;
+    const ck = level.chokepoint;
+    if (!onStreamLine(c, r)) return false;
+    if (c === ck.cell[0] && r === ck.cell[1]) return false;
+    if (ck.streamRow !== undefined) return !ck.streamCols || (c >= ck.streamCols[0] && c <= ck.streamCols[1]);
+    const rows = ck.streamRows;
     return !rows || (r >= rows[0] && r <= rows[1]);
   }
   function isBridge(c, r) { return c === level.chokepoint.cell[0] && r === level.chokepoint.cell[1]; }
@@ -217,43 +229,65 @@ const GameState = (() => {
     gate = { x: worldX(def.endpoint.gateCell[0]), z: worldZ(def.endpoint.gateCell[1] + 1) - 0.72 };
     const defs = def.routes || [{ id: 'main', waypoints: def.pathWaypoints }];
     routes = defs.map((rd, index) => {
-      const wps = rd.waypoints, cells = [];
-      for (let i = 0; i < wps.length - 1; i++) {
-        const [ax, az] = wps[i], [bx, bz] = wps[i + 1];
-        const dx = Math.sign(bx - ax), dz = Math.sign(bz - az);
-        let x = ax, z = az;
-        if (i === 0) cells.push([x, z]);
-        while (x !== bx || z !== bz) { x += dx; z += dz; cells.push([x, z]); }
+      // A 'warp' between two waypoints is a wormhole: the road ends in a
+      // portal there and goes on from a second portal at the next waypoint.
+      // Each stretch between portals is its own piece: its cells, its curve.
+      const pieces = [[]];
+      for (const w of rd.waypoints) { if (w === 'warp') pieces.push([]); else pieces[pieces.length - 1].push(w); }
+      const cells = [];
+      for (const wps of pieces) {
+        for (let i = 0; i < wps.length - 1; i++) {
+          const [ax, az] = wps[i], [bx, bz] = wps[i + 1];
+          const dx = Math.sign(bx - ax), dz = Math.sign(bz - az);
+          let x = ax, z = az;
+          if (i === 0) cells.push([x, z]);
+          while (x !== bx || z !== bz) { x += dx; z += dz; cells.push([x, z]); }
+        }
+        if (wps.length === 1) cells.push([wps[0][0], wps[0][1]]);
       }
-      let points = wps.map(([c, r]) => ({ x: worldX(c), z: worldZ(r) }));
-      points.push(gate);
+      const ptPieces = pieces.map((wps) => wps.map(([c, r]) => ({ x: worldX(c), z: worldZ(r) })));
+      ptPieces[ptPieces.length - 1].push(gate);
       // Optional `curvyRoads`: round every corner (Chaikin corner cutting) so
       // the road and the enemies on it sweep in curves instead of turning
       // on grid corners. The cells (what is road, what is buildable) are
       // unchanged; the curve only ever cuts inside the corner, staying
       // within about half a cell of them. Start and gate stay exact.
-      let straightLen = 0;
-      for (let i = 1; i < points.length; i++) straightLen += Math.hypot(points[i].x - points[i - 1].x, points[i].z - points[i - 1].z);
-      if (def.curvyRoads) {
+      const plen = (pts) => { let l = 0; for (let i = 1; i < pts.length; i++) l += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].z - pts[i - 1].z); return l; };
+      // a trip through a wormhole counts as WARP_LEN of road (a beat in transit)
+      const straightLen = ptPieces.reduce((a, pts) => a + plen(pts), 0) + WARP_LEN * (ptPieces.length - 1);
+      const curved = ptPieces.map((pts) => {
+        if (!def.curvyRoads || pts.length < 3) return pts;
         for (let pass = 0; pass < 3; pass++) {
-          const q = [points[0]];
-          for (let i = 0; i < points.length - 1; i++) {
-            const a = points[i], b = points[i + 1];
+          const q = [pts[0]];
+          for (let i = 0; i < pts.length - 1; i++) {
+            const a = pts[i], b = pts[i + 1];
             q.push({ x: a.x * 0.75 + b.x * 0.25, z: a.z * 0.75 + b.z * 0.25 }, { x: a.x * 0.25 + b.x * 0.75, z: a.z * 0.25 + b.z * 0.75 });
           }
-          q.push(points[points.length - 1]);
-          points = q;
+          q.push(pts[pts.length - 1]);
+          pts = q;
         }
-      }
-      const lens = [0];
-      for (let i = 1; i < points.length; i++) lens.push(lens[i - 1] + Math.hypot(points[i].x - points[i - 1].x, points[i].z - points[i - 1].z));
+        return pts;
+      });
+      // one polyline; a warp segment joins the last point of one piece to the
+      // first of the next and is WARP_LEN long whatever the distance
+      const points = [], lens = [], warps = [], spans = [];
+      curved.forEach((pts, k) => {
+        if (k > 0) {
+          const from = points[points.length - 1], d0 = lens[lens.length - 1];
+          warps.push({ d0, d1: d0 + WARP_LEN, from: { ...from }, to: { ...pts[0] } });
+          points.push(pts[0]); lens.push(d0 + WARP_LEN);
+        } else { points.push(pts[0]); lens.push(0); }
+        const start = points.length - 1;
+        for (let i = 1; i < pts.length; i++) { points.push(pts[i]); lens.push(lens[lens.length - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].z - pts[i - 1].z)); }
+        spans.push([start, points.length - 1]);
+      });
       const length = lens[lens.length - 1];
       // Optional `curveKeepsPace`: rounding the corners shortens a road, so
       // enemies walk it proportionally slower and take as long from spawn to
       // gate as they did on the straight road. A level tuned before it got
       // curves keeps its wave table and its time in tower range.
       const pace = def.curvyRoads && def.curveKeepsPace ? length / straightLen : 1;
-      return { id: rd.id, index, cells, points, lens, length, pace };
+      return { id: rd.id, index, cells, points, lens, length, pace, warps, spans };
     });
     // the union of every route's cells, primary route first and in order
     pathCells = []; pathIndex = new Map();
@@ -364,11 +398,18 @@ const GameState = (() => {
     if (typeof id === 'number') return routes[id] || routes[0];
     return routes.find((rt) => rt.id === id) || routes[0];
   }
+  // the wormhole an enemy at distance d is passing through, if any
+  function inWarp(route, d) {
+    for (const w of route.warps) if (d > w.d0 && d < w.d1) return w;
+    return null;
+  }
   function pathPosAt(d, out, route) {
     out = out || { x: 0, z: 0 };
     const { points, lens, length } = route || routes[0];
     if (d <= 0) { out.x = points[0].x; out.z = points[0].z; return out; }
     if (d >= length) { out.x = gate.x; out.z = gate.z; return out; }
+    const w = inWarp(route || routes[0], d);
+    if (w) { out.x = w.to.x; out.z = w.to.z; return out; }
     let i = 1;
     while (lens[i] < d) i++;
     const a = points[i - 1], b = points[i];
@@ -552,12 +593,22 @@ const GameState = (() => {
     e.speedMul = e.rooted ? 0 : (e.chilled ? e.chillMul : 1);
     e.dist += e.speed * e.speedMul * dt * routes[e.route].pace;
     const route = routes[e.route];
-    pathPosAt(e.dist - 0.3, _a, route);
-    pathPosAt(e.dist + 0.3, _b, route);
-    let dx = _b.x - _a.x, dz = _b.z - _a.z;
-    const l = Math.hypot(dx, dz) || 1;
-    dx /= l; dz /= l;
-    e.dirX = dx; e.dirZ = dz;
+    // in a wormhole: out of sight and out of reach until it comes out
+    const warping = !!inWarp(route, e.dist);
+    if (warping !== !!e.warping) { e.warping = warping; emit(warping ? 'enemyWarpIn' : 'enemyWarpOut', e); }
+    // heading from the road either side, never across a wormhole
+    let d0 = e.dist - 0.3, d1 = e.dist + 0.3;
+    if (inWarp(route, d0) || route.warps.some((w) => d0 <= w.d0 && e.dist >= w.d1)) d0 = e.dist;
+    if (inWarp(route, d1) || route.warps.some((w) => e.dist <= w.d0 && d1 >= w.d1)) d1 = e.dist;
+    let dx = e.dirX, dz = e.dirZ;
+    if (!warping && d1 > d0) {
+      pathPosAt(d0, _a, route);
+      pathPosAt(d1, _b, route);
+      dx = _b.x - _a.x; dz = _b.z - _a.z;
+      const l = Math.hypot(dx, dz) || 1;
+      dx /= l; dz /= l;
+      e.dirX = dx; e.dirZ = dz;
+    }
     pathPosAt(e.dist, _a, route);
     // lane offset fades out over the last stretch so everyone funnels into the gate
     const funnel = Math.min(1, Math.max(0, (route.length - e.dist) / 1.2));
@@ -604,7 +655,7 @@ const GameState = (() => {
   function pickTarget(tower, type) {
     let best = null;
     for (const e of state.enemies) {
-      if (e.flying && !type.hitsFlying) continue;
+      if (e.warping || (e.flying && !type.hitsFlying)) continue;
       const d = Math.hypot(e.x - tower.x, e.z - tower.z);
       if (d > tower.range || d < (type.minRange || 0)) continue;
       if (!best || ahead(e, best)) best = e;
@@ -615,7 +666,7 @@ const GameState = (() => {
   // Multi-shot towers: the primary target plus the next furthest along.
   function pickTargets(tower, type, primary, n) {
     const out = [primary];
-    const rest = state.enemies.filter((e) => e !== primary && (!e.flying || type.hitsFlying)
+    const rest = state.enemies.filter((e) => e !== primary && !e.warping && (!e.flying || type.hitsFlying)
       && Math.hypot(e.x - tower.x, e.z - tower.z) <= tower.range
       && Math.hypot(e.x - tower.x, e.z - tower.z) >= (type.minRange || 0));
     rest.sort((a, b) => (ahead(a, b) ? -1 : ahead(b, a) ? 1 : 0));
@@ -630,7 +681,7 @@ const GameState = (() => {
     let target = tower.targetId ? enemyById(tower.targetId) : null;
     if (target) {
       const d = Math.hypot(target.x - tower.x, target.z - tower.z);
-      if (d > tower.range + 0.2 || d < (type.minRange || 0)) target = null;
+      if (target.warping || d > tower.range + 0.2 || d < (type.minRange || 0)) target = null;
     }
     if (!target) { target = pickTarget(tower, type); tower.targetId = target ? target.id : null; }
     if (target) tower.facing = Math.atan2(target.x - tower.x, target.z - tower.z);
@@ -671,7 +722,7 @@ const GameState = (() => {
     for (let i = state.projectiles.length - 1; i >= 0; i--) {
       const p = state.projectiles[i];
       const target = enemyById(p.targetId);
-      if (!target) { state.projectiles.splice(i, 1); emit('projectileFizzled', p); continue; }
+      if (!target || target.warping) { state.projectiles.splice(i, 1); emit('projectileFizzled', p); continue; }
       const dx = target.x - p.x, dz = target.z - p.z;
       const dist = Math.hypot(dx, dz);
       const step = p.speed * dt;
@@ -693,7 +744,7 @@ const GameState = (() => {
     if (p.splash > 0) {
       // splash hits everything the tower could target within the radius
       for (const e of state.enemies.slice()) {
-        if (e.flying && !p.hitsFlying && e !== target) continue;
+        if (e.warping || (e.flying && !p.hitsFlying && e !== target)) continue;
         const d = Math.hypot(e.x - x, e.z - z);
         if (d > p.splash) continue;
         const falloff = e === target ? 1 : 0.65;
@@ -821,12 +872,12 @@ const GameState = (() => {
     get cols() { return cols; }, get rows() { return rows; },
     get pathCells() { return pathCells; }, get gate() { return gate; }, get routes() { return routes; }, get lastError() { return lastError; },
     TOWER_TYPES, TOWER_ORDER, TIERS, BRANCHES, ENEMY_TYPES, towerStats, upgradeCost, sellValue, towerById, upgradeTower, sellTower,
-    pathPosAt,
+    pathPosAt, inWarp,
     state, on, emit, update, worldX, worldZ, startGame, pause, resume, setSpeed,
     loadLevel, currentLevel, totalWaves, DIFFICULTY, setDifficulty, get difficulty() { return difficulty.id; },
     ENDLESS, setEndless, get endless() { return endless; },
     selectTile, clearSelection, placeTower, canAfford, towerAt, startWave, sendWave, spawnEnemy, waveInfo, routesForWave, enemiesLeft, stars,
-    inGrid, isPath, isStream, isBridge, isBastion, isSpawn, isBuildable, isCobble,
+    inGrid, isPath, isStream, onStreamLine, isBridge, isBastion, isSpawn, isBuildable, isCobble,
     cellKind, zoneFalloff, pathIndexOf,
   };
 })();

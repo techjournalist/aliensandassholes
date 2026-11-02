@@ -1,15 +1,17 @@
 // ===================================================================
 // LEVEL 6 — Spaceport Bazaar
 // The colony's spaceport, where the supply shuttles land and the Sunday
-// bazaar spreads out under the monorail. Two roads come in from the west
-// and cross the coolant canal under the monorail; the third comes round
-// from the east without crossing water. The Spore Cloud drifts in last.
+// bazaar spreads out under the monorail. The mill road comes in from the
+// west and crosses the coolant canal under the monorail; the east road
+// comes round from behind. The aliens hijacked the cargo jump gate: the west
+// road runs into it and comes out of the gate's twin behind the spaceport.
+// The Spore Cloud drifts in last.
 // ===================================================================
 const LEVEL_6 = (() => {
   const g = (type, count, gap, delay = 0, route, at) => ({ type, count, gap, delay, route, at });
 
   const waves = [
-    { name: "Arrivals", flavor: "Blob drones on the west road.", groups: [g('grunt', 5, 3.2, 0, 'west', 0)] },
+    { name: "Arrivals", flavor: "Blob drones on the west road. Watch the jump gate: they come out behind the spaceport.", groups: [g('grunt', 5, 3.2, 0, 'west', 0)] },
     { name: "Down the Mill Road", flavor: "The southern road opens.", groups: [g('grunt', 5, 2.0, 0, 'west', 0), g('grunt', 5, 2.0, 0, 'mill', 4)] },
     { name: "From Behind", flavor: "Crawlers come round from the east. They never cross the canal.", groups: [g('trickster', 4, 1.0, 0, 'east', 0), g('grunt', 5, 1.4, 0, 'west', 3)] },
     { name: "Shell at the Gate", flavor: "A brute on the mill road.", groups: [g('troll', 1, 1, 0, 'mill', 0), g('grunt', 6, 1.2, 0, 'west', 2), g('trickster', 5, 0.8, 0, 'east', 6)] },
@@ -44,12 +46,13 @@ const LEVEL_6 = (() => {
     id: 'spaceport',
     index: 6,
     name: 'Spaceport Bazaar',
-    subtitle: 'Three roads to the control tower. One comes from behind.',
+    subtitle: 'Three roads to the control tower. One goes through a jump gate.',
     map: { x: 222, y: 268, reclaim: 100, icon: 'tower' },
     grid: { cols: 20, rows: 12 },
     spawn: [0, 2],
     routes: [
-      { id: 'west', waypoints: [[0, 2], [3, 2], [3, 5], [1, 5], [1, 8], [5, 8], [5, 6], ...tail] },
+      // through the jump gate: in at [1, 8], out behind the spaceport at [16, 7]
+      { id: 'west', waypoints: [[0, 2], [3, 2], [3, 5], [1, 5], [1, 8], 'warp', [16, 7], [16, 10], [14, 10], [14, 8], [12, 8], [12, 5]] },
       { id: 'mill', waypoints: [[0, 11], [7, 11], [7, 6], ...tail] },
       { id: 'east', waypoints: [[19, 2], [16, 2], [16, 5], [18, 5], [18, 10], [14, 10], [14, 8], [12, 8], [12, 5]] },
     ],
@@ -61,7 +64,7 @@ const LEVEL_6 = (() => {
     cobbleTailCells: 3,
     curvyRoads: true,   // the road is a smooth ribbon and enemies follow the curve
     curveKeepsPace: true,   // shorter road, proportionally slower walkers: same time spawn to gate as the straight road
-    theme: { center: [0, 6], radiusOut: { x: 3, z: 7 }, radiusIn: 1.1, falloffWidth: 0.42, foothold: { center: [12.5, 4], radius: 3, falloffWidth: 2 }, backdrop: 0x1c1838, motes: { embers: 16, fireflies: 14 } },
+    theme: { center: [0, 6], radiusOut: { x: 3, z: 7 }, radiusIn: 1.1, falloffWidth: 0.42, foothold: { center: [12.5, 4], radius: 3, falloffWidth: 2 }, backdrop: 0x1c1838, groundMeadow: 0x7c9cb4, groundMeadowDark: 0x64849e, motes: { embers: 16, fireflies: 14 } },
     spawnBlockedText: "That's a landing pod. Nothing of ours stands there.",
     waves, prepSeconds: 14, startGold: 180, startLives: 20, starThresholds: [16, 8],
     tipTile: [2, 3],

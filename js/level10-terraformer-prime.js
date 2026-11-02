@@ -58,7 +58,7 @@ const LEVEL_10 = (() => {
     cobbleTailCells: 3,
     curvyRoads: true,   // the road is a smooth ribbon and enemies follow the curve
     curveKeepsPace: true,   // shorter road, proportionally slower walkers: same time spawn to gate as the straight road
-    theme: { center: [10.5, 7], radiusOut: { x: 13, z: 9.5 }, radiusIn: 1.25, falloffWidth: 0.5, foothold: { center: [12.5, 5], radius: 3.2, falloffWidth: 2 }, backdrop: 0x160e26, groundMeadow: 0x3a9a90, groundMeadowDark: 0x2c7c76, ambient: 0.34, fill: 0xd080ff, fillIntensity: 0.2, motes: { embers: 48, spores: 14 } },
+    theme: { center: [10.5, 7], radiusOut: { x: 13, z: 9.5 }, radiusIn: 1.25, falloffWidth: 0.5, foothold: { center: [12.5, 5], radius: 3.2, falloffWidth: 2 }, backdrop: 0x160e26, groundMeadow: 0x58b85a, groundMeadowDark: 0x449846, ambient: 0.34, fill: 0xd080ff, fillIntensity: 0.2, motes: { embers: 48, spores: 14 } },
     spawnBlockedText: "That's a landing pod. Nothing of ours stands there.",
     waves, prepSeconds: 14, startGold: 260, startLives: 20, starThresholds: [16, 8],
     tipTile: [1, 8],

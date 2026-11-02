@@ -1,9 +1,9 @@
 // ===================================================================
 // LEVEL 4 — Comms Ridge
 // The big dish on Comms Ridge is the colony's only line home. Three roads
-// loop up the ridge: the highway, the hairpin ridge road and the fen road.
-// They meet before the cable span over the chasm. The Sky Manta glides in
-// for the finale.
+// climb to it from the west and the south: the highway, the ridge road and
+// the fen road. They meet before the cable span over the chasm, then climb
+// north to the dish. The Sky Manta glides in for the finale.
 // ===================================================================
 const LEVEL_4 = (() => {
   const g = (type, count, gap, delay = 0, route, at) => ({ type, count, gap, delay, route, at });
@@ -32,7 +32,7 @@ const LEVEL_4 = (() => {
 
   }
 
-  const tail = [[12, 6], [17, 6], [17, 3], [20, 3], [20, 11], [18, 11]];
+  const tail = [[11, 8], [16, 8], [16, 10], [19, 10], [19, 6], [17, 6], [17, 4]];
   return {
     id: 'comms-ridge',
     index: 4,
@@ -40,24 +40,24 @@ const LEVEL_4 = (() => {
     subtitle: 'Three looping roads up the ridge. Keep the dish talking.',
     map: { x: 394, y: 262, reclaim: 104, icon: 'dish' },
     grid: { cols: 22, rows: 13 },
-    spawn: [0, 8],
+    spawn: [0, 2],
     routes: [
-      { id: 'highway', waypoints: [[0, 8], [3, 8], [3, 10], [7, 10], [7, 6], ...tail] },
-      { id: 'ridge',   waypoints: [[2, 0], [2, 4], [5, 4], [5, 1], [10, 1], [10, 4], [12, 4], ...tail] },
-      { id: 'fen',     waypoints: [[0, 12], [11, 12], [11, 8], [12, 8], ...tail] },
+      { id: 'highway', waypoints: [[0, 2], [6, 2], [6, 5], [11, 5], ...tail] },
+      { id: 'ridge',   waypoints: [[0, 9], [4, 9], [4, 7], [8, 7], [8, 8], ...tail] },
+      { id: 'fen',     waypoints: [[3, 12], [3, 11], [10, 11], [10, 8], ...tail] },
     ],
-    chokepoint: { cell: [15, 6], streamCol: 15 },
+    chokepoint: { cell: [14, 8], streamCol: 14 },
     endpoint: {
       name: 'the comms array', properName: 'The Comms Array',
-      cells: [[18, 8], [19, 8], [18, 9], [19, 9], [18, 10], [19, 10]], gateCell: [18, 10],
+      cells: [[17, 1], [18, 1], [17, 2], [18, 2], [17, 3], [18, 3]], gateCell: [17, 3],
     },
     cobbleTailCells: 3,
     curvyRoads: true,   // the road is a smooth ribbon and enemies follow the curve
     curveKeepsPace: true,   // shorter road, proportionally slower walkers: same time spawn to gate as the straight road
-    theme: { center: [1, 6], radiusOut: { x: 3.4, z: 7 }, radiusIn: 1.12, falloffWidth: 0.42, backdrop: 0x181530, motes: { embers: 20, dust: 10 } },
+    theme: { center: [0.5, 9], radiusOut: { x: 4.5, z: 6 }, radiusIn: 1.12, falloffWidth: 0.42, backdrop: 0x241526, groundMeadow: 0xc27a5a, groundMeadowDark: 0xa66248, sky: 0xffe2cc, motes: { embers: 20, dust: 18 } },
     spawnBlockedText: "That's a landing pod. Nothing of ours stands there.",
     waves, prepSeconds: 14, startGold: 180, startLives: 20, starThresholds: [16, 8],
-    tipTile: [2, 7],
+    tipTile: [5, 3],
     endScreenText: {
       3: () => 'The dish never dropped a single call. Home heard every word.',
       2: (s) => `The comms array holds with ${s.lives} lives to spare. The picture is a little fuzzy.`,

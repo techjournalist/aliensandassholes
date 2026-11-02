@@ -1,8 +1,10 @@
 // ===================================================================
 // LEVEL 8 — Bloomfruit Orchard
 // The orchard terraces grow the colony's bloomfruit, and the seed vault
-// in the hill keeps a copy of every seed the colonists brought. Three
-// lanes run down through the trees and meet before the old aqueduct.
+// in the middle of the orchard keeps a copy of every seed the colonists
+// brought. Two lanes cross the old aqueduct from the east and spiral in
+// around the vault; the orchard lane sneaks round from the west and joins
+// them for the last lap.
 // The aliens have stolen a harvester for the last wave.
 // ===================================================================
 const LEVEL_8 = (() => {
@@ -31,37 +33,38 @@ const LEVEL_8 = (() => {
 
   }
 
-  const tail = [[7, 6], [12, 6], [12, 2], [16, 2], [17, 2], [17, 3], [17, 12], [13, 12], [13, 11]];
+  // the extra points beside the long corners keep the rounded road on its cells
+  const tail = [[17, 6], [13, 6], [13, 3], [13, 2], [12, 2], [7, 2], [6, 2], [6, 3], [6, 9], [6, 10], [7, 10], [12, 10], [12, 8], [9, 8], [9, 7]];
   return {
     id: 'bloomfruit',
     index: 8,
     name: 'Bloomfruit Orchard',
-    subtitle: 'Three lanes through the orchard. Guard the seed vault.',
+    subtitle: 'Three lanes spiral in around the seed vault.',
     map: { x: 170, y: 120, reclaim: 98, icon: 'vault' },
     grid: { cols: 20, rows: 13 },
-    spawn: [0, 1],
+    spawn: [19, 1],
     routes: [
-      { id: 'vine',    waypoints: [[0, 1], [4, 1], [4, 4], [2, 4], [2, 6], ...tail] },
-      { id: 'orchard', waypoints: [[0, 9], [5, 9], [5, 6], ...tail] },
-      { id: 'cellar',  waypoints: [[0, 12], [8, 12], [8, 8], [7, 8], ...tail] },
+      { id: 'vine',    waypoints: [[19, 1], [17, 1], ...tail] },
+      { id: 'orchard', waypoints: [[0, 4], [3, 4], [3, 11], [6, 11], ...tail.slice(9)] },
+      { id: 'cellar',  waypoints: [[19, 11], [17, 11], ...tail] },
     ],
-    chokepoint: { cell: [9, 6], streamCol: 9 },
+    chokepoint: { cell: [15, 6], streamCol: 15 },
     endpoint: {
       name: 'the seed vault', properName: 'The Seed Vault',
-      cells: [[13, 9], [14, 9], [13, 10], [14, 10]], gateCell: [13, 10],
+      cells: [[9, 5], [10, 5], [9, 6], [10, 6]], gateCell: [9, 6],
     },
     cobbleTailCells: 3,
     curvyRoads: true,   // the road is a smooth ribbon and enemies follow the curve
     curveKeepsPace: true,   // shorter road, proportionally slower walkers: same time spawn to gate as the straight road
-    theme: { center: [0, 7], radiusOut: { x: 3, z: 7 }, radiusIn: 1.1, falloffWidth: 0.42, backdrop: 0x1e1838, groundMeadow: 0x48b090, groundMeadowDark: 0x349274, motes: { leaves: 20, fireflies: 20, embers: 12 } },
+    theme: { center: [19.6, 6], radiusOut: { x: 3, z: 7 }, radiusIn: 1.1, falloffWidth: 0.42, backdrop: 0x1e1838, groundMeadow: 0xd68aa0, groundMeadowDark: 0xbc7088, motes: { leaves: 20, fireflies: 20, embers: 12 } },
     spawnBlockedText: "That's a landing pod. Nothing of ours stands there.",
     waves, prepSeconds: 14, startGold: 165, startLives: 20, starThresholds: [16, 8],
-    tipTile: [3, 2],
+    tipTile: [16, 2],
     endScreenText: {
       3: () => 'Every seed safe and every tree standing. The orchard throws you a fruit party.',
       2: (s) => `The seed vault holds with ${s.lives} lives to spare. A few trees got trampled.`,
       1: (s) => `The seed vault holds with ${s.lives} lives left. Some of the seeds are now a little squashed.`,
-      lose: (s) => `The seed vault fell on wave ${s.wave}. All three lanes meet before the aqueduct: hold them there, and bring heavy hitters for the Harvester.`,
+      lose: (s) => `The seed vault fell on wave ${s.wave}. The east lanes meet before the aqueduct and the orchard lane joins them below the vault: hold the inner ring, and bring heavy hitters for the Harvester.`,
     },
     buildScene,
   };

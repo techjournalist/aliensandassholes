@@ -1,9 +1,10 @@
 // ===================================================================
 // LEVEL 2 — Crater Rim
 // The pump station on the rim of Big Crater sends water to every farm on
-// the moon. Two roads come at it: the rim road, which zigzags round the
-// lip of the crater, and the gully track along the bottom. They meet
-// before the girder bridge over the crevasse. The Gloop King waddles in last.
+// the moon. The aliens land on the east rim this time. Two roads come
+// west at it: the rim road, which zigzags round the lip of the crater, and
+// the gully track along the bottom. They meet before the girder bridge over
+// the crevasse. The Gloop King waddles in last.
 // ===================================================================
 const LEVEL_2 = (() => {
   const g = (type, count, gap, delay = 0, route, at) => ({ type, count, gap, delay, route, at });
@@ -26,13 +27,13 @@ const LEVEL_2 = (() => {
   function buildScene(kit) {
     const { P, M, GEO, PALETTE, batchPart, batchDecal, liveProp, srand, scene, animated, puff, glow, worldX, worldZ, level } = kit;
     const LC = LevelCommon;
-    LC.standardScene(kit, { channel: 'chasm', bridge: 'girder', outpost: 'pumpstation', seed: 202, mix: [[16, 'tree'], [8, 'bush'], [10, 'tuft'], [8, 'flower'], [6, 'rock'], [8, 'crater'], [4, 'crystal'], [3, 'solar'], [3, 'barrel'], [2, 'cart'], [3, 'cottage'], [2, 'well'], [14, null]], edge: [[30, 'tree'], [14, 'rock'], [12, 'crystal'], [8, 'crater'], [6, 'bush'], [20, null]] });
+    LC.standardScene(kit, { channel: 'chasm', bridge: 'girder', outpost: 'pumpstation', seed: 202, mix: [[4, 'tree'], [4, 'bush'], [10, 'tuft'], [4, 'flower'], [14, 'rock'], [20, 'crater'], [8, 'crystal'], [3, 'solar'], [3, 'barrel'], [2, 'cart'], [3, 'cottage'], [2, 'well'], [14, null]], edge: [[6, 'tree'], [26, 'rock'], [16, 'crystal'], [18, 'crater'], [4, 'bush'], [20, null]] });
     // the crater wall: a ring of boulders and crystals along the north edge
     const rng = srand(77);
     for (let c = -2; c < 21; c += 1) { const x = worldX(c) + (rng() - 0.5) * 0.4, z = worldZ(-2) + rng() * 0.6; for (const p of kit.rockParts(rng, false).parts) batchPart(p, M(x, 0, z, { s: 1.6 })); }
   }
 
-  const tail = [[9, 6], [14, 6], [14, 3], [17, 3], [17, 10], [15, 10]];
+  const tail = [[11, 7], [4, 7], [4, 10], [1, 10], [1, 6]];
   return {
     id: 'crater-rim',
     index: 2,
@@ -40,23 +41,23 @@ const LEVEL_2 = (() => {
     subtitle: 'Two roads to the pump station. Hold the girder bridge.',
     map: { x: 600, y: 268, reclaim: 96, icon: 'pump' },
     grid: { cols: 19, rows: 12 },
-    spawn: [0, 2],
+    spawn: [18, 1],
     routes: [
-      { id: 'rim',   waypoints: [[0, 2], [5, 2], [5, 4], [2, 4], [2, 8], [6, 8], [6, 6], ...tail] },
-      { id: 'gully', waypoints: [[0, 10], [9, 10], ...tail] },
+      { id: 'rim',   waypoints: [[18, 1], [13, 1], [13, 4], [16, 4], [16, 7], ...tail] },
+      { id: 'gully', waypoints: [[18, 10], [11, 10], ...tail] },
     ],
-    chokepoint: { cell: [12, 6], streamCol: 12 },
+    chokepoint: { cell: [7, 7], streamCol: 7 },
     endpoint: {
       name: 'the pump station', properName: 'The Pump Station',
-      cells: [[15, 7], [16, 7], [15, 8], [16, 8], [15, 9], [16, 9]], gateCell: [15, 9],
+      cells: [[1, 3], [2, 3], [1, 4], [2, 4], [1, 5], [2, 5]], gateCell: [1, 5],
     },
     cobbleTailCells: 3,
     curvyRoads: true,   // the road is a smooth ribbon and enemies follow the curve
     curveKeepsPace: true,   // shorter road, proportionally slower walkers: same time spawn to gate as the straight road
-    theme: { center: [0.2, 6], radiusOut: { x: 3.2, z: 6.5 }, radiusIn: 1.15, falloffWidth: 0.42, backdrop: 0x1c1834, motes: { embers: 18, fireflies: 18 } },
+    theme: { center: [18.6, 5.5], radiusOut: { x: 3.2, z: 6.5 }, radiusIn: 1.15, falloffWidth: 0.42, backdrop: 0x1c1834, groundMeadow: 0x9a92b8, groundMeadowDark: 0x7e78a2, motes: { embers: 18, dust: 16 } },
     spawnBlockedText: "That's a landing pod. Nothing of ours stands there.",
     waves, prepSeconds: 14, startGold: 160, startLives: 20, starThresholds: [16, 8],
-    tipTile: [4, 3],
+    tipTile: [14, 2],
     endScreenText: {
       3: () => 'The pump never missed a beat. Every farm on the moon still has water.',
       2: (s) => `The pump station holds with ${s.lives} lives to spare. A few pipes need welding.`,

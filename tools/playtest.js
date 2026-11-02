@@ -615,7 +615,10 @@ async function enterLevel(page, levelId) {
     const G = GameState, S = G.state, realRandom = Math.random;
     const SCEN = { swarm: ['trickster', 22, 0.25], armored: ['troll', 6, 1.2], mixed: ['grunt', 14, 0.4], air: ['bat', 16, 0.35] };
     const run = (type, branch, scen) => {
-      let seed = 12345; Math.random = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+      // lanes come from the duel's own generator: the renderer also draws on
+      // Math.random when an enemy spawns, which shifted the lanes run to run
+      let seed = 12345; const lane = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+      Math.random = lane;
       S.enemies.length = 0; S.projectiles.length = 0; S.towers.length = 0;
       // prep must be 0: a leftover countdown would auto-launch real waves mid-duel
       S.gold = 99999; S.lives = 9999; S.hpScale = 1.8; S.paused = false; S.phase = 'playing'; S.waveActive = false; S.schedule = []; S.waveQueue = []; S.prep = 0;
@@ -624,7 +627,7 @@ async function enterLevel(page, levelId) {
       const [et, n, gap] = SCEN[scen], spawned = [];
       let time = 0, queued = 0;
       for (let i = 0; i < 60 * 90; i++) {
-        while (queued < n && queued * gap <= time) { spawned.push(G.spawnEnemy(et)); queued++; }
+        while (queued < n && queued * gap <= time) { const e = G.spawnEnemy(et); e.lane = (lane() - 0.5) * 0.44; spawned.push(e); queued++; }
         G.update(1 / 60); time += 1 / 60;
         if (queued >= n && !S.enemies.length) break;
       }
