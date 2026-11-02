@@ -3,13 +3,14 @@
 // High on the ice, the colony mines water ice for the whole moon. Two
 // roads come across the shelf from the west and cross the meltwater on a
 // bridge of solid ice; a third drops off the ridge to the north-east.
-// A Tripod strides in on the last wave.
+// The miners' cargo launch pads are set into the road, and the aliens have
+// worked out how to ride them. A Tripod strides in on the last wave.
 // ===================================================================
 const LEVEL_7 = (() => {
   const g = (type, count, gap, delay = 0, route, at) => ({ type, count, gap, delay, route, at });
 
   const waves = [
-    { name: "Landing Party", flavor: "Blob drones along the shore road.", groups: [g('grunt', 5, 3.0, 0, 'shore', 0)] },
+    { name: "Landing Party", flavor: "Blob drones along the shore road. Watch the launch pads: whatever steps on one flies for a moment, and only Cryo Beams and Missile Pods reach it in the air.", groups: [g('grunt', 5, 3.0, 0, 'shore', 0)] },
     { name: "Across the Floe", flavor: "The floe road from the south opens.", groups: [g('grunt', 5, 2.0, 0, 'shore', 0), g('grunt', 4, 2.2, 0, 'floe', 3)] },
     { name: "Off the Ridge", flavor: "Crawlers slide down the ridge road. It never crosses the water.", groups: [g('grunt', 6, 1.6, 0, 'floe', 0), g('trickster', 6, 1.0, 0, 'ridge', 4)] },
     { name: "Shell on Ice", flavor: "A brute on the floe road.", groups: [g('grunt', 6, 1.3, 0, 'shore', 0), g('troll', 1, 1, 0, 'floe', 2), g('grunt', 5, 1.5, 0, 'ridge', 8)] },
@@ -54,6 +55,8 @@ const LEVEL_7 = (() => {
       { id: 'ridge', waypoints: [[20, 1], [15, 1], [15, 3], [13, 3], [13, 10], [16, 10], [16, 8]] },
     ],
     chokepoint: { cell: [6, 7], streamCol: 6 },
+    // cargo launch pads on the road: walkers that step on one fly over a stretch
+    jumpPads: [[10, 5], [13, 7]],
     endpoint: {
       name: 'the ice mine', properName: 'The Ice Mine',
       cells: [[16, 5], [17, 5], [16, 6], [17, 6], [16, 7], [17, 7]], gateCell: [16, 7],

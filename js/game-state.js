@@ -104,6 +104,10 @@ const GameState = (() => {
   // plays exactly as before.
   // a trip through a wormhole (a route's 'warp' waypoint) counts as this much road
   const WARP_LEN = 0.9;
+  // Jump pads (a level's jumpPads: road cells): a ground walker that steps on
+  // one is thrown into the air for JUMP_TIME seconds at JUMP_SPEED times its
+  // pace. Airborne it counts as a flyer: only towers that hit flyers reach it.
+  const JUMP_TIME = 1.1, JUMP_SPEED = 1.8;
 
   const ENDLESS = {
     cap: 45,          // enemies alive at once; later spawns wait for room
@@ -307,6 +311,18 @@ const GameState = (() => {
         pathPosAt(d, p, rt);
         rt.antiAir = plots.some((q) => aaTypes.some((t) => { const dd = Math.hypot(q.x - p.x, q.z - p.z); return dd <= t.range && dd >= (t.minRange || 0); }));
       }
+    }
+    // each jump pad, as a distance along every route that runs over it
+    for (const rt of routes) {
+      rt.pads = [];
+      for (const [pc, pr] of def.jumpPads || []) {
+        if (!rt.cells.some(([c, r]) => c === pc && r === pr)) continue;
+        const px = worldX(pc), pz = worldZ(pr);
+        let best = Infinity, bd = 0;
+        for (let d = 0; d <= rt.length; d += 0.05) { pathPosAt(d, p, rt); const dd = Math.hypot(p.x - px, p.z - pz); if (dd < best) { best = dd; bd = d; } }
+        rt.pads.push(bd);
+      }
+      rt.pads.sort((a, b) => a - b);
     }
     // endless waves start from the strongest of the level's last four waves (bosses aside)
     const costOf = (w) => w.groups.reduce((sum, g) => sum + (ENEMY_TYPES[g.type].boss ? 0 : g.count * (ENDLESS.cost[g.type] || 1)), 0);
@@ -591,8 +607,18 @@ const GameState = (() => {
     e.rooted = state.time < e.rootUntil;
     e.chilled = state.time < e.chillUntil;
     e.speedMul = e.rooted ? 0 : (e.chilled ? e.chillMul : 1);
-    e.dist += e.speed * e.speedMul * dt * routes[e.route].pace;
     const route = routes[e.route];
+    if (e.airborne) {
+      // mid-jump: no goo or frost can hold it, and it covers ground fast
+      e.speedMul = JUMP_SPEED; e.airT += dt;
+      if (e.airT >= JUMP_TIME) { e.airborne = false; emit('enemyLanded', e); }
+    }
+    const before = e.dist;
+    e.dist += e.speed * e.speedMul * dt * route.pace;
+    if (!e.airborne && !e.flying && !e.boss && route.pads.some((d) => before < d && e.dist >= d)) {
+      e.airborne = true; e.airT = 0; e.rooted = false; e.rootUntil = 0;
+      emit('enemyLaunched', e);
+    }
     // in a wormhole: out of sight and out of reach until it comes out
     const warping = !!inWarp(route, e.dist);
     if (warping !== !!e.warping) { e.warping = warping; emit(warping ? 'enemyWarpIn' : 'enemyWarpOut', e); }
@@ -652,10 +678,12 @@ const GameState = (() => {
     if (a.route === b.route) return a.dist > b.dist;
     return routes[a.route].length - a.dist < routes[b.route].length - b.dist;
   }
+  // flyers, and walkers in the air off a jump pad
+  function inAir(e) { return e.flying || !!e.airborne; }
   function pickTarget(tower, type) {
     let best = null;
     for (const e of state.enemies) {
-      if (e.warping || (e.flying && !type.hitsFlying)) continue;
+      if (e.warping || (inAir(e) && !type.hitsFlying)) continue;
       const d = Math.hypot(e.x - tower.x, e.z - tower.z);
       if (d > tower.range || d < (type.minRange || 0)) continue;
       if (!best || ahead(e, best)) best = e;
@@ -666,7 +694,7 @@ const GameState = (() => {
   // Multi-shot towers: the primary target plus the next furthest along.
   function pickTargets(tower, type, primary, n) {
     const out = [primary];
-    const rest = state.enemies.filter((e) => e !== primary && !e.warping && (!e.flying || type.hitsFlying)
+    const rest = state.enemies.filter((e) => e !== primary && !e.warping && (!inAir(e) || type.hitsFlying)
       && Math.hypot(e.x - tower.x, e.z - tower.z) <= tower.range
       && Math.hypot(e.x - tower.x, e.z - tower.z) >= (type.minRange || 0));
     rest.sort((a, b) => (ahead(a, b) ? -1 : ahead(b, a) ? 1 : 0));
@@ -681,7 +709,7 @@ const GameState = (() => {
     let target = tower.targetId ? enemyById(tower.targetId) : null;
     if (target) {
       const d = Math.hypot(target.x - tower.x, target.z - tower.z);
-      if (target.warping || d > tower.range + 0.2 || d < (type.minRange || 0)) target = null;
+      if (target.warping || (inAir(target) && !type.hitsFlying) || d > tower.range + 0.2 || d < (type.minRange || 0)) target = null;
     }
     if (!target) { target = pickTarget(tower, type); tower.targetId = target ? target.id : null; }
     if (target) tower.facing = Math.atan2(target.x - tower.x, target.z - tower.z);
@@ -722,7 +750,8 @@ const GameState = (() => {
     for (let i = state.projectiles.length - 1; i >= 0; i--) {
       const p = state.projectiles[i];
       const target = enemyById(p.targetId);
-      if (!target || target.warping) { state.projectiles.splice(i, 1); emit('projectileFizzled', p); continue; }
+      // a shot that cannot reach the air misses a walker that just jumped
+      if (!target || target.warping || (target.airborne && !p.hitsFlying)) { state.projectiles.splice(i, 1); emit('projectileFizzled', p); continue; }
       const dx = target.x - p.x, dz = target.z - p.z;
       const dist = Math.hypot(dx, dz);
       const step = p.speed * dt;
@@ -744,7 +773,7 @@ const GameState = (() => {
     if (p.splash > 0) {
       // splash hits everything the tower could target within the radius
       for (const e of state.enemies.slice()) {
-        if (e.warping || (e.flying && !p.hitsFlying && e !== target)) continue;
+        if (e.warping || (inAir(e) && !p.hitsFlying && e !== target)) continue;
         const d = Math.hypot(e.x - x, e.z - z);
         if (d > p.splash) continue;
         const falloff = e === target ? 1 : 0.65;
@@ -760,7 +789,7 @@ const GameState = (() => {
   function applyEffect(e, effect) {
     if (!effect) return;
     if (effect.chill) { e.chillUntil = state.time + effect.chill; e.chillMul = effect.chillMul; emit('enemyChilled', e); }
-    if (effect.root && !e.flying) { e.rootUntil = state.time + effect.root; emit('enemyRooted', e); }
+    if (effect.root && !inAir(e)) { e.rootUntil = state.time + effect.root; emit('enemyRooted', e); }
   }
 
   function damage(e, amount, source) {
@@ -872,7 +901,7 @@ const GameState = (() => {
     get cols() { return cols; }, get rows() { return rows; },
     get pathCells() { return pathCells; }, get gate() { return gate; }, get routes() { return routes; }, get lastError() { return lastError; },
     TOWER_TYPES, TOWER_ORDER, TIERS, BRANCHES, ENEMY_TYPES, towerStats, upgradeCost, sellValue, towerById, upgradeTower, sellTower,
-    pathPosAt, inWarp,
+    pathPosAt, inWarp, JUMP_TIME,
     state, on, emit, update, worldX, worldZ, startGame, pause, resume, setSpeed,
     loadLevel, currentLevel, totalWaves, DIFFICULTY, setDifficulty, get difficulty() { return difficulty.id; },
     ENDLESS, setEndless, get endless() { return endless; },

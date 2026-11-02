@@ -233,6 +233,36 @@ function warpTests(G, LEVELS) {
   return out;
 }
 
+// ---- 3a2. jump pads: walkers fly for a moment; only anti-air towers reach them ----
+function padTests(G, LEVELS) {
+  const out = [];
+  for (const def of LEVELS) {
+    if (!def.jumpPads) continue;
+    G.loadLevel(def);
+    const onRoad = def.jumpPads.every(([c, r]) => G.isPath(c, r) && !G.isBridge(c, r));
+    out.push({ name: `${def.id}: every jump pad sits on a road`, ok: onRoad && G.routes.some((rt) => rt.pads.length) });
+    const rt = G.routes.find((r) => r.pads.length), S = G.state, p = { x: 0, z: 0 };
+    G.pathPosAt(rt.pads[0], p, rt);
+    G.startGame(); S.gold = 9999; S.prep = 0;
+    const near = [];
+    for (let c = 0; c < def.grid.cols; c++) for (let r = 0; r < def.grid.rows; r++) if (G.isBuildable(c, r)) near.push([Math.hypot(G.worldX(c) - p.x, G.worldZ(r) - p.z), c, r]);
+    near.sort((a, b) => a[0] - b[0]);
+    const place = (type, [, c, r]) => { S.selected = { kind: 'tile', c, r }; G.placeTower(type); return S.towers[S.towers.length - 1]; };
+    const ground = place('slinger', near[0]), aa = place('druid', near[1]);
+    const e = G.spawnEnemy('grunt', rt.id);
+    e.hp = e.maxHp = 1e6; e.lane = 0;
+    let air = 0, groundHit = false, aaHit = false, t = 0;
+    while (S.enemies.includes(e) && t < 120) {
+      const was = !!e.airborne;
+      G.update(1 / 60); t += 1 / 60;
+      if (was && e.airborne) { air++; if (ground.targetId === e.id) groundHit = true; if (aa.targetId === e.id) aaHit = true; }
+    }
+    out.push({ name: `${def.id}: a walker on a jump pad flies, out of reach of ground towers`, ok: air > 30 && !groundHit, detail: `air frames ${air}` });
+    out.push({ name: `${def.id}: anti-air towers can hit a walker in mid-jump`, ok: aaHit });
+  }
+  return out;
+}
+
 // ---- 3b. a rounded road stays on its cells (curvyRoads levels) ----
 function curveTests(G, LEVELS) {
   const out = [];
@@ -552,6 +582,7 @@ function validate() {
   for (const def of LEVELS) results.push(...checkLevel(def));
   results.push(...legacyTests(GameState, LEVELS));
   results.push(...warpTests(GameState, LEVELS));
+  results.push(...padTests(GameState, LEVELS));
   results.push(...curveTests(GameState, LEVELS));
   results.push(...paceTests(GameState, LEVELS));
   results.push(...progressTests());

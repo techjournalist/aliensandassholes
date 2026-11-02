@@ -1173,6 +1173,50 @@ const Renderer = (() => {
       }
     });
   }
+  // -------- jump pads --------
+  // A launch plate set into the road: hazard ring, a spring deck and neon
+  // chevrons pointing the way the walkers get thrown. It kicks when used.
+  const padViews = [];
+  function buildJumpPads() {
+    padViews.length = 0;
+    const lv = GameState.currentLevel(), seen = new Set(), p = { x: 0, z: 0 }, q = { x: 0, z: 0 };
+    for (const rt of GameState.routes) rt.pads.forEach((d) => {
+      GameState.pathPosAt(d, p, rt); GameState.pathPosAt(d + 0.3, q, rt);
+      const key = p.x.toFixed(1) + ',' + p.z.toFixed(1);
+      if (seen.has(key)) return;
+      seen.add(key);
+      const g = new THREE.Group();
+      g.position.set(p.x, 0, p.z); g.rotation.y = Math.atan2(q.x - p.x, q.z - p.z); g.scale.setScalar(1.25);
+      const base = new THREE.Mesh(GEO.cyl, toon(PALETTE.hullDark));
+      base.scale.set(0.44, 0.05, 0.44); base.position.y = 0.025; addOutline(base); g.add(base);
+      for (const [rs, col] of [[0.42, PALETTE.hazard], [0.36, PALETTE.neon]]) {
+        const ring = new THREE.Mesh(GEO.ring, unlit(col));
+        ring.rotation.x = Math.PI / 2; ring.position.y = 0.055; ring.scale.set(rs, rs, 2.2); g.add(ring);
+      }
+      const glowPad = new THREE.Mesh(GEO.circle, new THREE.MeshBasicMaterial({ color: PALETTE.neon, transparent: true, opacity: 0.3, depthWrite: false }));
+      glowPad.rotation.x = -Math.PI / 2; glowPad.position.y = 0.012; glowPad.scale.setScalar(0.56); g.add(glowPad);
+      const deck = new THREE.Mesh(GEO.cyl, toon(PALETTE.hull));
+      deck.scale.set(0.32, 0.04, 0.32); deck.position.y = 0.07; g.add(deck);
+      const chev = [];
+      for (let i = 0; i < 3; i++) {
+        const c = new THREE.Mesh(GEO.cone, unlit(PALETTE.neon));
+        c.rotation.x = Math.PI / 2; c.scale.set(0.13, 0.1, 0.03); c.position.set(0, 0.1, -0.16 + i * 0.15); g.add(c); chev.push(c);
+      }
+      scene.add(g);
+      const view = { x: p.x, z: p.z, deck, kick: 0 };
+      padViews.push(view);
+      animated.push({ update(t, dt) {
+        chev.forEach((c, i) => { c.material.color.setHex(Math.floor(t * 4) % 3 === i ? 0xffffff : PALETTE.neon); });
+        view.kick = Math.max(0, view.kick - (dt || 0.016) * 4);
+        deck.position.y = 0.07 + Math.sin(view.kick * Math.PI) * 0.12;
+      } });
+    });
+  }
+  function padKick(e) {
+    let best = null, bd = Infinity;
+    for (const v of padViews) { const d = Math.hypot(v.x - e.x, v.z - e.z); if (d < bd) { bd = d; best = v; } }
+    if (best && bd < 1.2) { best.kick = 1; puff(best.x, 0.1, best.z, { count: 6, color: PALETTE.neon, speed: 1.2, size: 0.07, up: 1.4, ttl: 0.4 }); }
+  }
   let swirlGeo = null;
   // a standing ring gate across the road: hull plating with running lights
   // round a turning swirl, a glowing pad under it
@@ -1262,6 +1306,7 @@ const Renderer = (() => {
       }
     }
     buildPortals();
+    buildJumpPads();
     const meshOf = (list, name) => {
       if (!list.length) return null;
       const pos = new Float32Array(list.length / 6 * 3), colr = new Float32Array(list.length / 6 * 3);
@@ -2617,7 +2662,7 @@ const Renderer = (() => {
       const open = Math.min(1, v.barT / 0.35, (BAR_SHOW - v.barT) / 0.12 + 0.2);   // grows in fast, shrinks out at the end
       const k = Math.max(0.001, Math.min(1, open));
       const lift = BAR_LIFT[e.type] || 1.4;
-      _bp.set(v.group.position.x, (e.flying ? BAT_HEIGHT : 0) + lift, v.group.position.z);
+      _bp.set(v.group.position.x, (e.flying ? BAT_HEIGHT : e.airborne ? v.group.position.y : 0) + lift, v.group.position.z);
       _bs.set((w + 0.06) * k, (hgt + 0.05) * k, 1);
       _bm.compose(_bp, _bq, _bs); barBack.setMatrixAt(n, _bm);
       // fill is left-anchored: shift it along the camera's right axis
@@ -2976,9 +3021,11 @@ const Renderer = (() => {
       const bounce = e.rooted ? 0 : Math.abs(Math.sin(cycle));
       const struggle = e.rooted ? Math.sin(t * 30) * 0.03 : 0;
       const born = Math.min(1, e.age / 0.35);   // pop out of the pod
-      g.position.set(e.x + struggle, w.bounce * bounce, e.z);
+      // off a jump pad: a high arc with a forward tuck
+      const air = e.airborne ? Math.sin(Math.min(1, e.airT / GameState.JUMP_TIME) * Math.PI) : 0;
+      g.position.set(e.x + struggle, w.bounce * bounce + air * 1.4, e.z);
       g.rotation.y = Math.atan2(e.dirX, e.dirZ);
-      g.rotation.x = w.lean;
+      g.rotation.x = w.lean + air * 0.5;
       g.rotation.z = Math.sin(cycle) * w.sway + struggle * 4;
       if (!e.rooted) g.rotation.y += Math.sin(cycle) * w.sway * 0.9;   // shoulders twist against the stride
       // a footfall: the moment the hop lands, the heavy walkers kick up dust
@@ -3319,6 +3366,8 @@ const Renderer = (() => {
     GameState.on('towerPlaced', addTowerView);
     GameState.on('enemySpawned', addEnemyView);
     // a wormhole swallows an enemy in a violet flash and spits it out in a teal one
+    GameState.on('enemyLaunched', padKick);
+    GameState.on('enemyLanded', (e) => puff(e.x, 0.05, e.z, { count: 4, color: PALETTE.path, speed: 0.7, size: 0.08, up: 0.4, ttl: 0.35 }));
     GameState.on('enemyWarpIn', (e) => puff(e.x, 0.25, e.z, { count: e.boss ? 14 : 7, color: PALETTE.magic, speed: 1.1, size: 0.09, up: 0.9, ttl: 0.45 }));
     GameState.on('enemyWarpOut', (e) => puff(e.x, 0.25, e.z, { count: e.boss ? 14 : 7, color: PALETTE.crystalTeal, speed: 1.1, size: 0.09, up: 0.9, ttl: 0.45 }));
     GameState.on('enemyLeaked', (e) => removeEnemyView(e, leakExit));

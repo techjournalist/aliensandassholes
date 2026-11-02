@@ -124,7 +124,19 @@ no health bar, and no tower can pick it, keep it, splash it or land a
 projectile on it. `enemyWarpIn` and `enemyWarpOut` fire for the flashes. The
 validator walks warps as jumps and checks a test enemy goes through and
 cannot be targeted inside. Spaceport Bazaar's west road uses one: in at
-[1, 8], out behind the spaceport at [16, 7]. A stream runs down a column (`chokepoint.streamCol`) or, with
+[1, 8], out behind the spaceport at [16, 7].
+
+**Jump pads**: a level's `jumpPads` lists road cells (never the bridge).
+`loadLevel` turns each into a distance along every route over it
+(`route.pads`). A ground walker (not a flyer, not a boss) that crosses one
+gets `e.airborne` for `JUMP_TIME` (1.1 s) at `JUMP_SPEED` (1.8x) its pace,
+ignoring goo and frost. In the air it counts as a flyer (`inAir(e)`): only
+towers that hit flyers pick it, keep it or splash it, a ground shot already
+on its way fizzles, and it cannot be rooted. `enemyLaunched` and
+`enemyLanded` fire; the renderer arcs the walker 1.4 high and kicks the
+pad's deck (`buildJumpPads`, `padKick`). The validator checks every pad is
+on a road, a ground tower beside one loses the walker in the air and an
+anti-air tower keeps it. The Glacier Shelf has two: [10, 5] and [13, 7]. A stream runs down a column (`chokepoint.streamCol`) or, with
 `chokepoint.streamRow`, across the map along a row
 (`GameState.onStreamLine` covers both, border included; the water mesh,
 bank stones and bridge deck turn to match). Spaceport is steel blue,
