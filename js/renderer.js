@@ -3051,6 +3051,7 @@ const Renderer = (() => {
       updateEnemyView(v, t, dt);
       v.group.position.y += GameState.groundHeight(v.e.x, v.e.z);
     }
+    updateDying(dt);
   }
   function updateEnemyView(v, t, dt) {
       const e = v.e, g = v.group;
@@ -3122,13 +3123,16 @@ const Renderer = (() => {
       }
       v.decal.scale.setScalar(v.decalR * (1 - 0.3 * bounce));
       v.decal.position.y = 0.012 - w.bounce * bounce;   // keep the shadow flat on the ground while the body hops
-    }
+  }
+  // death and leak animations; a finished one leaves the scene
+  function updateDying(dt) {
     for (let i = dying.length - 1; i >= 0; i--) {
       const d = dying[i];
       d.t += dt;
       const k = d.t / d.dur;
-      if (k >= 1) { scene.remove(d.group); dying.splice(i, 1); return; }
+      if (k >= 1) { scene.remove(d.group); dying.splice(i, 1); continue; }
       d.update(k);
+    }
   }
 
   function updateBossView(v, t, dt) {
