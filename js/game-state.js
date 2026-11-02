@@ -108,6 +108,12 @@ const GameState = (() => {
   // one is thrown into the air for JUMP_TIME seconds at JUMP_SPEED times its
   // pace. Airborne it counts as a flyer: only towers that hit flyers reach it.
   const JUMP_TIME = 1.1, JUMP_SPEED = 1.8;
+  // Elevation (a level's elevation: { areas: [{ from, to, h }], ramps }):
+  // raised mesas (h > 0) and sunken crater floors (h < 0), each step
+  // ELEV_UNIT high. Roads climb on ramp cells. Play stays flat (ranges are
+  // measured across the map), except that a tower on high ground reaches
+  // HIGH_RANGE further.
+  const ELEV_UNIT = 0.55, HIGH_RANGE = 0.5;
 
   const ENDLESS = {
     cap: 45,          // enemies alive at once; later spawns wait for room
@@ -312,6 +318,7 @@ const GameState = (() => {
         rt.antiAir = plots.some((q) => aaTypes.some((t) => { const dd = Math.hypot(q.x - p.x, q.z - p.z); return dd <= t.range && dd >= (t.minRange || 0); }));
       }
     }
+    buildElevation(def);
     // each jump pad, as a distance along every route that runs over it
     for (const rt of routes) {
       rt.pads = [];
@@ -414,6 +421,54 @@ const GameState = (() => {
     if (typeof id === 'number') return routes[id] || routes[0];
     return routes.find((rt) => rt.id === id) || routes[0];
   }
+  // -------- elevation --------
+  let elevAreas = [], rampInfo = new Map();
+  function areaHeight(c, r) {
+    let h = 0;
+    for (const a of elevAreas) if (c >= a.c0 && c <= a.c1 && r >= a.r0 && r <= a.r1) h = a.h;
+    return h;
+  }
+  // Each ramp cell knows its run: the straight line of ramp cells it sits in,
+  // and the heights of the cells at either end, so a run of ramps is one
+  // even slope.
+  function buildElevation(def) {
+    const ev = def.elevation || {};
+    elevAreas = (ev.areas || []).map(({ from, to, h }) => ({ c0: Math.min(from[0], to[0]), c1: Math.max(from[0], to[0]), r0: Math.min(from[1], to[1]), r1: Math.max(from[1], to[1]), h }));
+    rampInfo = new Map();
+    const ramps = new Set((ev.ramps || []).map(([c, r]) => key(c, r)));
+    for (const k of ramps) {
+      const [c, r] = k.split(',').map(Number);
+      const along = isPath(c - 1, r) && isPath(c + 1, r) ? [1, 0] : [0, 1];
+      let a = 0, b = 0;
+      while (ramps.has(key(c - along[0] * (a + 1), r - along[1] * (a + 1)))) a++;
+      while (ramps.has(key(c + along[0] * (b + 1), r + along[1] * (b + 1)))) b++;
+      const sc = c - along[0] * a, sr = r - along[1] * a, n = a + b + 1;
+      rampInfo.set(k, {
+        along, sc, sr, n,
+        h0: areaHeight(sc - along[0], sr - along[1]), h1: areaHeight(sc + along[0] * n, sr + along[1] * n),
+      });
+    }
+  }
+  function isRamp(c, r) { return rampInfo.has(key(c, r)); }
+  // a cell's height in steps (a ramp reports its lower end)
+  function cellHeight(c, r) {
+    const ri = rampInfo.get(key(c, r));
+    return ri ? Math.min(ri.h0, ri.h1) : areaHeight(c, r);
+  }
+  // the ground's height in world units at a point: flat on every cell,
+  // an even slope across a run of ramps
+  function groundHeight(x, z) {
+    if (!elevAreas.length) return 0;
+    const c = Math.round(x + cols / 2 - 0.5), r = Math.round(z + rows / 2 - 0.5);
+    const ri = rampInfo.get(key(c, r));
+    if (!ri) return areaHeight(c, r) * ELEV_UNIT;
+    // 0 at the outer edge of the run's first cell, 1 at the far edge of its last
+    const u = ri.along[0] ? (x - (worldX(ri.sc) - 0.5)) : (z - (worldZ(ri.sr) - 0.5));
+    const t = Math.max(0, Math.min(1, u / ri.n));
+    return (ri.h0 + (ri.h1 - ri.h0) * t) * ELEV_UNIT;
+  }
+  function highGround(c, r) { return areaHeight(c, r) > 0 && !isRamp(c, r) ? HIGH_RANGE : 0; }
+
   // the wormhole an enemy at distance d is passing through, if any
   function inWarp(route, d) {
     for (const w of route.warps) if (d > w.d0 && d < w.d1) return w;
@@ -502,13 +557,13 @@ const GameState = (() => {
     if (br) {
       return {
         damage: Math.round(type.damage * br.damage), cooldown: type.cooldown * br.cooldown,
-        range: type.range + br.range, splash: br.splash ?? type.splash, effect: br.effect || type.effect || null,
+        range: type.range + br.range + highGround(tower.c, tower.r), splash: br.splash ?? type.splash, effect: br.effect || type.effect || null,
         shots: br.shots || 1, pierce: !!br.pierce, groundSplash: !!br.groundSplash,
       };
     }
     return {
       damage: Math.round(type.damage * tier.damage), cooldown: type.cooldown * tier.cooldown,
-      range: type.range + tier.range, splash: type.splash, effect: type.effect || null,
+      range: type.range + tier.range + highGround(tower.c, tower.r), splash: type.splash, effect: type.effect || null,
       shots: 1, pierce: false,
     };
   }
@@ -573,7 +628,7 @@ const GameState = (() => {
     state.gold -= type.cost;
     const tower = {
       id: nextId++, type: typeId, c: sel.c, r: sel.r, tier: 1,
-      x: worldX(sel.c), z: worldZ(sel.r), range: type.range, facing: 0,
+      x: worldX(sel.c), z: worldZ(sel.r), range: type.range + highGround(sel.c, sel.r), facing: 0,
       cooldown: 0, windup: 0, targetId: null,
     };
     state.towers.push(tower);
@@ -901,7 +956,7 @@ const GameState = (() => {
     get cols() { return cols; }, get rows() { return rows; },
     get pathCells() { return pathCells; }, get gate() { return gate; }, get routes() { return routes; }, get lastError() { return lastError; },
     TOWER_TYPES, TOWER_ORDER, TIERS, BRANCHES, ENEMY_TYPES, towerStats, upgradeCost, sellValue, towerById, upgradeTower, sellTower,
-    pathPosAt, inWarp, JUMP_TIME,
+    pathPosAt, inWarp, JUMP_TIME, ELEV_UNIT, cellHeight, groundHeight, isRamp, highGround,
     state, on, emit, update, worldX, worldZ, startGame, pause, resume, setSpeed,
     loadLevel, currentLevel, totalWaves, DIFFICULTY, setDifficulty, get difficulty() { return difficulty.id; },
     ENDLESS, setEndless, get endless() { return endless; },

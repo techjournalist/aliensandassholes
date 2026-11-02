@@ -263,6 +263,56 @@ function padTests(G, LEVELS) {
   return out;
 }
 
+// ---- 3a3. elevation: roads change height only on ramps, and stay level otherwise ----
+function elevationTests(G, LEVELS) {
+  const out = [];
+  for (const def of LEVELS) {
+    if (!def.elevation) continue;
+    G.loadLevel(def);
+    const add = (name, ok, detail = '') => out.push({ name: `${def.id}: ${name}`, ok, detail });
+    const H = (c, r) => G.cellHeight(c, r);
+    const ramps = def.elevation.ramps || [];
+    add('every ramp is a straight road cell', ramps.every(([c, r]) => G.isPath(c, r) && ((G.isPath(c - 1, r) && G.isPath(c + 1, r)) || (G.isPath(c, r - 1) && G.isPath(c, r + 1)))));
+    const steps = [];
+    for (const rt of G.routes) for (let i = 1; i < rt.cells.length; i++) {
+      const a = rt.cells[i - 1], b = rt.cells[i];
+      if (Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) !== 1) continue;   // a wormhole
+      if (!G.isRamp(...a) && !G.isRamp(...b) && H(...a) !== H(...b)) steps.push(`${rt.id} ${a}->${b}`);
+    }
+    add('roads change height only on ramps', !steps.length, steps.join(' '));
+    const flat = [...G.routes.map((rt) => rt.cells[0]), ...def.endpoint.cells.slice(0, 1)];
+    add('spawns sit at ground level', G.routes.every((rt) => H(...rt.cells[0]) === 0));
+    add('the endpoint stands level', new Set(def.endpoint.cells.map(([c, r]) => H(c, r))).size === 1);
+    let wet = 0;
+    for (let c = 0; c < def.grid.cols; c++) for (let r = 0; r < def.grid.rows; r++) if (G.onStreamLine(c, r) && H(c, r) !== 0) wet++;
+    add('the stream runs at ground level', wet === 0);
+    // the rounded road keeps to its own cells' heights (a curve that cuts a
+    // corner into a cell of another height would jump)
+    let worst = 0, where = '';
+    const p = { x: 0, z: 0 };
+    for (const rt of G.routes) for (let d = 0; d <= rt.length; d += 0.1) {
+      if (G.inWarp(rt, d)) continue;
+      G.pathPosAt(d, p, rt);
+      const c = Math.round(p.x + def.grid.cols / 2 - 0.5), r = Math.round(p.z + def.grid.rows / 2 - 0.5);
+      if (rt.cells.some(([a, b]) => a === c && b === r)) continue;
+      let best = Infinity, near = null;
+      for (const cell of rt.cells) { const dd = Math.hypot(G.worldX(cell[0]) - p.x, G.worldZ(cell[1]) - p.z); if (dd < best) { best = dd; near = cell; } }
+      const gap = Math.abs(G.groundHeight(p.x, p.z) - G.groundHeight(G.worldX(near[0]), G.worldZ(near[1])));
+      if (gap > worst) { worst = gap; where = `${rt.id} at [${c},${r}]`; }
+    }
+    add('the rounded road never cuts a corner onto another height', worst < 0.05, worst ? `${where} ${worst.toFixed(2)}` : '');
+    // high ground reaches further
+    const top = []; for (let c = 0; c < def.grid.cols; c++) for (let r = 0; r < def.grid.rows; r++) if (G.isBuildable(c, r) && H(c, r) > 0) top.push([c, r]);
+    if (top.length) {
+      G.startGame(); G.state.gold = 9999;
+      G.state.selected = { kind: 'tile', c: top[0][0], r: top[0][1] }; G.placeTower('slinger');
+      const t = G.state.towers[G.state.towers.length - 1];
+      add('a tower on high ground reaches further', Math.abs(t.range - (G.TOWER_TYPES.slinger.range + 0.5)) < 1e-9, String(t.range));
+    }
+  }
+  return out;
+}
+
 // ---- 3b. a rounded road stays on its cells (curvyRoads levels) ----
 function curveTests(G, LEVELS) {
   const out = [];
@@ -478,7 +528,7 @@ function progressTests() {
 // levels with curved roads. [lives, gold, kills] for seeds 1 and 2. A
 // deliberate change to a level's waves or economy will move these; regenerate
 // them then with `node tools/bot-runner.js all --seeds 2 --json`.
-const MEADOW_GOLDEN = {"greenhope":[[7,305,206],[14,349,213]],"crater-rim":[[19,265,160],[14,309,155]],"glowshroom-grove":[[20,311,151],[19,303,150]],"comms-ridge":[[10,329,235],[11,337,236]]};
+const MEADOW_GOLDEN = {"greenhope":[[7,305,206],[14,349,213]],"crater-rim":[[16,307,157],[17,267,158]],"glowshroom-grove":[[20,311,151],[19,303,150]],"comms-ridge":[[10,329,235],[11,337,236]]};
 function difficultyTests(G, LEVELS) {
   const out = [];
   const add = (name, ok, detail = '') => out.push({ name: `difficulty: ${name}`, ok, detail });
@@ -583,6 +633,7 @@ function validate() {
   results.push(...legacyTests(GameState, LEVELS));
   results.push(...warpTests(GameState, LEVELS));
   results.push(...padTests(GameState, LEVELS));
+  results.push(...elevationTests(GameState, LEVELS));
   results.push(...curveTests(GameState, LEVELS));
   results.push(...paceTests(GameState, LEVELS));
   results.push(...progressTests());

@@ -84,7 +84,8 @@ const UI = (() => {
           <span class="build-cost ${afford ? '' : 'poor'}">&#9679; ${t.cost}</span>
         </button>`;
       }).join('');
-      panel.innerHTML = `<div class="panel-title">Build here <span class="hint">${GameState.TOWER_TYPES[preview].name}'s reach is shown</span></div><div class="build-grid">${rows}</div>`;
+      const high = GameState.highGround(sel.c, sel.r) ? ' <span class="hint">High ground: every tower reaches further</span>' : '';
+      panel.innerHTML = `<div class="panel-title">Build here <span class="hint">${GameState.TOWER_TYPES[preview].name}'s reach is shown</span>${high}</div><div class="build-grid">${rows}</div>`;
     } else {
       const tower = GameState.towerById(sel.id);
       if (!tower) { panel.classList.remove('show'); return; }
@@ -94,7 +95,8 @@ const UI = (() => {
       const affordUp = up !== null && GameState.state.gold >= up;
       const flyers = t.hitsFlying ? 'Hits flyers' : 'Ground only';
       const br = tower.branch ? GameState.BRANCHES[tower.type][tower.branch] : null;
-      const tags = (st.pierce ? '<span><b>Pierces armor</b></span>' : '') + (st.shots > 1 ? `<span><b>${st.shots} targets</b></span>` : '');
+      const tags = (st.pierce ? '<span><b>Pierces armor</b></span>' : '') + (st.shots > 1 ? `<span><b>${st.shots} targets</b></span>` : '')
+        + (GameState.highGround(tower.c, tower.r) ? '<span><b>High ground: longer reach</b></span>' : '');
       // the last upgrade is a permanent fork: two cards, tap once to arm, again to commit
       const branching = up !== null && tower.tier + 1 >= GameState.TIERS.length;
       if (!branching || armed.tower !== tower.id) armed = { tower: null, branch: null };

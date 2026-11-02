@@ -402,6 +402,7 @@ const Renderer = (() => {
   }
   function groundYAt(x, z) {
     const c = Math.round(x + cols / 2 - 0.5), r = Math.round(z + rows / 2 - 0.5);
+    if (GameState.inGrid(c, r)) return GameState.groundHeight(x, z);
     return Math.max(0, rimHeight(c, r));
   }
 
@@ -891,7 +892,14 @@ const Renderer = (() => {
     return { parts, radius: s * 1.1 };
   }
   // -------- scene construction --------
+  // the lowest ground in the grid (a crater floor), 0 on a flat level
+  let elevBase = 0;
+  const cliffColor = new THREE.Color();
   function buildGround() {
+    cliffColor.copy(lerpColor(PALETTE.stone, PALETTE.cream, 0.15));
+    elevBase = 0;
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) elevBase = Math.min(elevBase, GameState.cellHeight(c, r) * GameState.ELEV_UNIT);
+    if (GameState.currentLevel().elevation) elevBase = Math.min(elevBase, -1e-3);
     const geos = [];
     const rng = srand(7);
     const vt = levelTheme();
@@ -905,6 +913,9 @@ const Renderer = (() => {
         const h = GameState.zoneFalloff(c, r);
         let top, side, height = tileHeight, yTop = 0;
         if (!inGrid && kind === 'ground') { yTop = rimHeight(c, r); height = tileHeight + yTop; }
+        // elevation: every grid tile reaches down to one shared base, so mesa
+        // and crater walls close; a ramp's top slopes (fixed up below)
+        if (inGrid && elevBase < 0 && kind !== 'stream' && kind !== 'bridge') { yTop = GameState.cellHeight(c, r) * GameState.ELEV_UNIT; height = yTop - (elevBase - tileHeight); }
         if (kind === 'stream') {
           height = 0.12; yTop = -0.2;
           topColor.set(PALETTE.streamBed); sideColor.set(PALETTE.streamBed);
@@ -925,11 +936,24 @@ const Renderer = (() => {
           topColor.offsetHSL(0, 0, (rng() - 0.5) * 0.022 - (inGrid ? 0 : 0.03));
           sideColor.copy(lerpColor(PALETTE.earth, PALETTE.hollowEarth, h));
         }
+        // mesa tops a shade lighter, crater floors a shade darker
+        const step = inGrid && elevBase < 0 ? GameState.cellHeight(c, r) : 0;
+        if (step && kind !== 'stream' && kind !== 'bridge') topColor.offsetHSL(0, -0.02 * Math.abs(step), step > 0 ? 0.05 * step : 0.09 * step);
         top = topColor; side = sideColor;
         const g = GEO.box.clone().applyMatrix4(M(worldX(c), yTop - height / 2, worldZ(r), { sx: 1, sy: height, sz: 1 }));
-        const n = g.attributes.normal, colors = new Float32Array(n.count * 3);
+        if (inGrid && GameState.isRamp(c, r)) {
+          const pos = g.attributes.position;
+          for (let i = 0; i < pos.count; i++) {
+            if (pos.getY(i) < yTop - 1e-4) continue;
+            const vx = worldX(c) + (pos.getX(i) - worldX(c)) * 0.999, vz = worldZ(r) + (pos.getZ(i) - worldZ(r)) * 0.999;
+            pos.setY(i, GameState.groundHeight(vx, vz));
+          }
+          g.computeVertexNormals();
+        }
+        const n = g.attributes.normal, colors = new Float32Array(n.count * 3), vpos = g.attributes.position;
         for (let i = 0; i < n.count; i++) {
-          const col = n.getY(i) > 0.5 ? top : side;
+          // a cliff face: pale rock at the lip fading to dark earth at the foot
+          const col = n.getY(i) > 0.5 ? top : (inGrid && elevBase < 0 && vpos.getY(i) > elevBase + 0.01 - tileHeight * 0.2 && vpos.getY(i) > -tileHeight * 0.5 ? cliffColor : side);
           colors[i * 3] = col.r; colors[i * 3 + 1] = col.g; colors[i * 3 + 2] = col.b;
         }
         g.setAttribute('color', new THREE.BufferAttribute(colors, 3));
@@ -948,7 +972,7 @@ const Renderer = (() => {
     // own backdrop so the fog blends the edge into it.
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(cols + border * 2 + 40, rows + border * 2 + 40), unlit(lerpColor(vt.backdrop, 0x000000, 0.14).getHex()));
     floor.rotation.x = -Math.PI / 2;
-    floor.position.y = -tileHeight - 0.02;
+    floor.position.y = Math.min(0, elevBase) - tileHeight - 0.02;
     scene.add(floor);
 
     buildRoadEdges(vt);
@@ -964,7 +988,7 @@ const Renderer = (() => {
       const fill = lerpColor(PALETTE.meadowLight, 0x8f86a3, h).offsetHSL(0, 0, 0.08);
       const rim = fill.clone().offsetHSL(0, -0.08, -0.16);
       for (const [shape, col, y] of [[plotRim, rim, 0.058], [plotFill, fill, 0.06]]) {
-        const g = shape.clone().applyMatrix4(M(worldX(c), y, worldZ(r)));
+        const g = shape.clone().applyMatrix4(M(worldX(c), y + GameState.groundHeight(worldX(c), worldZ(r)), worldZ(r)));
         const colors = new Float32Array(g.attributes.position.count * 3);
         for (let i = 0; i < g.attributes.position.count; i++) { colors[i * 3] = col.r; colors[i * 3 + 1] = col.g; colors[i * 3 + 2] = col.b; }
         g.setAttribute('color', new THREE.BufferAttribute(colors, 3));
@@ -997,7 +1021,7 @@ const Renderer = (() => {
       const hz = GameState.zoneFalloff(c, r);
       top.copy(lerpColor(PALETTE.meadow, PALETTE.cobble, 0.4)).lerp(new THREE.Color(PALETTE.hollowGround), hz);
       side.copy(lerpColor(PALETTE.earth, PALETTE.hollowEarth, hz));
-      const g = base.clone().applyMatrix4(M(worldX(c), 0, worldZ(r)));
+      const g = base.clone().applyMatrix4(M(worldX(c), GameState.groundHeight(worldX(c), worldZ(r)), worldZ(r)));
       const n = g.attributes.normal, colors = new Float32Array(n.count * 3);
       for (let i = 0; i < n.count; i++) {
         const col = n.getY(i) > 0.5 ? top : side;
@@ -1280,17 +1304,20 @@ const Renderer = (() => {
         const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)];
         let tx = b.x - a.x, tz = b.z - a.z; const m = Math.hypot(tx, tz) || 1; tx /= m; tz /= m;
         const nx = -tz, nz = tx;
-        L.push([pts[i].x + nx * (offset + half), pts[i].z + nz * (offset + half)]);
-        R.push([pts[i].x + nx * (offset - half), pts[i].z + nz * (offset - half)]);
+        // both edges take the centerline's ground height, so a road along a
+        // mesa's edge never bends down the cliff
+        const gh = GameState.groundHeight(pts[i].x, pts[i].z);
+        L.push([pts[i].x + nx * (offset + half), pts[i].z + nz * (offset + half), gh]);
+        R.push([pts[i].x + nx * (offset - half), pts[i].z + nz * (offset - half), gh]);
       }
       for (let i = 0; i < pts.length - 1; i++) {
         const mx = (pts[i].x + pts[i + 1].x) / 2, mz = (pts[i].z + pts[i + 1].z) / 2;
         if (inBridge(mx, mz)) continue;
         const left = total - lens[i];
         const quad = [L[i], R[i], R[i + 1], L[i], R[i + 1], L[i + 1]];
-        for (const [qx, qz] of quad) {
+        for (const [qx, qz, gh] of quad) {
           const c = colorFn(qx, qz, lens[i], left, cobbleTail);
-          list.push(qx, y, qz, c.r, c.g, c.b);
+          list.push(qx, y + gh, qz, c.r, c.g, c.b);
         }
       }
     };
@@ -1334,7 +1361,7 @@ const Renderer = (() => {
         if (rng() < 0.3) {
           const puddle = rng() < 0.22;
           col.copy(puddle ? lerpColor(PALETTE.streamBed, PALETTE.path, 0.35) : lerpColor(PALETTE.path, PALETTE.earth, 0.42)).lerp(new THREE.Color(PALETTE.hollowPath), h * 0.8);
-          const g = GEO.circle.clone().applyMatrix4(M(a.x + (rng() - 0.5) * 0.3, 0.02, a.z + (rng() - 0.5) * 0.3, { sx: puddle ? 0.2 : 0.14 + rng() * 0.14, sy: 1, sz: puddle ? 0.12 : 0.08 + rng() * 0.08, ry: Math.atan2(tx, tz) }));
+          const g = GEO.circle.clone().applyMatrix4(M(a.x + (rng() - 0.5) * 0.3, 0.02 + GameState.groundHeight(a.x, a.z), a.z + (rng() - 0.5) * 0.3, { sx: puddle ? 0.2 : 0.14 + rng() * 0.14, sy: 1, sz: puddle ? 0.12 : 0.08 + rng() * 0.08, ry: Math.atan2(tx, tz) }));
           const colors = new Float32Array(g.attributes.position.count * 3);
           for (let k = 0; k < g.attributes.position.count; k++) { colors[k * 3] = col.r; colors[k * 3 + 1] = col.g; colors[k * 3 + 2] = col.b; }
           g.setAttribute('color', new THREE.BufferAttribute(colors, 3)); g.deleteAttribute('uv');
@@ -1342,7 +1369,7 @@ const Renderer = (() => {
         }
         if (rng() < 0.18) {
           const side = rng() < 0.5 ? -1 : 1, s = 0.03 + rng() * 0.03;
-          batchPart(P(GEO.rock, h > 0.5 ? PALETTE.hollowRock : PALETTE.stone, M(a.x - tz * side * (0.46 + rng() * 0.1), s * 0.3, a.z + tx * side * (0.46 + rng() * 0.1), { sx: s * 1.3, sy: s * 0.6, sz: s, ry: rng() * 3 }), false));
+          batchPart(P(GEO.rock, h > 0.5 ? PALETTE.hollowRock : PALETTE.stone, M(a.x - tz * side * (0.46 + rng() * 0.1), s * 0.3 + GameState.groundHeight(a.x, a.z), a.z + tx * side * (0.46 + rng() * 0.1), { sx: s * 1.3, sy: s * 0.6, sz: s, ry: rng() * 3 }), false));
         }
       }
     }
@@ -2406,7 +2433,7 @@ const Renderer = (() => {
     // reuse a free slot, else steal the oldest so a burst of impacts never drops the newest
     let pick = rings.find((u) => !u.alive);
     if (!pick) pick = rings.reduce((a, b) => (a.life / a.ttl > b.life / b.ttl ? a : b));
-    Object.assign(pick, { alive: true, life: 0, ttl, x, y: Math.max(0.03, y), z, r: radius });
+    Object.assign(pick, { alive: true, life: 0, ttl, x, y: Math.max(0.03, y) + groundYAt(x, z), z, r: radius });
     pick.color.setHex(color);
   }
   function spark(x, y, z, color = PALETTE.gold, count = 3) {
@@ -2417,7 +2444,7 @@ const Renderer = (() => {
     for (const u of particles) {
       if (u.alive) continue;
       const a = fxRand() * Math.PI * 2, s = speed * (0.5 + fxRand() * 0.5);
-      Object.assign(u, { alive: true, life: 0, ttl: ttl * (0.7 + fxRand() * 0.5), x, y, z, vx: Math.cos(a) * s, vy: up * (0.4 + fxRand() * 0.6), vz: Math.sin(a) * s, size: size * (0.6 + fxRand() * 0.8) });
+      Object.assign(u, { alive: true, life: 0, ttl: ttl * (0.7 + fxRand() * 0.5), x, y: y + groundYAt(x, z), z, vx: Math.cos(a) * s, vy: up * (0.4 + fxRand() * 0.6), vz: Math.sin(a) * s, size: size * (0.6 + fxRand() * 0.8) });
       u.color.setHex(color);
       if (++n >= count) break;
     }
@@ -2516,7 +2543,8 @@ const Renderer = (() => {
       const targetY = p.targetBoss ? BOSS_HEIGHT : BAT_HEIGHT;
       const baseY = p.targetFlying ? 0.75 + p.t * (targetY - 0.75) : 0.75;
       const px = g.position.x, py = g.position.y, pz = g.position.z;
-      g.position.set(p.x, baseY + Math.sin(p.t * Math.PI) * PROJ_ARC[p.kind], p.z);
+      const gy = GameState.groundHeight(p.sx, p.sz) * (1 - p.t) + GameState.groundHeight(p.x, p.z) * p.t;
+      g.position.set(p.x, gy + baseY + Math.sin(p.t * Math.PI) * PROJ_ARC[p.kind], p.z);
       if (AIMED[p.kind]) {
         if (!fresh && (px !== g.position.x || pz !== g.position.z)) {
           _aim.set(g.position.x * 2 - px, g.position.y * 2 - py, g.position.z * 2 - pz);
@@ -2662,7 +2690,8 @@ const Renderer = (() => {
       const open = Math.min(1, v.barT / 0.35, (BAR_SHOW - v.barT) / 0.12 + 0.2);   // grows in fast, shrinks out at the end
       const k = Math.max(0.001, Math.min(1, open));
       const lift = BAR_LIFT[e.type] || 1.4;
-      _bp.set(v.group.position.x, (e.flying ? BAT_HEIGHT : e.airborne ? v.group.position.y : 0) + lift, v.group.position.z);
+      const gy = GameState.groundHeight(e.x, e.z);
+      _bp.set(v.group.position.x, (e.flying ? BAT_HEIGHT + gy : e.airborne ? v.group.position.y : gy) + lift, v.group.position.z);
       _bs.set((w + 0.06) * k, (hgt + 0.05) * k, 1);
       _bm.compose(_bp, _bq, _bs); barBack.setMatrixAt(n, _bm);
       // fill is left-anchored: shift it along the camera's right axis
@@ -3004,18 +3033,24 @@ const Renderer = (() => {
       rig[8].set(0, Math.sin(t * 2.2) * 0.3, 0, 0);
     },
   };
+  // every enemy view, then lifted onto the ground under it (mesas, craters, ramps)
   function updateEnemyViews(t, dt) {
     for (const v of enemyViews.values()) {
+      updateEnemyView(v, t, dt);
+      v.group.position.y += GameState.groundHeight(v.e.x, v.e.z);
+    }
+  }
+  function updateEnemyView(v, t, dt) {
       const e = v.e, g = v.group;
       g.visible = !e.warping;   // inside a wormhole
       v.frost.visible = !!e.chilled;
       v.roots.visible = !!e.rooted;
       if (e.chilled) v.frost.rotation.y = t * 2;
-      if (e.type === 'manta') { updateDragonView(v, t, dt); continue; }
-      if (e.type === 'sandworm') { updateWormView(v, t, dt); continue; }
-      if (ROLLERS.has(e.type)) { updateRamView(v, t, dt); continue; }
-      if (e.boss && !WALKER_BOSSES.has(e.type)) { updateBossView(v, t, dt); continue; }
-      if (e.flying) { updateBatView(v, t, dt); continue; }
+      if (e.type === 'manta') { updateDragonView(v, t, dt); return; }
+      if (e.type === 'sandworm') { updateWormView(v, t, dt); return; }
+      if (ROLLERS.has(e.type)) { updateRamView(v, t, dt); return; }
+      if (e.boss && !WALKER_BOSSES.has(e.type)) { updateBossView(v, t, dt); return; }
+      if (e.flying) { updateBatView(v, t, dt); return; }
       const w = v.walk;
       const cycle = e.dist * w.freq;
       const bounce = e.rooted ? 0 : Math.abs(Math.sin(cycle));
@@ -3080,10 +3115,10 @@ const Renderer = (() => {
       const d = dying[i];
       d.t += dt;
       const k = d.t / d.dur;
-      if (k >= 1) { scene.remove(d.group); dying.splice(i, 1); continue; }
+      if (k >= 1) { scene.remove(d.group); dying.splice(i, 1); return; }
       d.update(k);
-    }
   }
+
   function updateBossView(v, t, dt) {
     const e = v.e, g = v.group;
     const born = Math.min(1, e.age / 0.6);
@@ -3292,7 +3327,7 @@ const Renderer = (() => {
       update(k) {
         g.position.x = x0 + (gate.x - x0) * k;
         g.position.z = z0 + (gate.z - 0.25 - z0) * k;
-        g.position.y = 0.15 * Math.sin(k * Math.PI);
+        g.position.y = 0.15 * Math.sin(k * Math.PI) + GameState.groundHeight(g.position.x, g.position.z);
         g.rotation.y += 0.6;
         const s = (1 - k) * (1 + 0.3 * Math.sin(k * Math.PI));
         g.scale.set(s * 1.1, s * 0.8, s * 1.1);
@@ -3335,12 +3370,14 @@ const Renderer = (() => {
         if (sel) {
           const x = worldX(sel.c), z = worldZ(sel.r);
           selectionRing.position.x = x; selectionRing.position.z = z;
+          const gy = GameState.groundHeight(x, z);
+          selectionRing.position.y = 0.02 + gy; rangeRing.position.y = 0.016 + gy; rangeDisc.position.y = 0.014 + gy;
           const s = 1 + 0.06 * Math.sin(t * 5);
           selectionRing.scale.set(s, 1, s);
           selectionRing.rotation.y = t * 0.6;
           const range = sel.kind === 'tower'
             ? (GameState.state.towers.find((tw) => tw.id === sel.id) || { range: 0 }).range
-            : GameState.TOWER_TYPES[UI.previewType()].range;
+            : GameState.TOWER_TYPES[UI.previewType()].range + GameState.highGround(sel.c, sel.r);
           rangeRing.position.x = rangeDisc.position.x = x;
           rangeRing.position.z = rangeDisc.position.z = z;
           rangeRing.scale.set(range, 1, range);
@@ -3354,6 +3391,7 @@ const Renderer = (() => {
           rejectRing.material.opacity = k;
           rejectRing.position.x = worldX(rejectCell.c) + Math.sin(rejectTimer * 60) * 0.05 * k;
           rejectRing.position.z = worldZ(rejectCell.r);
+          rejectRing.position.y = 0.02 + GameState.groundHeight(worldX(rejectCell.c), worldZ(rejectCell.r));
           rejectRing.scale.setScalar(1.2 - 0.2 * k);
         }
       },
@@ -3609,9 +3647,25 @@ const Renderer = (() => {
   const raycaster = new THREE.Raycaster();
   const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
   const hit = new THREE.Vector3();
+  // the distinct ground heights in the grid, highest first (picking tests each)
+  let elevLevels = [];
+  const elevPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
   function screenToCell(x, y) {
+    if (!elevLevels.length) {
+      const set = new Set([0]);
+      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) set.add(GameState.cellHeight(c, r) * GameState.ELEV_UNIT);
+      elevLevels = [...set].sort((a, b) => b - a);
+    }
     const ndc = new THREE.Vector2((x / cssW) * 2 - 1, -(y / cssH) * 2 + 1);
     raycaster.setFromCamera(ndc, camera);
+    if (elevLevels.length > 1) {
+      for (const y of elevLevels) {
+        elevPlane.constant = -y;
+        if (!raycaster.ray.intersectPlane(elevPlane, hit)) continue;
+        const c = Math.floor(hit.x + cols / 2), r = Math.floor(hit.z + rows / 2);
+        if (GameState.inGrid(c, r) && GameState.groundHeight(hit.x, hit.z) >= y - 0.05) return { c, r };
+      }
+    }
     if (!raycaster.ray.intersectPlane(groundPlane, hit)) return null;
     return { c: Math.floor(hit.x + cols / 2), r: Math.floor(hit.z + rows / 2) };
   }

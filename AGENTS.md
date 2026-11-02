@@ -136,7 +136,31 @@ on its way fizzles, and it cannot be rooted. `enemyLaunched` and
 `enemyLanded` fire; the renderer arcs the walker 1.4 high and kicks the
 pad's deck (`buildJumpPads`, `padKick`). The validator checks every pad is
 on a road, a ground tower beside one loses the walker in the air and an
-anti-air tower keeps it. The Glacier Shelf has two: [10, 5] and [13, 7]. A stream runs down a column (`chokepoint.streamCol`) or, with
+anti-air tower keeps it. The Glacier Shelf has two: [10, 5] and [13, 7].
+
+**Elevation**: a level's `elevation` is `{ areas: [{ from, to, h }], ramps }`.
+Areas are rectangles of cells raised (mesa, `h` 1) or sunk (crater floor,
+`h` -1), each step `ELEV_UNIT` (0.55) high; later areas win. Ramps are road
+cells where a road changes height: a straight run of ramps slopes evenly
+between the cells at its two ends (`buildElevation`). Play stays flat (all
+ranges and distances are across the map), except that a tower on high
+ground (`highGround(c, r)`, a raised non-ramp cell) reaches `HIGH_RANGE`
+(0.5) further; the build panel and tower card say so and the range ring
+shows it. `GameState.groundHeight(x, z)` is the ground's height anywhere in
+the grid; the renderer's `groundYAt` uses it, so batched props, live props,
+towers, puffs, rings, projectiles, health bars, the selection rings and
+every enemy view (lifted after its own update in `updateEnemyViews`) follow
+it. Grid tiles all reach down to one shared base so cliffs close; cliff
+faces are pale rock, mesa tops lighter, crater floors darker. The road
+ribbon takes its centerline height at both edges. Picking
+(`screenToCell`) tests each ground height from the top down. The validator
+checks ramps are straight road cells, roads change height only on ramps,
+spawns, the stream and the endpoint are level, the rounded road never cuts
+a corner onto another height, and high ground adds the range. Crater Rim:
+the gully drops into the crater on ramps [17, 10] and [12, 10] (the extra
+gully waypoints [12, 10] and [11, 9] keep the curve off the crater floor),
+the rim mesa is [14..17, 2..3]. Comms Ridge: the dish stands on a mesa
+[15..21, 0..4], the last road climbs ramp [17, 5]. A stream runs down a column (`chokepoint.streamCol`) or, with
 `chokepoint.streamRow`, across the map along a row
 (`GameState.onStreamLine` covers both, border included; the water mesh,
 bank stones and bridge deck turn to match). Spaceport is steel blue,

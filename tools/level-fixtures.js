@@ -22,7 +22,7 @@ module.exports = {
   'crater-rim': {
     firstSlingerTile: [14, 2],
     laneSlingerTiles: {rim: [15,2], gully: [13,9]},
-    botBuildSpots: [[14, 2], [3, 8], [2, 8], [9, 8], [13, 8], [3, 7], [8, 8], [14, 5], [3, 9], [15, 9], [16, 3], [10, 8], [5, 9], [15, 3], [2, 7], [16, 8]],
+    botBuildSpots: [[14, 2], [3, 8], [2, 8], [9, 8], [13, 8], [3, 7], [8, 8], [14, 5], [3, 9], [16, 8], [10, 8], [15, 3], [6, 8], [15, 9], [2, 9], [16, 3]],
     botPlan: ['slinger', 'slinger', 'slinger', 'druid', 'warden', 'artillery', 'golem', 'druid', 'warden', 'slinger', 'golem', 'artillery', 'warden', 'druid', 'slinger', 'golem'],
     waveCount: 12, hasBossOnWave: 12, bossType: 'gloopking',
   },

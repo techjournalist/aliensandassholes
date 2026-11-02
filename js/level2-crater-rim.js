@@ -44,9 +44,15 @@ const LEVEL_2 = (() => {
     spawn: [18, 1],
     routes: [
       { id: 'rim',   waypoints: [[18, 1], [13, 1], [13, 4], [16, 4], [16, 7], ...tail] },
-      { id: 'gully', waypoints: [[18, 10], [11, 10], ...tail] },
+      { id: 'gully', waypoints: [[18, 10], [12, 10], [11, 10], [11, 9], ...tail] },
     ],
     chokepoint: { cell: [7, 7], streamCol: 7 },
+    // the gully track drops into the crater floor on a ramp and climbs out on
+    // another; the rim is a mesa, high ground for towers
+    elevation: {
+      areas: [{ from: [12, 9], to: [17, 11], h: -1 }, { from: [14, 2], to: [17, 3], h: 1 }],
+      ramps: [[17, 10], [12, 10]],
+    },
     endpoint: {
       name: 'the pump station', properName: 'The Pump Station',
       cells: [[1, 3], [2, 3], [1, 4], [2, 4], [1, 5], [2, 5]], gateCell: [1, 5],

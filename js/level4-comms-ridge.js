@@ -47,6 +47,12 @@ const LEVEL_4 = (() => {
       { id: 'fen',     waypoints: [[3, 12], [3, 11], [10, 11], [10, 8], ...tail] },
     ],
     chokepoint: { cell: [14, 8], streamCol: 14 },
+    // the dish stands on the ridge: a mesa the last road climbs on a ramp,
+    // high ground for towers
+    elevation: {
+      areas: [{ from: [15, 0], to: [21, 4], h: 1 }],
+      ramps: [[17, 5]],
+    },
     endpoint: {
       name: 'the comms array', properName: 'The Comms Array',
       cells: [[17, 1], [18, 1], [17, 2], [18, 2], [17, 3], [18, 3]], gateCell: [17, 3],
