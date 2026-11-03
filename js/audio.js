@@ -84,7 +84,9 @@ const Audio = (() => {
 
   // One tonal voice: oscillator -> lowpass -> gain envelope. Slight random
   // detune keeps repeats from sounding stamped out.
-  function voice({ type = 'sine', freq = 440, to = null, dur = 0.15, vol = 0.4, cutoff = 2400, delay = 0, attack = 0.008, jitter = 0.04, key = null, gap = 0.05 }) {
+  // fm: { ratio, depth } frequency-modulates the tone (metallic, zappy sci-fi
+  // timbres); vib: { rate, depth } wobbles the pitch; q gives the filter bite.
+  function voice({ type = 'sine', freq = 440, to = null, dur = 0.15, vol = 0.4, cutoff = 2400, delay = 0, attack = 0.008, jitter = 0.04, key = null, gap = 0.05, fm = null, vib = null, q = 0 }) {
     if (!ctx || (!settings.sfxOn && !rendering) || limited(key, gap)) return;
     const t0 = ctx.currentTime + baseDelay + delay;
     const j = 1 + (Math.random() * 2 - 1) * jitter;
@@ -93,8 +95,18 @@ const Audio = (() => {
     osc.frequency.setValueAtTime(freq * j, t0);
     if (to) osc.frequency.exponentialRampToValueAtTime(Math.max(20, to * j), t0 + dur);
     filt.type = 'lowpass';
+    if (q) filt.Q.value = q;
     filt.frequency.setValueAtTime(cutoff, t0);
     filt.frequency.exponentialRampToValueAtTime(Math.max(120, cutoff * 0.3), t0 + dur);
+    for (const mod of [fm && { rate: freq * j * fm.ratio, depth: freq * fm.depth, follow: fm.ratio }, vib && { rate: vib.rate, depth: freq * vib.depth }]) {
+      if (!mod) continue;
+      const m = ctx.createOscillator(), mg = ctx.createGain();
+      m.frequency.setValueAtTime(mod.rate, t0);
+      if (mod.follow && to) m.frequency.exponentialRampToValueAtTime(Math.max(20, to * j * mod.follow), t0 + dur);
+      mg.gain.setValueAtTime(mod.depth, t0);
+      if (mod.follow && to) mg.gain.exponentialRampToValueAtTime(Math.max(1, mod.depth * to / freq), t0 + dur);
+      m.connect(mg); mg.connect(osc.frequency); m.start(t0); m.stop(t0 + dur + 0.03);
+    }
     const v = vol * duck(t0);
     g.gain.setValueAtTime(0.0001, t0);
     g.gain.exponentialRampToValueAtTime(v, t0 + attack);
@@ -171,12 +183,11 @@ const Audio = (() => {
       voice({ type: 'square', freq: 140, to: 95, dur: 0.12, vol: 0.1, cutoff: 500, delay: 0.09 });
       noise({ dur: 0.08, vol: 0.14, freq: 500, filter: 'lowpass' });
     },
-    place() {    // a stone thud on the dais, two quick mallet taps, then a bright "ta-da"
-      noise({ dur: 0.14, vol: 0.4, freq: 320, filter: 'lowpass' });
-      voice({ type: 'triangle', freq: 150, to: 80, dur: 0.14, vol: 0.45, cutoff: 700 });
-      [0.1, 0.19].forEach((d) => { voice({ type: 'square', freq: 1500, to: 1300, dur: 0.03, vol: 0.08, cutoff: 5000, delay: d }); noise({ dur: 0.03, vol: 0.12, freq: 3500, q: 3, delay: d }); });
-      voice({ type: 'triangle', freq: 523, to: 523, dur: 0.1, vol: 0.18, cutoff: 3000, delay: 0.3, jitter: 0 });
-      voice({ type: 'triangle', freq: 784, to: 784, dur: 0.2, vol: 0.18, cutoff: 3000, delay: 0.4, jitter: 0 });
+    place() {    // a tower beams down onto its pad: a rising shimmer, a power-up hum and a confirm chirp
+      voice({ type: 'sine', freq: 300, to: 1800, dur: 0.3, vol: 0.12, cutoff: 6000, fm: { ratio: 3, depth: 0.4 } });
+      noise({ dur: 0.3, vol: 0.08, freq: 2500, to: 8000, q: 0.8 });
+      voice({ type: 'sawtooth', freq: 110, to: 220, dur: 0.35, vol: 0.1, cutoff: 900, q: 3, delay: 0.1 });
+      [1047, 1568].forEach((f, i) => voice({ type: 'square', freq: f, to: f, dur: 0.06, vol: 0.06, cutoff: 5000, delay: 0.36 + i * 0.07, jitter: 0 }));
     },
     upgrade() {
       [523, 659, 784].forEach((f, i) => voice({ type: 'triangle', freq: f, to: f, dur: 0.14, vol: 0.2, cutoff: 3200, delay: i * 0.09, jitter: 0 }));
@@ -193,15 +204,18 @@ const Audio = (() => {
       [1318, 1568, 1046, 1760].forEach((f, i) => voice({ type: 'sine', freq: f, to: f, dur: 0.08, vol: 0.14, cutoff: 5000, delay: i * 0.06, jitter: 0.01 }));
       noise({ dur: 0.1, vol: 0.12, freq: 4500, q: 2 });
     },
-    gameStart() {   // a proper horn fanfare from the walls
-      [262, 262, 330, 392].forEach((f, i) => voice({ type: 'sawtooth', freq: f, to: f, dur: i === 3 ? 0.7 : 0.18, vol: 0.22, cutoff: 1700, delay: i * 0.2, jitter: 0.005 }));
-      voice({ type: 'sawtooth', freq: 196, to: 196, dur: 0.7, vol: 0.14, cutoff: 1200, delay: 0.6, jitter: 0.005 });
-      voice({ type: 'sine', freq: 784, to: 784, dur: 0.5, vol: 0.1, cutoff: 4000, delay: 0.65, jitter: 0 });
+    gameStart() {   // the colony's defenses power up: a long rising sweep and a synth chord
+      voice({ type: 'sawtooth', freq: 55, to: 440, dur: 1.1, vol: 0.12, cutoff: 2200, q: 5, fm: { ratio: 0.5, depth: 0.2 } });
+      noise({ dur: 1.0, vol: 0.06, freq: 400, to: 6000, q: 1 });
+      [262, 330, 392, 523].forEach((f, i) => voice({ type: 'sawtooth', freq: f, to: f, dur: 0.9, vol: 0.06, cutoff: 2600, delay: 1.0 + i * 0.02, jitter: 0.004 }));
+      voice({ type: 'sine', freq: 1568, to: 1568, dur: 0.6, vol: 0.06, cutoff: 6000, delay: 1.05, jitter: 0 });
     },
-    waveStart() {   // a little horn call
-      voice({ type: 'sawtooth', freq: 262, to: 262, dur: 0.22, vol: 0.2, cutoff: 1600, jitter: 0.005 });
-      voice({ type: 'sawtooth', freq: 262, to: 262, dur: 0.18, vol: 0.18, cutoff: 1600, delay: 0.24, jitter: 0.005 });
-      voice({ type: 'sawtooth', freq: 392, to: 392, dur: 0.45, vol: 0.22, cutoff: 1800, delay: 0.44, jitter: 0.005 });
+    waveStart() {   // the colony alarm: a two-tone siren, twice
+      [0, 0.3].forEach((d) => {
+        voice({ type: 'square', freq: 660, to: 660, dur: 0.14, vol: 0.09, cutoff: 2400, delay: d, jitter: 0 });
+        voice({ type: 'square', freq: 880, to: 880, dur: 0.14, vol: 0.09, cutoff: 2400, delay: d + 0.15, jitter: 0 });
+      });
+      voice({ type: 'sawtooth', freq: 110, to: 82, dur: 0.6, vol: 0.08, cutoff: 600, delay: 0.1 });
     },
     waveEnd() {
       [523, 659, 784].forEach((f, i) => voice({ type: 'sine', freq: f, to: f, dur: i === 2 ? 0.3 : 0.14, vol: 0.24, cutoff: 3000, delay: i * 0.12, jitter: 0 }));
@@ -292,52 +306,54 @@ const Audio = (() => {
         for (let i = 0; i < 5; i++) voice({ type: 'sine', freq: 300 + i * 80, to: 600 + i * 80, dur: 0.15, vol: 0.1, cutoff: 3000, delay: 0.3 + i * 0.15 });
       }
     },
-    // ---- towers firing ----
-    shoot() {    // a laser turret: a bright "pew"
-      voice({ type: 'square', freq: 1800, to: 500, dur: 0.11, vol: 0.1, cutoff: 4000, key: 'shoot', gap: 0.04 });
-      voice({ type: 'sine', freq: 2400, to: 900, dur: 0.08, vol: 0.06, cutoff: 6000 });
+    // ---- towers firing: sci-fi weapons, each with its own voice ----
+    shoot() {    // the laser turret: a classic laser "pew", a falling buzzy FM tone with a crackle
+      voice({ type: 'sawtooth', freq: 2600, to: 220, dur: 0.16, vol: 0.09, cutoff: 5200, q: 6, fm: { ratio: 0.5, depth: 0.6 }, key: 'shoot', gap: 0.04, jitter: 0.06 });
+      voice({ type: 'square', freq: 3400, to: 600, dur: 0.07, vol: 0.04, cutoff: 7000 });
+      noise({ dur: 0.04, vol: 0.06, freq: 7000, q: 2 });
     },
-    shootWarden() {   // the goo cannon: a fat "gloomp" and a lobbing whoosh
-      voice({ type: 'sine', freq: 240, to: 110, dur: 0.14, vol: 0.24, cutoff: 900, key: 'warden', gap: 0.08 });
-      voice({ type: 'sine', freq: 420, to: 180, dur: 0.1, vol: 0.12, cutoff: 900, delay: 0.06 });
-      noise({ dur: 0.22, vol: 0.14, freq: 1000, to: 300, q: 0.7, delay: 0.05 });
+    shootWarden() {   // the goo cannon: a warbling plasma "bwomp" lobbed with a bubbling gurgle
+      voice({ type: 'sine', freq: 110, to: 320, dur: 0.22, vol: 0.26, cutoff: 1400, vib: { rate: 22, depth: 0.25 }, key: 'warden', gap: 0.08 });
+      voice({ type: 'triangle', freq: 220, to: 640, dur: 0.18, vol: 0.08, cutoff: 1800, vib: { rate: 30, depth: 0.2 }, delay: 0.02 });
+      for (let i = 0; i < 3; i++) voice({ type: 'sine', freq: 500 + i * 160, to: 900 + i * 160, dur: 0.05, vol: 0.06, cutoff: 3000, delay: 0.12 + i * 0.05 });
     },
-    shootDruid() {    // the cryo beam: a crystalline ting with a cold hiss
-      voice({ type: 'sine', freq: 1760, to: 2200, dur: 0.12, vol: 0.15, cutoff: 6000, key: 'druid', gap: 0.06 });
-      voice({ type: 'sine', freq: 2637, to: 2500, dur: 0.2, vol: 0.07, cutoff: 6000, delay: 0.05 });
-      noise({ dur: 0.16, vol: 0.08, freq: 6000, q: 0.6 });
+    shootDruid() {    // the cryo beam: a freezing zap: an icy FM crackle, a hiss sweeping down, a crystal shimmer
+      voice({ type: 'sine', freq: 4200, to: 1600, dur: 0.22, vol: 0.09, cutoff: 9000, fm: { ratio: 2.7, depth: 1.4 }, key: 'druid', gap: 0.06 });
+      noise({ dur: 0.3, vol: 0.12, freq: 9000, to: 2200, q: 1.2, filter: 'bandpass' });
+      for (let i = 0; i < 4; i++) noise({ dur: 0.015, vol: 0.08, freq: 6000 + i * 900, q: 6, delay: 0.02 + i * 0.035 });
+      [3136, 4186].forEach((f, i) => voice({ type: 'sine', freq: f, to: f * 1.02, dur: 0.25, vol: 0.035, cutoff: 9000, delay: 0.08 + i * 0.06, jitter: 0 }));
     },
-    shootGolem() {    // the mech: a servo whine and a rocket-fist launch
-      voice({ type: 'sawtooth', freq: 300, to: 900, dur: 0.12, vol: 0.06, cutoff: 2000, key: 'golem', gap: 0.1 });
-      noise({ dur: 0.3, vol: 0.28, freq: 800, to: 250, filter: 'lowpass', delay: 0.08 });
-      voice({ type: 'triangle', freq: 80, to: 40, dur: 0.3, vol: 0.4, cutoff: 500, delay: 0.08 });
+    shootGolem() {    // the mech walker: a hydraulic hiss, a servo whine and a rocket-fist ignition
+      noise({ dur: 0.12, vol: 0.1, freq: 4000, to: 1500, q: 0.7, key: 'golem', gap: 0.1 });
+      voice({ type: 'sawtooth', freq: 260, to: 1100, dur: 0.14, vol: 0.05, cutoff: 2400, q: 4 });
+      voice({ type: 'square', freq: 90, to: 45, dur: 0.32, vol: 0.18, cutoff: 600, fm: { ratio: 1.5, depth: 0.8 }, delay: 0.12 });
+      noise({ dur: 0.35, vol: 0.26, freq: 900, to: 180, filter: 'lowpass', delay: 0.12 });
     },
-    shootArtillery() {   // the missile pod: a click, a hiss and a rising scream
-      noise({ dur: 0.04, vol: 0.14, freq: 3000, q: 3, key: 'artillery', gap: 0.1 });
-      noise({ dur: 0.5, vol: 0.14, freq: 1400, to: 3600, q: 0.8, delay: 0.04 });
-      voice({ type: 'sawtooth', freq: 220, to: 660, dur: 0.4, vol: 0.05, cutoff: 1800, delay: 0.05 });
+    shootArtillery() {   // the missile pod: two target-lock beeps, then a rocket whoosh
+      [0, 0.06].forEach((d) => voice({ type: 'square', freq: 1760, to: 1760, dur: 0.035, vol: 0.06, cutoff: 5000, delay: d, jitter: 0, key: d ? null : 'artillery', gap: 0.1 }));
+      noise({ dur: 0.55, vol: 0.24, freq: 900, to: 4200, q: 0.9, delay: 0.12 });
+      voice({ type: 'sawtooth', freq: 120, to: 480, dur: 0.45, vol: 0.05, cutoff: 1600, fm: { ratio: 0.25, depth: 0.5 }, delay: 0.12 });
     },
     // ---- hits and effects ----
-    hit() {      // a squelchy tok
-      voice({ type: 'square', freq: 620, to: 300, dur: 0.05, vol: 0.13, cutoff: 1800, key: 'hit', gap: 0.04 });
-      voice({ type: 'triangle', freq: 180, to: 120, dur: 0.07, vol: 0.18, cutoff: 900 });
-      noise({ dur: 0.03, vol: 0.14, freq: 1800, q: 1 });
+    hit() {      // an energy hit: a short zap and a splat
+      voice({ type: 'square', freq: 900, to: 260, dur: 0.06, vol: 0.1, cutoff: 2600, fm: { ratio: 1.41, depth: 0.7 }, key: 'hit', gap: 0.04 });
+      noise({ dur: 0.04, vol: 0.12, freq: 2400, q: 1.2 });
     },
-    clink() {    // armor shrugging off a hit
-      voice({ type: 'square', freq: 2400, to: 1800, dur: 0.04, vol: 0.12, cutoff: 6000, key: 'clink', gap: 0.05 });
-      noise({ dur: 0.04, vol: 0.18, freq: 5200, q: 3 });
+    clink() {    // armor plating deflecting a shot: a ringing metallic FM ping
+      voice({ type: 'sine', freq: 2100, to: 1900, dur: 0.14, vol: 0.1, cutoff: 7000, fm: { ratio: 3.53, depth: 1.2 }, key: 'clink', gap: 0.05 });
+      noise({ dur: 0.03, vol: 0.14, freq: 5200, q: 3 });
     },
-    splash() {   // a soft wide thud for area hits
-      noise({ dur: 0.26, vol: 0.28, freq: 600, to: 200, filter: 'lowpass', key: 'splash', gap: 0.08 });
-      voice({ type: 'triangle', freq: 120, to: 70, dur: 0.2, vol: 0.3, cutoff: 700 });
+    splash() {   // an area blast: a low plasma boom
+      noise({ dur: 0.3, vol: 0.26, freq: 700, to: 160, filter: 'lowpass', key: 'splash', gap: 0.08 });
+      voice({ type: 'sine', freq: 140, to: 50, dur: 0.24, vol: 0.3, cutoff: 700, fm: { ratio: 0.5, depth: 0.6 } });
     },
-    chill() {    // frost taking hold, a tiny glass tinkle
-      voice({ type: 'sine', freq: 3200, to: 3600, dur: 0.06, vol: 0.06, cutoff: 8000, key: 'chill', gap: 0.15 });
-      voice({ type: 'sine', freq: 4100, to: 3900, dur: 0.09, vol: 0.05, cutoff: 8000, delay: 0.05 });
+    chill() {    // a target freezing: a crackle of ice forming
+      for (let i = 0; i < 3; i++) noise({ dur: 0.02, vol: 0.07, freq: 7000 - i * 800, q: 5, delay: i * 0.03, key: i ? null : 'chill', gap: 0.15 });
+      voice({ type: 'sine', freq: 5200, to: 4600, dur: 0.12, vol: 0.035, cutoff: 9000, fm: { ratio: 2.1, depth: 0.5 }, delay: 0.04 });
     },
-    root() {     // stuck in goo: a sticky splorch
+    root() {     // stuck in goo: a sticky, bubbling splorch
       noise({ dur: 0.1, vol: 0.2, freq: 450, filter: 'lowpass', key: 'root', gap: 0.12 });
-      voice({ type: 'sine', freq: 220, to: 90, dur: 0.14, vol: 0.2, cutoff: 700, delay: 0.02 });
+      voice({ type: 'sine', freq: 200, to: 90, dur: 0.16, vol: 0.2, cutoff: 700, vib: { rate: 26, depth: 0.3 }, delay: 0.02 });
     },
     death() {    // a surprised bwoop sliding down, then a soft pop
       voice({ type: 'square', freq: 520, to: 160, dur: 0.28, vol: 0.14, cutoff: 1500, key: 'death', gap: 0.06 });

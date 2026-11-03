@@ -511,6 +511,7 @@ async function enterLevel(page, levelId) {
     [x, y] = await cellToScreen(page, c, r);
     await page.mouse.click(x, y); await page.waitForTimeout(200);
     const btn = page.locator(`.build-btn[data-tower="${type}"]`);
+    await btn.waitFor({ timeout: 5000 }).catch(() => {});   // the panel opens on the next UI frame, slow under software rendering
     check(`${type} button present`, await btn.count() === 1);
     await btn.click(); await page.waitForTimeout(200);
     check(`${type} placed`, (await S(page)).towers === before + 1);

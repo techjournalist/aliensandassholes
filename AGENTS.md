@@ -95,6 +95,18 @@ off the board above the first route's landing pods; scenery only. There
 are no drifting clouds or cloud shadows any more (a moon has no weather;
 the clouds showed as white blobs at the screen corners).
 
+**Sound effects are sci-fi** (the user said the towers still sounded like
+the medieval games). `voice()` takes `fm: { ratio, depth }` (frequency
+modulation: zaps, metallic pings), `vib: { rate, depth }` (warbling plasma)
+and `q` (filter bite). Laser Turret: a falling buzzy FM laser "pew" with a
+crackle. Goo Cannon: a warbling plasma "bwomp" with bubbles. Cryo Beam: a
+freezing zap (icy FM crackle, a hiss sweeping down, ice-crack clicks, a
+crystal shimmer). Mech Walker: hydraulic hiss, servo whine, rocket-fist
+ignition. Missile Pod: two target-lock beeps and a rocket whoosh. Hits are
+energy zaps, armor deflects with an FM ping, slows crackle as ice forms.
+Placing a tower beams it down; the game start is a power-up sweep and a
+synth chord; each wave starts with a two-tone colony alarm.
+
 **Music is space music** (the user said the Knights & Knaves score still
 sounded like an Earth game). Same engine (`scheduleStep`, layers, mixes,
 seeded tune per level) with new sounds: open sus2, add9, maj7 and min9
