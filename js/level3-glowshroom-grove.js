@@ -46,6 +46,8 @@ const LEVEL_3 = (() => {
       { id: 'fen',   waypoints: [[17, 0], [17, 3], [14, 3], [14, 4], ...tail] },
     ],
     chokepoint: { cell: [10, 5], streamRow: 5 },
+    // spore-puffer launch pads on the road below the creek: walkers that step on one fly for a moment
+    jumpPads: [[7, 7], [8, 11]],
     endpoint: {
       name: 'the lab', properName: 'The Research Lab',
       cells: [[14, 8], [15, 8], [14, 9], [15, 9], [14, 10], [15, 10]], gateCell: [14, 10],

@@ -47,10 +47,13 @@ const LEVEL_10 = (() => {
       { id: 'westmid',  waypoints: [[0, 9], [2, 9], [2, 11], [5, 11], ...westTail] },
       { id: 'westhigh', waypoints: [[0, 2], [3, 2], [3, 5], [6, 5], [6, 7], [5, 7], ...westTail] },
       { id: 'westlow',  waypoints: [[0, 13], [4, 13], [4, 11], [5, 11], ...westTail] },
-      { id: 'easthigh', waypoints: [[21, 2], [17, 2], [17, 5], [19, 5], [19, 9], ...eastTail] },
+      // the east pods' high road runs into a stolen jump gate and comes out on the west front
+      { id: 'easthigh', waypoints: [[21, 2], [17, 2], [17, 5], 'warp', [4, 4], [4, 5], [6, 5], [6, 7], [5, 7], ...westTail] },
       { id: 'eastlow',  waypoints: [[21, 12], [17, 12], [17, 11], [16, 11], ...eastTail] },
     ],
     chokepoint: { cell: [7, 9], streamCol: 7 },
+    // a rise beside the hard-light bridge: high ground over the crossing
+    elevation: { areas: [{ from: [8, 10], to: [11, 12], h: 1 }], ramps: [] },
     endpoint: {
       name: 'Terraformer Prime', properName: 'Terraformer Prime',
       cells: [[12, 4], [13, 4], [12, 5], [13, 5], [12, 6], [13, 6]], gateCell: [12, 6],

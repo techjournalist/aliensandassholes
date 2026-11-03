@@ -42,8 +42,8 @@ module.exports = {
   },
   'dune-sea': {
     firstSlingerTile: [3, 11],
-    laneSlingerTiles: {caravan: [4,11], wash: [14,11]},
-    botBuildSpots: [[3, 11], [11, 3], [4, 4], [9, 4], [5, 4], [11, 4], [10, 8], [8, 4], [8, 8], [4, 6], [14, 11], [12, 3], [7, 8], [5, 3], [10, 3], [14, 9]],
+    laneSlingerTiles: {caravan: [4,11], wash: [17,3]},
+    botBuildSpots: [[3, 11], [4, 4], [11, 3], [8, 4], [5, 4], [12, 3], [16, 3], [9, 4], [7, 8], [4, 6], [14, 3], [9, 3], [8, 8], [17, 3], [5, 3], [4, 11]],
     botPlan: ['slinger', 'slinger', 'slinger', 'druid', 'warden', 'artillery', 'golem', 'druid', 'warden', 'slinger', 'golem', 'artillery', 'warden', 'druid', 'slinger', 'golem'],
     waveCount: 13, hasBossOnWave: 13, bossType: 'sandworm',
   },
@@ -77,8 +77,8 @@ module.exports = {
   },
   'terraformer-prime': {
     firstSlingerTile: [1, 8],
-    laneSlingerTiles: {westmid: [3,9], westhigh: [2,3], westlow: [2,12], easthigh: [19,4], eastlow: [17,10]},
-    botBuildSpots: [[1, 8], [10, 8], [12, 8], [6, 8], [17, 10], [4, 10], [11, 8], [19, 4], [16, 8], [8, 7], [3, 12], [2, 4], [18, 10], [13, 8], [6, 10], [18, 4]],
+    laneSlingerTiles: {westmid: [3,9], westhigh: [2,3], westlow: [2,12], easthigh: [19,3], eastlow: [17,10]},
+    botBuildSpots: [[1, 8], [8, 7], [10, 8], [6, 8], [12, 8], [4, 10], [4, 6], [11, 8], [17, 10], [6, 10], [2, 4], [3, 12], [19, 3], [13, 8], [8, 8], [18, 11]],
     botPlan: ['slinger', 'slinger', 'slinger', 'druid', 'warden', 'artillery', 'golem', 'druid', 'warden', 'slinger', 'golem', 'artillery', 'warden', 'druid', 'slinger', 'golem'],
     waveCount: 14, hasBossOnWave: 14, bossType: 'mothership',
   },

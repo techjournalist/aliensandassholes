@@ -63,6 +63,23 @@ a damage ceiling) and it comes down the longer north-west road; the Spore
 Cloud is 330 and comes down the west road, the Sky Manta 440 (600 and 480
 both leaked on Comms Ridge once its layout changed).
 
+**Every level has at least one terrain feature** (the user asked for this):
+| Level | Feature |
+|---|---|
+| 1 Greenhope | low mesa [4..6, 3] and [5, 2] beside the first bends (teaches high ground) |
+| 2 Crater Rim | crater floor on the gully with two ramps; rim mesa |
+| 3 Glowshroom Grove | jump pads [7, 7] and [8, 11] |
+| 4 Comms Ridge | the dish's mesa, one ramp |
+| 5 The Dune Sea | worm tunnel: the wash warps from [16, 10] to [18, 5], past the bridge |
+| 6 Spaceport Bazaar | jump gate: the west road warps from [1, 8] to [16, 7] |
+| 7 The Glacier Shelf | jump pads [10, 5] and [13, 7] |
+| 8 Bloomfruit Orchard | jump pads [6, 6] and [13, 4]; terrace mesa [7..12, 3..4] |
+| 9 The Hive Front | jump pads [11, 8] and [16, 10] |
+| 10 Terraformer Prime | jump gate: the east high road warps from [17, 5] to the west front at [4, 4]; mesa [8..11, 10..12] by the bridge |
+A mesa must stay clear of a road's rounded corners (the validator says
+where); Greenhope's first try at [4..6, 2..3] clipped the bends at [3, 1]
+and [7, 1].
+
 **Scenery is alien, never Earth**: no trees, grass or birds (the user called
 them out). `treeParts` picks a tentacled anemone, a rock hoodoo, a tube coral
 or a nest of glowing pods; `bushParts` is a spiny urchin; the goo-withered

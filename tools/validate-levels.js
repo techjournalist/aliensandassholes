@@ -528,7 +528,7 @@ function progressTests() {
 // levels with curved roads. [lives, gold, kills] for seeds 1 and 2. A
 // deliberate change to a level's waves or economy will move these; regenerate
 // them then with `node tools/bot-runner.js all --seeds 2 --json`.
-const MEADOW_GOLDEN = {"greenhope":[[7,305,206],[14,349,213]],"crater-rim":[[16,307,157],[17,267,158]],"glowshroom-grove":[[20,311,151],[19,303,150]],"comms-ridge":[[10,329,235],[11,337,236]]};
+const MEADOW_GOLDEN = {"greenhope":[[12,337,211],[13,339,212]],"crater-rim":[[16,307,157],[17,267,158]],"glowshroom-grove":[[18,301,149],[18,295,149]],"comms-ridge":[[10,329,235],[11,337,236]]};
 function difficultyTests(G, LEVELS) {
   const out = [];
   const add = (name, ok, detail = '') => out.push({ name: `difficulty: ${name}`, ok, detail });

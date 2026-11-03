@@ -49,6 +49,9 @@ const LEVEL_8 = (() => {
       { id: 'cellar',  waypoints: [[19, 11], [17, 11], ...tail] },
     ],
     chokepoint: { cell: [15, 6], streamCol: 15 },
+    // fruit-cannon launch pads on the spiral, and a raised terrace inside it
+    jumpPads: [[6, 6], [13, 4]],
+    elevation: { areas: [{ from: [7, 3], to: [12, 4], h: 1 }], ramps: [] },
     endpoint: {
       name: 'the seed vault', properName: 'The Seed Vault',
       cells: [[9, 5], [10, 5], [9, 6], [10, 6]], gateCell: [9, 6],

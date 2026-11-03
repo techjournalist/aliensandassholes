@@ -10,7 +10,7 @@ const LEVEL_5 = (() => {
 
   const waves = [
     { name: "Up the Caravan Road", flavor: "Blob drones on the winding caravan road.", groups: [g('grunt', 5, 3.2, 0, 'caravan', 0)] },
-    { name: "The Dry Wash", flavor: "The wash from the south opens.", groups: [g('grunt', 5, 2.0, 0, 'caravan', 0), g('grunt', 4, 2.4, 0, 'wash', 4)] },
+    { name: "The Dry Wash", flavor: "The wash from the south opens. It dives into an old worm tunnel and comes out north of the quicksand, past the bridge.", groups: [g('grunt', 5, 2.0, 0, 'caravan', 0), g('grunt', 4, 2.4, 0, 'wash', 4)] },
     { name: "Hot Feet", flavor: "Crawlers race up the wash.", groups: [g('grunt', 5, 1.5, 0, 'caravan', 0), g('trickster', 5, 0.9, 0, 'wash', 4)] },
     { name: "Shell in the Sand", flavor: "A brute on the caravan road.", groups: [g('grunt', 6, 1.2, 0, 'wash', 0), g('troll', 1, 1, 0, 'caravan', 2), g('grunt', 4, 1.4, 0, 'caravan', 6)] },
     { name: "Heat Shimmer", flavor: "Saucers over the wash.", groups: [g('bat', 3, 1.3, 0, 'wash', 0), g('grunt', 6, 1.1, 0, 'caravan', 3)] },
@@ -48,7 +48,8 @@ const LEVEL_5 = (() => {
     spawn: [2, 12],
     routes: [
       { id: 'caravan', waypoints: [[2, 12], [2, 10], [6, 10], [6, 9], ...tail] },
-      { id: 'wash',    waypoints: [[16, 12], [16, 10], [12, 10], [12, 9], ...tail] },
+      // the wash runs into an old worm tunnel at [16, 10] and comes out north of the quicksand at [18, 5]
+      { id: 'wash',    waypoints: [[16, 12], [16, 10], 'warp', [18, 5], [18, 2], [13, 2], [6, 2], [6, 5], [2, 5]] },
     ],
     chokepoint: { cell: [9, 7], streamRow: 7 },
     endpoint: {

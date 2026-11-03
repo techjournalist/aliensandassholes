@@ -51,6 +51,8 @@ const LEVEL_9 = (() => {
       { id: 'flank',     waypoints: [[21, 13], [19, 13], [19, 10], [18, 10], [18, 8]] },
     ],
     chokepoint: { cell: [14, 8], streamCol: 14 },
+    // the Hive grew launch pads into the main road: one before the gantry, one past it
+    jumpPads: [[11, 8], [16, 10]],
     endpoint: {
       name: 'the shield generator', properName: 'The Shield Generator',
       cells: [[18, 6], [19, 6], [18, 7], [19, 7]], gateCell: [18, 7],

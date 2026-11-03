@@ -139,6 +139,8 @@ const LEVEL_1 = (() => {
     spawn: [0, 4],
     pathWaypoints: [[0, 4], [3, 4], [3, 1], [7, 1], [7, 6], [5, 6], [5, 9], [12, 9], [12, 3], [14, 3], [14, 9], [15, 9]],
     chokepoint: { cell: [10, 9], streamCol: 10 },
+    // a low mesa beside the first bends: high ground, so towers there reach further
+    elevation: { areas: [{ from: [4, 3], to: [6, 3], h: 1 }, { from: [5, 2], to: [5, 2], h: 1 }], ramps: [] },
     endpoint: {
       name: 'the homestead', properName: 'Greenhope Homestead',
       cells: [[15, 6], [16, 6], [15, 7], [16, 7], [15, 8], [16, 8]], gateCell: [15, 8],
