@@ -364,7 +364,7 @@ async function enterLevel(page, levelId) {
   // ---- P3-V16: the player can tilt the camera ----
   const tiltDone = () => page.waitForFunction(() => !Renderer.tiltTurning() && !Renderer.viewTurning(), null, { timeout: 30000 }).then(() => true, () => false);
   const camNow = () => page.evaluate(() => Renderer.debugCamera());
-  const pickOk = () => page.evaluate(() => [[7, 5], [3, 3], [12, 7]].every(([c, r]) => { const p = Renderer.worldToScreen(GameState.worldX(c), 0, GameState.worldZ(r)); const h = Renderer.screenToCell(p.x, p.y); return h && h.c === c && h.r === r; }));
+  const pickOk = () => page.evaluate(() => [[7, 5], [5, 9], [12, 7]].every(([c, r]) => { const p = Renderer.worldToScreen(GameState.worldX(c), 0, GameState.worldZ(r)); const h = Renderer.screenToCell(p.x, p.y); return h && h.c === c && h.r === r; }));
   check('tilt buttons are 44px targets', await page.evaluate(() => ['tilt-up-btn', 'tilt-down-btn'].every((id) => { const r = document.getElementById(id).getBoundingClientRect(); return r.width >= 44 && r.height >= 44; })));
   const t0 = await camNow();
   await page.locator('#tilt-down-btn').click(); await tiltDone();

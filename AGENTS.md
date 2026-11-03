@@ -86,8 +86,11 @@ or a nest of glowing pods; `bushParts` is a spiny urchin; the goo-withered
 plant is a crooked crust spire; `buildGrass` scatters tiny crystal shards
 (the mesh keeps the name `grass` for the harness); there are no birds or
 butterflies, only drifting cloud shadows and motes (fireflies, spores,
-embers, dust; no leaves). The ground shader (`patchGround`) mutes each
-level's ground color toward stone and draws cracked rock plates
+embers, dust; no leaves). `countryside()` makes every mix rockier
+(`ROCKIER`: plants and mushrooms keep 15 to 50% of their weight, the rest
+goes to rock, crystal and crater). The ground shader (`patchGround`) mutes
+each level's ground color 80% toward grey-brown stone (only a faint tint
+is left) and draws cracked rock plates
 (`fxCells`, cellular noise), fine grit and the odd small crater; the old
 grass-like brush strokes are gone.
 

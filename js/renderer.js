@@ -1388,7 +1388,7 @@ const Renderer = (() => {
         } else if (GameState.onStreamLine(c, r)) continue;
         const h = GameState.zoneFalloff(c, r);
         if (h > 0.62) continue;
-        const tufts = Math.floor((inGrid ? 3.4 : 2.4) * (1 - h * 0.9) * QUALITY + rng());
+        const tufts = Math.floor((inGrid ? 1.5 : 1.1) * (1 - h * 0.9) * QUALITY + rng());
         for (let t = 0; t < tufts; t++) {
           const cx = worldX(c) + (rng() - 0.5) * 0.84, cz = worldZ(r) + (rng() - 0.5) * 0.84;
           if (roadDist(cx, cz) < 0.62) continue;
@@ -3748,7 +3748,10 @@ const Renderer = (() => {
           m.g.scale.set(s * (1 - 0.03 * Math.sin(t * 4)), s * (1 + 0.05 * Math.sin(t * 4)), s);
           m.live.flag.rotation.y = Math.sin(t * 2 + i) * 0.15;
           m.live.lamp.rotation.y = t * 6;
-          m.live.lamp.scale.setScalar(1 + 0.25 * Math.max(0, Math.sin(t * 12)));
+          // pulse relative to the lamp's own size (setScalar here once blew the
+          // little lamp up into a pink blob a tile wide)
+          m.lampBase = m.lampBase || m.live.lamp.scale.clone();
+          m.live.lamp.scale.copy(m.lampBase).multiplyScalar(1 + 0.25 * Math.max(0, Math.sin(t * 12)));
           m.live.ring.scale.setScalar(0.5 * (1 + 0.45 * ((t * 1.2 + i * 0.3) % 1)));
           m.live.arrow.position.z = 0.7 + 0.15 * Math.sin(t * 5);
         });

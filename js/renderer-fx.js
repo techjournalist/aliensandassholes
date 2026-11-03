@@ -66,7 +66,8 @@ const RendererFX = (() => {
           float fxBroad = fxFbm(vFxWorld.xz * 0.55);
           float fxFine = fxFbm(vFxWorld.xz * 3.4 + 7.3);
           float fxLum = dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11));
-          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(fxLum) * vec3(1.0, 0.97, 1.06), 0.42);
+          // mostly bare stone: the level's color is kept only as a faint tint
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(fxLum) * vec3(1.02, 0.97, 0.93), 0.8);
           vec3 fxPl = fxCells(vFxWorld.xz * 1.6 + vec2(fxFine * 0.4));
           float fxSeam = 1.0 - smoothstep(0.02, 0.09, fxPl.y - fxPl.x);
           float fxGrit = fxHash(floor(vFxWorld.xz * 26.0));

@@ -359,6 +359,16 @@ const LevelCommon = (() => {
       ...(kit.extraRecipes ? kit.extraRecipes(rng) : {}),
     };
     const TALL = new Set(['tree', 'cottage', 'silo', 'greenhouse', 'antenna', 'bigshroom', 'crystal']);
+    // A moon is mostly rock: whatever a level asks for, plants and mushrooms
+    // give way to boulders, crystals and craters (the user found the flora-
+    // heavy mixes read as a garden, not an alien world).
+    const ROCKIER = { tree: 0.35, bush: 0.3, tuft: 0.3, flower: 0.25, mushroom: 0.15, bigshroom: 0.15, hay: 0.5 };
+    const rockier = (list) => {
+      let freed = 0;
+      const out = list.map(([w, name]) => { const k = ROCKIER[name]; if (k === undefined) return [w, name]; freed += w * (1 - k); return [w * k, name]; });
+      return out.concat([[freed * 0.5, 'rock'], [freed * 0.25, 'crystal'], [freed * 0.25, 'crater']]);
+    };
+    mix = rockier(mix); edge = rockier(edge);
     const pick = (list) => {
       let roll = rng() * list.reduce((a, [w]) => a + w, 0);
       for (const [w, name] of list) { roll -= w; if (roll <= 0) return name; }
