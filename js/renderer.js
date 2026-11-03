@@ -689,38 +689,71 @@ const Renderer = (() => {
   // -------- prop recipes (each returns a parts list in local space) --------
   const P = (geo, color, m, outline = true, extra = {}) => ({ geo, color, m, outline, ...extra });
 
-  // Moon flora: three species keep a grove from reading as one plant
-  // repeated: a bulb tree (a curving stalk under a fat round crown with
-  // glowing seeds), a corkscrew frond (tilted discs stacked up a stalk) and a
-  // coral cluster (capped tubes of different heights). Like the old trees
-  // they only use the three meadow tones for their bulk, so each level's
-  // retint still works, plus one glowing accent.
+  // Moon flora, nothing like an Earth tree: a tentacled anemone with
+  // glowing tips, a hoodoo (a stacked rock pinnacle), a tube coral and a
+  // cluster of glowing pods. Flora uses the three meadow tones for its bulk,
+  // so each level's retint still works, plus one glowing accent.
   function treeParts(rng) {
     const kind = rng();
-    if (kind < 0.28) return frondParts(rng);
-    if (kind < 0.48) return coralParts(rng);
-    return bulbTreeParts(rng);
+    if (kind < 0.3) return anemoneParts(rng);
+    if (kind < 0.52) return hoodooParts(rng);
+    if (kind < 0.76) return coralParts(rng);
+    return podParts(rng);
   }
   const GLOWS = () => [PALETTE.flowerPink, PALETTE.crystalTeal, PALETTE.flowerYellow, PALETTE.crystal];
-  function rootFlares(parts, rng, n, ry, len) {
-    const ra = rng() * 6;
-    for (let i = 0; i < n; i++) {
-      const a = ra + i * (Math.PI * 2 / n);
-      parts.push(P(GEO.cone, PALETTE.meadowDark, M(Math.cos(a) * 0.09, 0.04, Math.sin(a) * 0.09,
-        { sx: 0.05, sy: len, sz: 0.045, rz: -Math.cos(a) * 1.25, rx: Math.sin(a) * 1.25 }), false));
-    }
+  // a tentacle: two tapering segments bending outward from the base, a glowing bead at the tip
+  function tentacle(parts, rng, a, len, w, col, tip) {
+    const lean1 = 0.25 + rng() * 0.25, lean2 = lean1 + 0.5 + rng() * 0.4, l1 = len * 0.55, l2 = len * 0.45;
+    const ca = Math.cos(a), sa = Math.sin(a);
+    const x1 = ca * Math.sin(lean1) * l1, y1 = Math.cos(lean1) * l1, z1 = sa * Math.sin(lean1) * l1;
+    parts.push(P(GEO.cylTaper, col, M(x1 / 2, y1 / 2 + 0.08, z1 / 2, { sx: w, sy: l1, sz: w, rz: -ca * lean1, rx: sa * lean1 })));
+    const x2 = x1 + ca * Math.sin(lean2) * l2, y2 = y1 + Math.cos(lean2) * l2, z2 = z1 + sa * Math.sin(lean2) * l2;
+    parts.push(P(GEO.cylTaper, col, M((x1 + x2) / 2, (y1 + y2) / 2 + 0.08, (z1 + z2) / 2, { sx: w * 0.6, sy: l2, sz: w * 0.6, rz: -ca * lean2, rx: sa * lean2 }), false));
+    parts.push(P(GEO.bead, tip, M(x2, y2 + 0.08, z2, { s: w * 0.9 }), false, { unlit: true }));
   }
-  function frondParts(rng) {
-    const h = 0.9 + rng() * 0.6, lean = (rng() - 0.5) * 0.25;
-    const parts = [P(GEO.cylTaper, PALETTE.meadowDark, M(0, h / 2, 0, { sx: 0.06, sy: h, sz: 0.06, rz: lean }))];
-    rootFlares(parts, rng, 3, 0.04, 0.16);
-    const n = 4, cols = [PALETTE.meadowDark, PALETTE.meadow, PALETTE.meadow, PALETTE.meadowLight];
+  function anemoneParts(rng) {
+    const s = 0.75 + rng() * 0.5, tip = GLOWS()[Math.floor(rng() * 4)];
+    const parts = [P(GEO.dome, PALETTE.meadowDark, M(0, 0.02, 0, { sx: 0.22 * s, sy: 0.16 * s, sz: 0.22 * s }))];
+    const n = 6 + Math.floor(rng() * 3), ra = rng() * 6;
     for (let i = 0; i < n; i++) {
-      const k = i / (n - 1), y = 0.3 + k * h * 0.78, r = 0.34 - k * 0.17;
-      parts.push(P(GEO.cyl, cols[i], M(Math.sin(lean) * -y * 0.5, y, 0, { sx: r, sy: 0.05, sz: r * 0.82, rx: (rng() - 0.5) * 0.5, rz: 0.35 * (i % 2 ? 1 : -1), ry: rng() * 6 })));
+      const a = ra + i * (Math.PI * 2 / n) + (rng() - 0.5) * 0.4;
+      tentacle(parts, rng, a, (0.5 + rng() * 0.45) * s, 0.05 * s, i % 2 ? PALETTE.meadow : PALETTE.meadowLight, tip);
     }
-    parts.push(P(GEO.sphereLo, GLOWS()[Math.floor(rng() * 4)], M(Math.sin(lean) * -h * 0.5, h + 0.12, 0, { s: 0.07 }), false, { unlit: true }));
+    // a tall central stalk with a pulsing bulb
+    parts.push(P(GEO.cylTaper, PALETTE.meadowDark, M(0, 0.4 * s, 0, { sx: 0.06 * s, sy: 0.75 * s, sz: 0.06 * s })));
+    parts.push(P(GEO.sphereLo, tip, M(0, 0.8 * s, 0, { s: 0.08 * s }), false, { unlit: true }));
+    return { parts, radius: 0.3 * s };
+  }
+  // a hoodoo: rock blocks stacked into a leaning pinnacle with a flat cap
+  // and a band of crystal, the kind of thing low gravity lets stand
+  function hoodooParts(rng) {
+    const parts = [], n = 3 + Math.floor(rng() * 2), lean = (rng() - 0.5) * 0.3;
+    let y = 0, w = 0.3 + rng() * 0.1;
+    for (let i = 0; i < n; i++) {
+      const h = 0.22 + rng() * 0.12;
+      parts.push(P(GEO.rock, i % 2 ? PALETTE.stoneDark : PALETTE.stone, M(Math.sin(lean) * y, y + h / 2, 0, { sx: w, sy: h * 0.9, sz: w * 0.9, ry: rng() * 3 })));
+      y += h * 0.8; w *= 0.78;
+    }
+    parts.push(P(GEO.cyl, PALETTE.stoneDark, M(Math.sin(lean) * y, y + 0.03, 0, { sx: w * 2, sy: 0.06, sz: w * 1.8, ry: rng() * 3 })));
+    const col = rng() < 0.5 ? PALETTE.crystal : PALETTE.crystalTeal;
+    for (let i = 0; i < 3; i++) {
+      const a = rng() * 6.28;
+      parts.push(P(GEO.cone, col, M(Math.sin(lean) * y * 0.4 + Math.cos(a) * 0.16, y * 0.35, Math.sin(a) * 0.15, { sx: 0.045, sy: 0.16, sz: 0.045, rz: -Math.cos(a) * 0.7, rx: Math.sin(a) * 0.7 }), false));
+    }
     return { parts, radius: 0.3 };
+  }
+  // a nest of glowing pods (eggs? fruit? nobody on the colony is sure) on short stalks
+  function podParts(rng) {
+    const parts = [P(GEO.dome, PALETTE.meadowDark, M(0, 0, 0, { sx: 0.3, sy: 0.1, sz: 0.3 }))];
+    const glow = GLOWS()[Math.floor(rng() * 4)], n = 3 + Math.floor(rng() * 3);
+    for (let i = 0; i < n; i++) {
+      const a = rng() * 6.28, d = i ? 0.1 + rng() * 0.14 : 0, h = 0.12 + rng() * 0.35, r = 0.09 + rng() * 0.07;
+      const x = Math.cos(a) * d, z = Math.sin(a) * d;
+      parts.push(P(GEO.cyl, PALETTE.meadow, M(x, h / 2, z, { sx: 0.025, sy: h, sz: 0.025 }), false));
+      parts.push(P(GEO.sphereMid, PALETTE.meadowLight, M(x, h + r * 0.9, z, { sx: r, sy: r * 1.25, sz: r })));
+      parts.push(P(GEO.sphereLo, glow, M(x, h + r * 0.9, z + r * 0.35, { sx: r * 0.55, sy: r * 0.8, sz: r * 0.6 }), false, { unlit: true }));
+    }
+    return { parts, radius: 0.28 };
   }
   function coralParts(rng) {
     const parts = [], n = 3 + Math.floor(rng() * 3), cap = GLOWS()[Math.floor(rng() * 4)];
@@ -733,56 +766,18 @@ const Renderer = (() => {
     }
     return { parts, radius: 0.25 };
   }
-  function bulbTreeParts(rng) {
-    const h = 0.7 + rng() * 0.5, r = 0.36 + rng() * 0.22, bend = (rng() - 0.5) * 0.5;
-    const top = h * 0.7;
-    const parts = [
-      P(GEO.cylTaper, PALETTE.meadowDark, M(0, h * 0.2, 0, { sx: 0.1, sy: h * 0.4, sz: 0.1 })),
-      P(GEO.cylTaper, PALETTE.meadowDark, M(Math.sin(bend) * h * 0.15, h * 0.52, 0, { sx: 0.07, sy: h * 0.42, sz: 0.07, rz: -bend * 0.8 })),
-    ];
-    rootFlares(parts, rng, 3 + Math.floor(rng() * 2), 0.04, 0.2);
-    const cx = Math.sin(bend) * h * 0.3;
-    // the crown: one fat round bulb, lighter toward the sun, ringed with leaf flaps
-    parts.push(P(GEO.sphereMid, PALETTE.meadow, M(cx, top + r * 0.7, 0, { sx: r, sy: r * 0.85, sz: r })));
-    parts.push(P(GEO.sphereLo, PALETTE.meadowLight, M(cx - r * 0.3, top + r * 1.1, -r * 0.05, { s: r * 0.55 })));
-    for (let i = 0; i < 5; i++) {
-      const a = (i / 5) * Math.PI * 2 + rng();
-      parts.push(P(GEO.cone, PALETTE.meadowDark, M(cx + Math.cos(a) * r * 0.85, top + r * 0.35, Math.sin(a) * r * 0.85,
-        { sx: r * 0.32, sy: r * 0.5, sz: r * 0.12, rz: -Math.cos(a) * 2.2, rx: Math.sin(a) * 2.2 }), false));
-    }
-    // glowing seeds dotted over the crown, so a grove twinkles
-    if (rng() < 0.7) {
-      const fc = GLOWS()[Math.floor(rng() * 4)];
-      for (let i = 0; i < 4; i++) {
-        const a = rng() * 6.28, el = 0.2 + rng() * 0.9;
-        parts.push(P(GEO.bead, fc, M(cx + Math.cos(a) * Math.cos(el) * r * 0.98, top + r * 0.7 + Math.sin(el) * r * 0.85, Math.sin(a) * Math.cos(el) * r * 0.98, { s: 0.045 }), false, { unlit: true }));
-      }
-    }
-    return { parts, radius: r * 0.9 };
-  }
-  // where the goo has spread: a withered stalk hung with goo strings and a
-  // pod of acid-green spores still glowing
+  // where the goo has spread: a crooked spire of goo crust, dripping, with
+  // a pod of acid-green spores still glowing on top
   function deadTreeParts(rng) {
-    const h = 0.8 + rng() * 0.7, lean = (rng() - 0.5) * 0.6;
+    const h = 0.7 + rng() * 0.6, lean = (rng() - 0.5) * 0.6;
     const parts = [
-      P(GEO.cylTaper, PALETTE.hollowWood, M(0, h / 2, 0, { sx: 0.1, sy: h, sz: 0.1, rz: lean })),
+      P(GEO.cylTaper, PALETTE.hollowWood, M(0, h / 2, 0, { sx: 0.13, sy: h, sz: 0.13, rz: lean })),
+      P(GEO.rock, PALETTE.hollowEarth, M(0, 0.06, 0, { sx: 0.24, sy: 0.12, sz: 0.2, ry: rng() * 3 })),
     ];
-    for (let i = 0; i < 3; i++) {
-      const a = i * 2.1 + rng();
-      parts.push(P(GEO.cone, PALETTE.hollowWood, M(Math.cos(a) * 0.1, 0.05, Math.sin(a) * 0.1,
-        { sx: 0.05, sy: 0.22, sz: 0.045, rz: -Math.cos(a) * 1.3, rx: Math.sin(a) * 1.3 }), false));
+    for (let i = 0; i < 2; i++) {
+      const y = h * (0.3 + rng() * 0.4);
+      parts.push(P(GEO.sphereLo, PALETTE.hollowEarth, M(Math.sin(lean) * -y * 0.5 + (rng() - 0.5) * 0.08, y, 0.06, { sx: 0.08, sy: 0.1, sz: 0.07 })));
     }
-    const n = 2 + Math.floor(rng() * 2);
-    for (let i = 0; i < n; i++) {
-      const y = h * (0.5 + rng() * 0.4), a = rng() * Math.PI * 2, len = 0.25 + rng() * 0.3;
-      const m = new THREE.Matrix4().makeTranslation(Math.sin(lean) * -y * 0.5, y, 0)
-        .multiply(new THREE.Matrix4().makeRotationY(a))
-        .multiply(new THREE.Matrix4().makeRotationZ(1.2 + rng() * 0.6))
-        .multiply(new THREE.Matrix4().makeTranslation(0, len / 2, 0))
-        .multiply(new THREE.Matrix4().makeScale(0.04, len, 0.04));
-      parts.push(P(GEO.cylTaper, PALETTE.hollowWood, m));
-    }
-    // the spore pod, and a drip of goo down the stalk
     parts.push(P(GEO.sphereLo, PALETTE.hollowEarth, M(Math.sin(lean) * -h * 0.5, h + 0.04, 0, { sx: 0.11, sy: 0.14, sz: 0.11 })));
     if (rng() < 0.7) parts.push(P(GEO.bead, PALETTE.spore, M(Math.sin(lean) * -h * 0.5, h + 0.06, 0.08, { s: 0.045 }), false, { unlit: true }));
     parts.push(P(GEO.cyl, PALETTE.spore, M(Math.sin(lean) * -h * 0.25 + 0.06, h * 0.55, 0.05, { sx: 0.015, sy: h * 0.4, sz: 0.015, rz: lean }), false, { unlit: true }));
@@ -1397,22 +1392,28 @@ const Renderer = (() => {
         for (let t = 0; t < tufts; t++) {
           const cx = worldX(c) + (rng() - 0.5) * 0.84, cz = worldZ(r) + (rng() - 0.5) * 0.84;
           if (roadDist(cx, cz) < 0.62) continue;
-          const n = 5 + Math.floor(rng() * 5);
-          const tint = lerpColor(vt.meadow, PALETTE.meadowLight, 0.2 + rng() * 0.55).lerp(new THREE.Color(PALETTE.hollowGround), Math.min(1, h * 1.2));
-          const tall = 0.16 + rng() * 0.12;
+          // not grass: a little nest of crystal shards poking out of the regolith
+          const n = 2 + Math.floor(rng() * 3);
+          const tint = lerpColor(rng() < 0.5 ? PALETTE.crystal : PALETTE.crystalTeal, vt.meadowLight, 0.35 + rng() * 0.3).lerp(new THREE.Color(PALETTE.hollowGround), Math.min(1, h * 1.2));
+          const tall = 0.09 + rng() * 0.1;
           for (let b = 0; b < n; b++) {
-            blades.push({ x: cx + (rng() - 0.5) * 0.2, z: cz + (rng() - 0.5) * 0.2, h: tall * (0.7 + rng() * 0.5) * (1 - h * 0.4), ry: rng() * Math.PI, lean: (rng() - 0.5) * 0.6, tint: tint.clone().offsetHSL(0, 0, (rng() - 0.5) * 0.07) });
+            blades.push({ x: cx + (rng() - 0.5) * 0.16, z: cz + (rng() - 0.5) * 0.16, h: tall * (0.6 + rng() * 0.6) * (1 - h * 0.4), ry: rng() * Math.PI, lean: (rng() - 0.5) * 1.1, tint: tint.clone().offsetHSL(0, 0, (rng() - 0.5) * 0.08) });
           }
         }
       }
     }
     if (!blades.length) return;
-    const mesh = new THREE.InstancedMesh(RendererFX.grassBladeGeometry(), RendererFX.grassMaterial(fxTime), blades.length);
+    // a four-sided shard, dark at the root and bright at the tip; shards don't sway
+    const shard = new THREE.ConeGeometry(0.035, 1, 4, 1).translate(0, 0.5, 0);
+    const sc = [], sp = shard.attributes.position;
+    for (let i = 0; i < sp.count; i++) { const k = 0.55 + 0.6 * sp.getY(i); sc.push(k, k, k); }
+    shard.setAttribute('color', new THREE.Float32BufferAttribute(sc, 3));
+    const mesh = new THREE.InstancedMesh(shard, new THREE.MeshBasicMaterial({ vertexColors: true }), blades.length);
     const dummy = new THREE.Object3D();
     blades.forEach((b, i) => {
       dummy.position.set(b.x, groundYAt(b.x, b.z), b.z);
       dummy.rotation.set(b.lean * 0.4, b.ry, b.lean);
-      dummy.scale.set(1, b.h, 1);
+      dummy.scale.set(1 + b.h * 2, b.h, 1 + b.h * 2);
       dummy.updateMatrix();
       mesh.setMatrixAt(i, dummy.matrix);
       mesh.setColorAt(i, b.tint);
@@ -2561,7 +2562,7 @@ const Renderer = (() => {
     }
   }
 
-  // -------- living world: birds, butterflies, drifting cloud shadows --------
+  // -------- living world: drifting cloud shadows (the moon has no birds) --------
   // Birds and butterflies are instanced wing triangles (two draw calls each
   // species, however many there are) flapped by rewriting instance matrices.
   // Cloud shadows are one big soft-noise quad. Levels that are mostly blight
@@ -2608,29 +2609,6 @@ const Renderer = (() => {
       _qf.setFromAxisAngle(zAxis, -flap); _m.compose(_p, _q.clone().multiply(_qf), _sc); fl.L.setMatrixAt(i, _m);
       _qf.setFromAxisAngle(zAxis, flap); _m.compose(_p, _q.clone().multiply(_qf), _sc); fl.R.setMatrixAt(i, _m);
     };
-    if (corrupt < 0.72) {
-      const birds = flock(Math.round(5 * QUALITY + 0.5), 0.34, 0.11, 0.11, 0x2a2048, false);
-      if (birds) animated.push({ update(t) {
-        birds.items.forEach((b, i) => {
-          const a = t * b.sp + b.ph, x = b.cx + Math.cos(a) * b.rx * 2.4, z = b.cz + Math.sin(a) * b.rz * 2.4;
-          const yaw = Math.atan2(-Math.sin(a) * b.rx, Math.cos(a) * b.rz);
-          place(birds, i, x, 3.2 + b.h + Math.sin(t * 1.1 + b.ph) * 0.2, z, yaw, Math.sin(t * 9 + b.ph * 3) * 0.6, 1.6);
-        });
-        birds.L.instanceMatrix.needsUpdate = birds.R.instanceMatrix.needsUpdate = true;
-      } });
-    }
-    if (corrupt < 0.45) {
-      const flies = flock(Math.round(9 * QUALITY), 0.13, 0.08, 0.08, 0xffffff, true);
-      if (flies) animated.push({ update(t) {
-        flies.items.forEach((b, i) => {
-          const a = t * (0.5 + b.sp) + b.ph;
-          const x = b.cx * 0.6 + Math.sin(a * 0.9) * b.rx * 0.5, z = b.cz * 0.6 + Math.cos(a * 0.7) * b.rz * 0.5;
-          const yaw = Math.atan2(Math.cos(a * 0.9) * b.rx * 0.45, -Math.sin(a * 0.7) * b.rz * 0.35);
-          place(flies, i, x, 0.42 + Math.sin(a * 1.9) * 0.14, z, yaw, 0.15 + (Math.sin(t * 22 + b.ph * 5) * 0.5 + 0.5) * 1.1, 1.4);
-        });
-        flies.L.instanceMatrix.needsUpdate = flies.R.instanceMatrix.needsUpdate = true;
-      } });
-    }
     // cloud shadows: soft noise scrolling over the ground, under every unit
     const w = cols + border * 2, h = rows + border * 2;
     const cloudMat = new THREE.ShaderMaterial({

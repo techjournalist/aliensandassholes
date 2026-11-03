@@ -103,15 +103,16 @@ const LevelCommon = (() => {
     parts.push(P(GEO.bead, PALETTE.capRed, M(0, h + 0.03, 0, { s: 0.03 }), false, { unlit: true }));
     return { parts, radius: 0.1 };
   }
-  // A moss shrub with glowing berries.
+  // A spiny moon urchin: a squat ball bristling with spines, glowing tips.
   function bushParts(kit, rng) {
     const { P, M, GEO } = kit;
-    const s = 0.14 + rng() * 0.1;
-    const parts = [
-      P(GEO.sphereLo, PALETTE.meadowDark, M(0, s * 0.8, 0, { sx: s * 1.4, sy: s, sz: s * 1.2 })),
-      P(GEO.sphereLo, PALETTE.meadow, M(s * 0.5, s * 1.1, s * 0.2, { s: s * 0.7 })),
-    ];
-    if (rng() < 0.6) for (let i = 0; i < 3; i++) parts.push(P(GEO.bead, rng() < 0.5 ? PALETTE.flowerPink : PALETTE.crystalTeal, M((rng() - 0.5) * s * 2, s * (0.9 + rng() * 0.6), s * 0.9, { s: 0.03 }), false, { unlit: true }));
+    const s = 0.12 + rng() * 0.08, tip = rng() < 0.5 ? PALETTE.flowerPink : PALETTE.crystalTeal;
+    const parts = [P(GEO.sphereLo, PALETTE.meadowDark, M(0, s * 0.7, 0, { sx: s * 1.2, sy: s, sz: s * 1.2 }))];
+    for (let i = 0; i < 9; i++) {
+      const a = i * 2.4 + rng() * 0.3, el = 0.3 + (i % 3) * 0.4, ca = Math.cos(a) * Math.cos(el), sa = Math.sin(a) * Math.cos(el), up = Math.sin(el);
+      parts.push(P(GEO.cone, PALETTE.meadowLight, M(ca * s * 1.2, s * 0.7 + up * s, sa * s * 1.2, { sx: 0.02, sy: s * 1.1, sz: 0.02, rz: -Math.atan2(ca, up), rx: Math.atan2(sa, up) }), false));
+      if (i % 3 === 0) parts.push(P(GEO.bead, tip, M(ca * s * 1.75, s * 0.7 + up * s * 1.5, sa * s * 1.75, { s: 0.022 }), false, { unlit: true }));
+    }
     return { parts, radius: s * 1.2 };
   }
   // A run of low colony fence: white posts with a light on top and a cable between.

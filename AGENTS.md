@@ -63,6 +63,14 @@ a damage ceiling) and it comes down the longer north-west road; the Spore
 Cloud is 330 and comes down the west road, the Sky Manta 440 (600 and 480
 both leaked on Comms Ridge once its layout changed).
 
+**Scenery is alien, never Earth**: no trees, grass or birds (the user called
+them out). `treeParts` picks a tentacled anemone, a rock hoodoo, a tube coral
+or a nest of glowing pods; `bushParts` is a spiny urchin; the goo-withered
+plant is a crooked crust spire; `buildGrass` scatters tiny crystal shards
+(the mesh keeps the name `grass` for the harness); there are no birds or
+butterflies, only drifting cloud shadows and motes (fireflies, spores,
+embers, dust; no leaves).
+
 **Levels** (`js/level*.js`). Level 1 builds its own scene; Levels 2 to 10
 are mostly data and call `LevelCommon.standardScene(kit, {...})`, which picks
 the level's own chokepoint channel (`STREAMS`: canal, chasm, goo, coolant,
