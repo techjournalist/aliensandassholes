@@ -108,6 +108,8 @@ const GameState = (() => {
   // one is thrown into the air for JUMP_TIME seconds at JUMP_SPEED times its
   // pace. Airborne it counts as a flyer: only towers that hit flyers reach it.
   const JUMP_TIME = 1.1, JUMP_SPEED = 1.8;
+  // a boss is too heavy for a full launch: a short, low hop that lands hard
+  const BOSS_JUMP_TIME = 0.75, BOSS_JUMP_SPEED = 1.35;
   // Elevation (a level's elevation: { areas: [{ from, to, h }], ramps }):
   // raised mesas (h > 0) and sunken crater floors (h < 0), each step
   // ELEV_UNIT high. Roads climb on ramp cells. Play stays flat (ranges are
@@ -665,13 +667,13 @@ const GameState = (() => {
     const route = routes[e.route];
     if (e.airborne) {
       // mid-jump: no goo or frost can hold it, and it covers ground fast
-      e.speedMul = JUMP_SPEED; e.airT += dt;
-      if (e.airT >= JUMP_TIME) { e.airborne = false; emit('enemyLanded', e); }
+      e.speedMul = e.boss ? BOSS_JUMP_SPEED : JUMP_SPEED; e.airT += dt;
+      if (e.airT >= e.jumpTime) { e.airborne = false; emit('enemyLanded', e); }
     }
     const before = e.dist;
     e.dist += e.speed * e.speedMul * dt * route.pace;
-    if (!e.airborne && !e.flying && !e.boss && route.pads.some((d) => before < d && e.dist >= d)) {
-      e.airborne = true; e.airT = 0; e.rooted = false; e.rootUntil = 0;
+    if (!e.airborne && !e.flying && route.pads.some((d) => before < d && e.dist >= d)) {
+      e.airborne = true; e.airT = 0; e.jumpTime = e.boss ? BOSS_JUMP_TIME : JUMP_TIME; e.rooted = false; e.rootUntil = 0;
       emit('enemyLaunched', e);
     }
     // in a wormhole: out of sight and out of reach until it comes out

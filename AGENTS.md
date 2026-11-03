@@ -86,7 +86,10 @@ or a nest of glowing pods; `bushParts` is a spiny urchin; the goo-withered
 plant is a crooked crust spire; `buildGrass` scatters tiny crystal shards
 (the mesh keeps the name `grass` for the harness); there are no birds or
 butterflies, only drifting cloud shadows and motes (fireflies, spores,
-embers, dust; no leaves).
+embers, dust; no leaves). The ground shader (`patchGround`) mutes each
+level's ground color toward stone and draws cracked rock plates
+(`fxCells`, cellular noise), fine grit and the odd small crater; the old
+grass-like brush strokes are gone.
 
 **Levels** (`js/level*.js`). Level 1 builds its own scene; Levels 2 to 10
 are mostly data and call `LevelCommon.standardScene(kit, {...})`, which picks
@@ -153,13 +156,15 @@ cannot be targeted inside. Spaceport Bazaar's west road uses one: in at
 
 **Jump pads**: a level's `jumpPads` lists road cells (never the bridge).
 `loadLevel` turns each into a distance along every route over it
-(`route.pads`). A ground walker (not a flyer, not a boss) that crosses one
+(`route.pads`). A ground walker (not a flyer) that crosses one
 gets `e.airborne` for `JUMP_TIME` (1.1 s) at `JUMP_SPEED` (1.8x) its pace,
 ignoring goo and frost. In the air it counts as a flyer (`inAir(e)`): only
 towers that hit flyers pick it, keep it or splash it, a ground shot already
 on its way fizzles, and it cannot be rooted. `enemyLaunched` and
 `enemyLanded` fire; the renderer arcs the walker 1.4 high and kicks the
-pad's deck (`buildJumpPads`, `padKick`). The validator checks every pad is
+pad's deck (`buildJumpPads`, `padKick`). Ground bosses hop too: `BOSS_JUMP_TIME` (0.75 s)
+at `BOSS_JUMP_SPEED` (1.35x), 0.9 high, and land with a camera shake and a
+dust ring. The validator checks every pad is
 on a road, a ground tower beside one loses the walker in the air and an
 anti-air tower keeps it. The Glacier Shelf has two: [10, 5] and [13, 7].
 

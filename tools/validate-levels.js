@@ -259,6 +259,13 @@ function padTests(G, LEVELS) {
     }
     out.push({ name: `${def.id}: a walker on a jump pad flies, out of reach of ground towers`, ok: air > 30 && !groundHit, detail: `air frames ${air}` });
     out.push({ name: `${def.id}: anti-air towers can hit a walker in mid-jump`, ok: aaHit });
+    // a ground boss on the pad's road hops too (shorter, lower)
+    const bossType = Object.keys(G.ENEMY_TYPES).find((k) => G.ENEMY_TYPES[k].boss && !G.ENEMY_TYPES[k].flying);
+    S.enemies.length = 0;
+    const b = G.spawnEnemy(bossType, rt.id); b.hp = b.maxHp = 1e7;
+    let bossAir = 0; t = 0;
+    while (S.enemies.includes(b) && t < 200) { G.update(1 / 60); t += 1 / 60; if (b.airborne) bossAir++; }
+    out.push({ name: `${def.id}: a ground boss hops on a jump pad too`, ok: bossAir > 20 && bossAir < air, detail: `boss air frames ${bossAir}` });
   }
   return out;
 }

@@ -3048,8 +3048,8 @@ const Renderer = (() => {
       const struggle = e.rooted ? Math.sin(t * 30) * 0.03 : 0;
       const born = Math.min(1, e.age / 0.35);   // pop out of the pod
       // off a jump pad: a high arc with a forward tuck
-      const air = e.airborne ? Math.sin(Math.min(1, e.airT / GameState.JUMP_TIME) * Math.PI) : 0;
-      g.position.set(e.x + struggle, w.bounce * bounce + air * 1.4, e.z);
+      const air = e.airborne ? Math.sin(Math.min(1, e.airT / e.jumpTime) * Math.PI) : 0;
+      g.position.set(e.x + struggle, w.bounce * bounce + air * (e.boss ? 0.9 : 1.4), e.z);
       g.rotation.y = Math.atan2(e.dirX, e.dirZ);
       g.rotation.x = w.lean + air * 0.5;
       g.rotation.z = Math.sin(cycle) * w.sway + struggle * 4;
@@ -3187,9 +3187,12 @@ const Renderer = (() => {
     const bounce = e.rooted ? 0 : Math.abs(Math.sin(cycle));
     const struggle = e.rooted ? Math.sin(t * 30) * 0.02 : 0;
     const born = Math.min(1, e.age / 0.5);
-    g.position.set(e.x + struggle, w.bounce * bounce, e.z);
+    // a roller off a jump pad: a heavy, nose-up hop
+    const air = e.airborne ? Math.sin(Math.min(1, e.airT / e.jumpTime) * Math.PI) : 0;
+    g.position.set(e.x + struggle, w.bounce * bounce + air * 0.9, e.z);
     g.rotation.y = Math.atan2(e.dirX, e.dirZ);
     g.rotation.z = Math.sin(cycle) * w.sway;
+    g.rotation.x = -air * 0.25;
     v.pop = Math.max(0, v.pop - dt * 5);
     const popK = Math.sin(Math.min(1, v.pop) * Math.PI) * 0.12;
     g.scale.set(born * (1 + popK), born * (1 - popK * 0.5), born * (1 + popK));
@@ -3399,7 +3402,11 @@ const Renderer = (() => {
     GameState.on('enemySpawned', addEnemyView);
     // a wormhole swallows an enemy in a violet flash and spits it out in a teal one
     GameState.on('enemyLaunched', padKick);
-    GameState.on('enemyLanded', (e) => puff(e.x, 0.05, e.z, { count: 4, color: PALETTE.path, speed: 0.7, size: 0.08, up: 0.4, ttl: 0.35 }));
+    GameState.on('enemyLanded', (e) => {
+      puff(e.x, 0.05, e.z, { count: e.boss ? 18 : 4, color: PALETTE.path, speed: e.boss ? 1.8 : 0.7, size: e.boss ? 0.14 : 0.08, up: 0.4, ttl: 0.35 });
+      // a boss lands like a dropped hab: the ground shakes and a dust ring rolls out
+      if (e.boss) { shakeCamera(0.2, 0.5); ring(e.x, 0.06, e.z, { color: PALETTE.cream, radius: 2.2, ttl: 0.6 }); }
+    });
     GameState.on('enemyWarpIn', (e) => puff(e.x, 0.25, e.z, { count: e.boss ? 14 : 7, color: PALETTE.magic, speed: 1.1, size: 0.09, up: 0.9, ttl: 0.45 }));
     GameState.on('enemyWarpOut', (e) => puff(e.x, 0.25, e.z, { count: e.boss ? 14 : 7, color: PALETTE.crystalTeal, speed: 1.1, size: 0.09, up: 0.9, ttl: 0.45 }));
     GameState.on('enemyLeaked', (e) => removeEnemyView(e, leakExit));

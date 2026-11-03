@@ -15,6 +15,20 @@ const RendererFX = (() => {
       return mix(mix(fxHash(i), fxHash(i + vec2(1.0, 0.0)), u.x), mix(fxHash(i + vec2(0.0, 1.0)), fxHash(i + vec2(1.0, 1.0)), u.x), u.y);
     }
     float fxFbm(vec2 p) { return fxNoise(p) * 0.62 + fxNoise(p * 2.07 + 11.3) * 0.38; }
+    // cellular noise: x = distance to the nearest feature point, y = to the
+    // second nearest (their difference is small along the cracks between cells),
+    // z = a random value for the nearest cell
+    vec3 fxCells(vec2 p) {
+      vec2 i = floor(p), f = fract(p);
+      float d1 = 8.0, d2 = 8.0, id = 0.0;
+      for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) {
+        vec2 g = vec2(float(x), float(y));
+        vec2 o = vec2(fxHash(i + g), fxHash(i + g + 17.7));
+        float d = length(g + o - f);
+        if (d < d1) { d2 = d1; d1 = d; id = fxHash(i + g + 3.1); } else if (d < d2) d2 = d;
+      }
+      return vec3(d1, d2, id);
+    }
   `;
   function hash(x, y) {
     let h = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
@@ -46,11 +60,21 @@ const RendererFX = (() => {
       shader.fragmentShader = shader.fragmentShader
         .replace('#include <common>', `#include <common>\nvarying vec3 vFxWorld;\nuniform float uTime;\nuniform vec4 uZone, uZone2;\n${NOISE_GLSL}`)
         .replace('#include <color_fragment>', `#include <color_fragment>
+          // moon rock, not a lawn: the level's ground color muted toward stone,
+          // broken into cracked plates of slightly different shades, with fine
+          // grit and the odd small crater
           float fxBroad = fxFbm(vFxWorld.xz * 0.55);
           float fxFine = fxFbm(vFxWorld.xz * 3.4 + 7.3);
-          float fxStroke = fxNoise(vec2(vFxWorld.x * 7.0 + vFxWorld.z * 2.0, vFxWorld.z * 1.4));
-          diffuseColor.rgb *= 0.85 + 0.26 * fxBroad + 0.14 * (fxFine - 0.5) + 0.07 * (fxStroke - 0.5);
-          diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.94, 1.06, 1.1), smoothstep(0.58, 0.82, fxBroad));
+          float fxLum = dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11));
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(fxLum) * vec3(1.0, 0.97, 1.06), 0.42);
+          vec3 fxPl = fxCells(vFxWorld.xz * 1.6 + vec2(fxFine * 0.4));
+          float fxSeam = 1.0 - smoothstep(0.02, 0.09, fxPl.y - fxPl.x);
+          float fxGrit = fxHash(floor(vFxWorld.xz * 26.0));
+          diffuseColor.rgb *= 0.86 + 0.2 * fxBroad + 0.16 * (fxPl.z - 0.5) + 0.1 * (fxGrit - 0.5) - 0.3 * fxSeam;
+          vec3 fxCr2 = fxCells(vFxWorld.xz * 0.45 + 31.0);
+          float fxPit = smoothstep(0.17, 0.11, fxCr2.x) * step(0.72, fxCr2.z);
+          float fxLip = smoothstep(0.13, 0.17, fxCr2.x) * smoothstep(0.23, 0.17, fxCr2.x) * step(0.72, fxCr2.z);
+          diffuseColor.rgb *= 1.0 - 0.28 * fxPit + 0.16 * fxLip;
           vec2 fxCell = vec2(vFxWorld.x + uZone2.z * 0.5 - 0.5, vFxWorld.z + uZone2.w * 0.5 - 0.5);
           vec2 fxD = (fxCell - uZone.xy) / uZone.zw;
           float fxH = clamp((uZone2.x - length(fxD)) / uZone2.y, 0.0, 1.0);
