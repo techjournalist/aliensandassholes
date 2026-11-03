@@ -80,6 +80,20 @@ A mesa must stay clear of a road's rounded corners (the validator says
 where); Greenhope's first try at [4..6, 2..3] clipped the bends at [3, 1]
 and [7, 1].
 
+**Music is space music** (the user said the Knights & Knaves score still
+sounded like an Earth game). Same engine (`scheduleStep`, layers, mixes,
+seeded tune per level) with new sounds: open sus2, add9, maj7 and min9
+chords, a lydian progression for major keys (a major chord on the second)
+and a phrygian one for minor (the flat second); the lead's scale is lydian
+or phrygian (`SCALE`, seven notes). Pads are detuned saws whose filter
+opens as they swell, with a high shimmer; the arpeggio is a square-wave
+sequencer (sixteenths in a fight); the lead is a theremin (`mTone` options
+`from`/`glide` for portamento, `vib`/`vibRate` for vibrato); the bass is a
+sine sub when calm and a resonant saw (`q`) in a fight; drums are
+electronic with a laser-zap snare. A dotted-eighth echo with a darkening
+feedback loop carries the pad, arpeggio and lead. Calm plays a distant
+beacon ping every other bar.
+
 **Scenery is a bare moon**: nothing grows. No trees, grass, birds,
 mushrooms or colorful alien plants (the user called each of these out in
 turn). In `countryside()` every flora recipe name maps to rock: 'tree' is a

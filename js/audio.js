@@ -434,13 +434,17 @@ const Audio = (() => {
     'terraformer-prime': { root: 38, minor: true },
   };
 
-  // chord = [semitones above the key root, 'maj' | 'min']; one chord per bar
+  // Space, not a village fair: open suspended and added-ninth chords, a
+  // lydian lift (the raised fourth, a major chord on the second) for major
+  // keys and a phrygian shadow (the flat second) for minor ones.
+  // chord = [semitones above the key root, shape]; one chord per bar
   const PROG = {
-    major: { calm: [[0, 'maj'], [9, 'min'], [5, 'maj'], [7, 'maj']], war: [[9, 'min'], [5, 'maj'], [0, 'maj'], [7, 'maj']] },
-    minor: { calm: [[0, 'min'], [8, 'maj'], [3, 'maj'], [10, 'maj']], war: [[0, 'min'], [5, 'min'], [8, 'maj'], [10, 'maj']] },
+    major: { calm: [[0, 'add9'], [2, 'maj'], [9, 'min7'], [2, 'sus2']], war: [[0, 'sus2'], [2, 'maj'], [8, 'maj'], [10, 'sus2']] },
+    minor: { calm: [[0, 'min9'], [8, 'maj7'], [3, 'add9'], [10, 'sus2']], war: [[0, 'min'], [1, 'maj'], [8, 'maj'], [7, 'sus4']] },
   };
-  const PENTA = { major: [0, 2, 4, 7, 9], minor: [0, 3, 5, 7, 10] };
-  const TRIAD = { maj: [0, 4, 7], min: [0, 3, 7] };
+  // the lead's scales: lydian and phrygian, seven notes each
+  const SCALE = { major: [0, 2, 4, 6, 7, 9, 11], minor: [0, 1, 3, 5, 7, 8, 10] };
+  const TRIAD = { maj: [0, 4, 7], min: [0, 3, 7], sus2: [0, 2, 7], sus4: [0, 5, 7], add9: [0, 4, 7, 14], maj7: [0, 4, 7, 11], min7: [0, 3, 7, 10], min9: [0, 3, 7, 14] };
   // per-state mix: layer gains, tempo and which chord order to play
   const MIX = {
     calm:   { pad: 0.55, arp: 0.55, bass: 0.22, drums: 0,    lead: 0,    bpm: 84,  prog: 'calm' },
@@ -457,7 +461,7 @@ const Audio = (() => {
   // the tune for one level: a fixed 4-bar arpeggio and lead phrase, built once from a seed
   function buildPlan(levelId) {
     const key = MUSIC_KEYS[levelId] || { root: 38, minor: false };
-    const mode = key.minor ? 'minor' : 'major', scale = PENTA[mode];
+    const mode = key.minor ? 'minor' : 'major', scale = SCALE[mode];
     const r = seededRand(hashStr(levelId || 'x'));
     const arp = [], lead = [];
     for (let bar = 0; bar < 4; bar++) {
@@ -474,9 +478,18 @@ const Audio = (() => {
   }
 
   function makeMusicGraph(c, dest) {
-    const bus = c.createGain(); bus.gain.value = 0.32; bus.connect(dest);   // kept well under the sound effects so hits and clinks stay audible
+    const bus = c.createGain(); bus.gain.value = 0.3; bus.connect(dest);   // kept well under the sound effects so hits and clinks stay audible
+    // the space echo: a dotted-eighth delay with a darkening feedback loop,
+    // fed by the pad, the arpeggio and the lead (never the drums or bass)
+    const send = c.createGain(); send.gain.value = 0.42;
+    const delay = c.createDelay(2), fb = c.createGain(), tone = c.createBiquadFilter();
+    delay.delayTime.value = 0.42; fb.gain.value = 0.4; tone.type = 'lowpass'; tone.frequency.value = 1800;
+    send.connect(delay); delay.connect(tone); tone.connect(fb); fb.connect(delay); tone.connect(bus);
     const layers = {};
-    for (const n of ['pad', 'arp', 'bass', 'drums', 'lead']) { const g = c.createGain(); g.gain.value = 0; g.connect(bus); layers[n] = g; }
+    for (const n of ['pad', 'arp', 'bass', 'drums', 'lead']) {
+      const g = c.createGain(); g.gain.value = 0; g.connect(bus); layers[n] = g;
+      if (n === 'pad' || n === 'arp' || n === 'lead') g.connect(send);
+    }
     return { bus, layers };
   }
   function mTone(dest, type, freq, t, dur, vol, o = {}) {
@@ -484,7 +497,16 @@ const Audio = (() => {
     osc.type = type; osc.frequency.setValueAtTime(freq, t);
     if (o.detune) osc.detune.value = o.detune;
     f.type = 'lowpass'; f.frequency.setValueAtTime(o.cutoff || 2400, t);
+    if (o.q) f.Q.value = o.q;
     if (o.cutTo) f.frequency.exponentialRampToValueAtTime(o.cutTo, t + dur);
+    // glide in from another pitch (the theremin's portamento)
+    if (o.from) { osc.frequency.setValueAtTime(o.from, t); osc.frequency.exponentialRampToValueAtTime(freq, t + (o.glide || 0.08)); }
+    // vibrato: a slow wobble on the pitch
+    if (o.vib) {
+      const lfo = ctx.createOscillator(), lg = ctx.createGain();
+      lfo.frequency.value = o.vibRate || 5.5; lg.gain.value = freq * o.vib;
+      lfo.connect(lg); lg.connect(osc.frequency); lfo.start(t); lfo.stop(t + dur + 0.05);
+    }
     const a = o.attack || 0.006;
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(vol, t + a);
@@ -512,44 +534,60 @@ const Audio = (() => {
     const bar = Math.floor(step / 16), i = step % 16, sd = 60 / mix.bpm / 4;
     const chord = PROG[plan.mode][mix.prog][bar % 4], root = plan.key.root + chord[0], tri = TRIAD[chord[1]];
     const war = stateName !== 'calm', boss = stateName === 'boss';
-    // pad: one soft chord per bar, long attack and release
+    // pad: a slow, detuned synth chord per bar, its filter opening as it swells,
+    // with a faint high shimmer an octave and a fifth up
     if (i === 0 && mix.pad > 0) {
-      for (const semi of [tri[0], tri[1], tri[2]]) {
-        mTone(L.pad, 'sine', mtof(root + 12 + semi), t, sd * 16 + 0.6, 0.14, { attack: 0.7, cutoff: 1800, detune: -4 });
-        mTone(L.pad, 'triangle', mtof(root + 12 + semi), t, sd * 16 + 0.6, 0.06, { attack: 0.9, cutoff: 1400, detune: 5 });
+      const len = sd * 16 + 0.8;
+      for (const semi of tri) {
+        const f = mtof(root + 12 + semi);
+        mTone(L.pad, 'sawtooth', f, t, len, 0.035, { attack: 1.1, cutoff: 380, cutTo: 1300, detune: -9 });
+        mTone(L.pad, 'sawtooth', f, t, len, 0.035, { attack: 1.3, cutoff: 380, cutTo: 1300, detune: 9 });
+        mTone(L.pad, 'sine', f, t, len, 0.06, { attack: 0.9, cutoff: 2000 });
       }
+      mTone(L.pad, 'sine', mtof(root + 31), t, len, 0.018, { attack: 1.6, cutoff: 4000, vib: 0.004, vibRate: 0.4 });
     }
-    // bass: long roots when calm, an eighth-note drive in a fight, a 16th pulse for a boss
+    // calm: a distant beacon ping now and then, left to ring in the echo
+    if (!war && i === 6 && bar % 2 === 1 && mix.arp > 0) mTone(L.arp, 'sine', mtof(root + 43), t, 0.5, 0.05, { attack: 0.003, cutoff: 6000 });
+    // bass: a deep sine sub when calm, a resonant synth line in a fight, an acid pulse for a boss
     if (mix.bass > 0) {
-      if (!war && (i === 0 || i === 8)) mTone(L.bass, 'triangle', mtof(root), t, sd * 7, 0.24, { attack: 0.02, cutoff: 500 });
-      else if (war && !boss && i % 2 === 0) mTone(L.bass, 'triangle', mtof(root + (i % 8 === 6 ? 7 : 0)), t, sd * 1.7, 0.26, { attack: 0.008, cutoff: 650 });
-      else if (boss && (i % 4 === 0 || i % 4 === 2 || i === 15)) mTone(L.bass, 'sawtooth', mtof(root - (i === 15 ? 12 : 0)), t, sd * 1.5, 0.15, { attack: 0.006, cutoff: 480, cutTo: 260 });
+      if (!war && (i === 0 || i === 8)) mTone(L.bass, 'sine', mtof(root), t, sd * 7, 0.3, { attack: 0.08, cutoff: 400 });
+      else if (war && !boss && i % 2 === 0) mTone(L.bass, 'sawtooth', mtof(root + (i % 8 === 6 ? 7 : 0)), t, sd * 1.7, 0.16, { attack: 0.006, cutoff: 900, cutTo: 220, q: 6 });
+      else if (boss && (i % 4 === 0 || i % 4 === 2 || i === 15)) mTone(L.bass, 'sawtooth', mtof(root - (i === 15 ? 12 : 0)), t, sd * 1.5, 0.14, { attack: 0.004, cutoff: 1400, cutTo: 200, q: 9 });
     }
-    // arp: a plucked lute-like arpeggio on the eighth notes
-    if (mix.arp > 0 && i % 2 === 0) {
-      const idx = plan.arp[bar % 4][i / 2];
+    // arp: a synth sequencer, square blips up and down the chord on the
+    // sixteenths (eighths when calm), bouncing in the echo
+    if (mix.arp > 0 && (war || i % 2 === 0)) {
+      const idx = plan.arp[bar % 4][Math.floor(i / 2)];
       if (idx >= 0) {
-        const n = tri[idx % 3] + 12 * Math.floor(idx / 3);
-        mTone(L.arp, 'triangle', mtof(root + 24 + n), t, sd * 3, 0.2, { attack: 0.004, cutoff: 3200, cutTo: 900 });
+        const up = war && i % 2 === 1 ? 12 : 0;
+        const n = tri[idx % tri.length] + 12 * Math.floor(idx / tri.length) + up;
+        mTone(L.arp, 'square', mtof(root + 24 + n), t, sd * 1.4, war ? 0.06 : 0.08, { attack: 0.003, cutoff: 2600, cutTo: 700, q: 4 });
       }
     }
-    // lead: the tune, a reedy pentatonic line that only plays once a wave is live
+    // lead: the tune, sung by a theremin: a sine that glides into each note
+    // with a wavering vibrato (a buzzier ring modulated tone for a boss)
     if (mix.lead > 0) {
       const deg = plan.lead[bar % 4][i];
       if (deg >= 0) {
-        const semi = plan.scale[deg % 5] + 12 * Math.floor(deg / 5);
-        const f = mtof(plan.key.root + 36 + semi);
-        mTone(L.lead, boss ? 'sawtooth' : 'square', f, t, sd * (boss ? 2.4 : 1.8), boss ? 0.11 : 0.085, { attack: 0.012, cutoff: boss ? 2600 : 1700 });
-        mTone(L.lead, 'triangle', f * 2, t, sd * 1.6, 0.05, { attack: 0.01, cutoff: 2200 });
+        const sc = plan.scale, semi = sc[deg % sc.length] + 12 * Math.floor(deg / sc.length);
+        const f = mtof(plan.key.root + 31 + semi), from = graph.lastLead || f;
+        graph.lastLead = f;
+        mTone(L.lead, boss ? 'triangle' : 'sine', f, t, sd * (boss ? 2.6 : 2.2), boss ? 0.12 : 0.11, { attack: 0.05, cutoff: boss ? 3200 : 2600, from, glide: 0.09, vib: 0.012, vibRate: 5.8 });
+        if (boss) mTone(L.lead, 'sawtooth', f * 1.5, t, sd * 1.8, 0.02, { attack: 0.02, cutoff: 1800, from: from * 1.5, glide: 0.09 });
       }
     }
-    // drums: war drums in a fight, four on the floor and rolls for a boss
+    // drums: a tight electronic kit: a sub kick, a snare that is half noise,
+    // half laser zap, and ticking hats; a boss adds a falling zap fill
     if (mix.drums > 0) {
       const kickAt = boss ? (i % 4 === 0) : (i === 0 || i === 8 || i === 10);
       if (kickAt) mKick(L.drums, t, boss ? 0.5 : 0.42);
-      if (i === 4 || i === 12) { mNoise(L.drums, t, 0.14, 0.28, 1900, 'bandpass', 0.8); mTone(L.drums, 'triangle', 190, t, 0.1, 0.16, { cutoff: 900 }); }
-      if (boss && i >= 14) mNoise(L.drums, t, 0.06, 0.16, 1400, 'bandpass', 0.8);
-      if (i % 2 === 0) mNoise(L.drums, t, 0.035, i % 4 === 0 ? 0.07 : 0.045, 7000, 'highpass', 0.7);
+      if (i === 4 || i === 12) {
+        mNoise(L.drums, t, 0.1, 0.2, 3200, 'bandpass', 1.2);
+        mTone(L.drums, 'sine', 220, t, 0.12, 0.14, { cutoff: 4000, from: 1400, glide: 0.08 });
+        mTone(L.drums, 'square', 900, t, 0.09, 0.05, { cutoff: 2600, cutTo: 300 });
+      }
+      if (boss && i >= 14) mTone(L.drums, 'sawtooth', mtof(root + 48 - (i - 14) * 7), t, 0.08, 0.06, { cutoff: 3000, cutTo: 400 });
+      if (i % 2 === 0) mNoise(L.drums, t, 0.025, i % 4 === 0 ? 0.06 : 0.035, 9000, 'highpass', 0.7);
     }
   }
 
