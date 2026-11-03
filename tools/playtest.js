@@ -51,6 +51,9 @@ async function enterLevel(page, levelId) {
   await page.locator('#start-btn').click(); await page.waitForTimeout(250);
   await page.locator(`.wm-node[data-level="${levelId}"]`).click(); await page.waitForTimeout(150);
   await page.locator('#wm-play-btn').click(); await page.waitForTimeout(200);
+  // playing a different level reloads the page: wait until the game is back
+  // and on that level (a slow software-rendered load used to race this)
+  await page.waitForFunction((id) => window.GameState && GameState.currentLevel && GameState.currentLevel().id === id && window.Renderer && Renderer.debugScene, levelId, { timeout: 30000 }).catch(() => {});
 }
 
 (async () => {

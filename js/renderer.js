@@ -898,6 +898,83 @@ const Renderer = (() => {
     return { parts, radius: s * 1.1 };
   }
   // -------- scene construction --------
+  // A ring of jagged violet mountains just outside the board, with pale
+  // crystal tips, like the ridges on the title screen. One mesh per side;
+  // the side nearest the camera hides so it never covers the board.
+  const mountainSides = [];
+  function buildMountains() {
+    const rng = srand(5150), base = new THREE.Color(), tip = new THREE.Color();
+    const hw = cols / 2 + border, hh = rows / 2 + border;
+    const sides = [
+      { n: [0, -1], along: [-hw - 2, hw + 2], at: -hh - 0.6, axis: 'x' },
+      { n: [0, 1], along: [-hw - 2, hw + 2], at: hh + 0.6, axis: 'x' },
+      { n: [-1, 0], along: [-hh, hh], at: -hw - 0.6, axis: 'z' },
+      { n: [1, 0], along: [-hh, hh], at: hw + 0.6, axis: 'z' },
+    ];
+    // each side is cut into short runs; a run whose middle sits on the
+    // camera's side of the board hides, so no peak ever covers the play area
+    const SEG = 4;
+    for (const sd of sides) {
+      for (let u0 = sd.along[0]; u0 < sd.along[1]; u0 += SEG) {
+        const geos = [];
+        for (let u = u0; u < Math.min(u0 + SEG, sd.along[1]); u += 0.7 + rng() * 0.6) {
+          const out = rng() * 2.2, h = 0.6 + rng() * 1.1 + out * 0.35, rad = 0.45 + rng() * 0.45;
+          const x = sd.axis === 'x' ? u : sd.at + sd.n[0] * out, z = sd.axis === 'x' ? sd.at + sd.n[1] * out : u;
+          const g = new THREE.ConeGeometry(rad, h, 5, 1).translate(0, h / 2 - tileHeight, 0).rotateY(rng() * 6).translate(x, 0, z);
+          base.set(rng() < 0.5 ? 0x4a3a7a : 0x3a2e66);
+          tip.set(rng() < 0.5 ? 0xc77dff : 0x8ef0e0);
+          const pos = g.attributes.position, colors = new Float32Array(pos.count * 3);
+          for (let i = 0; i < pos.count; i++) {
+            const k = (pos.getY(i) + tileHeight) / h;
+            const c = base.clone().lerp(tip, Math.max(0, (k - 0.72) / 0.28) * 0.85).multiplyScalar(0.7 + 0.5 * k);
+            colors[i * 3] = c.r; colors[i * 3 + 1] = c.g; colors[i * 3 + 2] = c.b;
+          }
+          g.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+          geos.push(g);
+        }
+        if (!geos.length) continue;
+        const mesh = new THREE.Mesh(mergeGeoms(geos), new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap, vertexColors: true }));
+        mesh.name = 'mountains'; mesh.matrixAutoUpdate = false;
+        scene.add(mesh);
+        const um = Math.min(u0 + SEG / 2, (u0 + sd.along[1]) / 2);
+        mountainSides.push({ mesh, x: sd.axis === 'x' ? um : sd.at, z: sd.axis === 'x' ? sd.at : um });
+      }
+    }
+    buildUfo();
+    animated.push({ update() {
+      const cx = camera.position.x, cz = camera.position.z, l = Math.hypot(cx, cz) || 1;
+      for (const m of mountainSides) m.mesh.visible = (m.x * cx + m.z * cz) / (l * (Math.hypot(m.x, m.z) || 1)) < -0.15;
+    } });
+  }
+
+  // The aliens' ship from the title screen: a big saucer hovering just off
+  // the board above the first landing site, shining its tractor beam down
+  // on the pods. Scenery only: it is never a target and never moves in.
+  function buildUfo() {
+    const rt = GameState.routes[0], [sc, sr] = rt.cells[0], [nc, nr] = rt.cells[1];
+    const dx = nc - sc, dz = nr - sr;
+    const x = worldX(sc) - dx * 2.6, z = worldZ(sr) - dz * 2.6, y = 2.6;
+    const g = liveProp([
+      P(GEO.sphereMid, 0x6a6e94, M(0, 0, 0, { sx: 1.05, sy: 0.22, sz: 1.05 })),
+      P(GEO.cyl, 0xb8bedc, M(0, 0.06, 0, { sx: 0.82, sy: 0.08, sz: 0.82 })),
+      P(GEO.sphereMid, 0x3a3e66, M(0, -0.1, 0, { sx: 0.7, sy: 0.14, sz: 0.7 })),
+      P(GEO.dome, 0x8ef0ff, M(0, 0.1, 0, { sx: 0.46, sy: 0.5, sz: 0.46 }), true, { unlit: true }),
+      P(GEO.sphereLo, 0xe8ffff, M(-0.12, 0.38, -0.1, { s: 0.1 }), false, { unlit: true }),
+      ...Array.from({ length: 10 }, (_, i) => P(GEO.bead, PALETTE.spore, M(Math.cos(i * 0.628) * 0.95, 0.08, Math.sin(i * 0.628) * 0.95, { s: 0.075 }), false, { unlit: true, live: true, name: 'light' + i })),
+    ], x, y, z, { ao: false });
+    g.name = 'ufo';
+    const beam = new THREE.Mesh(new THREE.ConeGeometry(1, 1, 24, 1, true), new THREE.MeshBasicMaterial({ color: 0xd8ffb0, transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
+    beam.scale.set(0.85, y, 0.85); beam.position.set(x, y / 2, z);
+    const lights = []; g.traverse((o) => { if (/^light\d/.test(o.name)) lights.push(o); });
+    scene.add(beam);
+    animated.push({ update(t) {
+      g.position.y = y + groundYAt(x, z) + Math.sin(t * 0.9) * 0.12;
+      g.rotation.y = t * 0.5;
+      beam.material.opacity = 0.16 + 0.08 * Math.sin(t * 2.3);
+      lights.forEach((l, i) => { l.visible = (Math.floor(t * 6) + i) % 3 !== 0; });
+    } });
+  }
+
   // the lowest ground in the grid (a crater floor), 0 on a flat level
   let elevBase = 0;
   const cliffColor = new THREE.Color();
@@ -976,10 +1053,8 @@ const Renderer = (() => {
 
     // A wide floor so the world never shows the void, tinted to the level's
     // own backdrop so the fog blends the edge into it.
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(cols + border * 2 + 40, rows + border * 2 + 40), unlit(lerpColor(vt.backdrop, 0x000000, 0.14).getHex()));
-    floor.rotation.x = -Math.PI / 2;
-    floor.position.y = Math.min(0, elevBase) - tileHeight - 0.02;
-    scene.add(floor);
+    // no floor: the board floats in the battle sky, ringed by mountains
+    buildMountains();
 
     buildRoadEdges(vt);
 
@@ -2640,7 +2715,7 @@ const Renderer = (() => {
     });
     const cloud = new THREE.Mesh(new THREE.PlaneGeometry(w + 8, h + 8), cloudMat);
     cloud.rotation.x = -Math.PI / 2; cloud.position.y = 0.045; cloud.renderOrder = 0; cloud.name = 'cloudShadows';
-    if (corrupt < 0.72) scene.add(cloud);
+    // (no cloud shadows: the moon has no clouds)
   }
 
   // -------- hit-triggered health bars --------
@@ -3774,7 +3849,9 @@ const Renderer = (() => {
   // -------- init / frame --------
   function init(canvasEl) {
     canvas = canvasEl;
-    renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+    // transparent: the battle sky (js/battle-sky.js) shows round the floating board
+    renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'high-performance' });
+    if (typeof BattleSky !== 'undefined') BattleSky.init();
     const vt = levelTheme();
     // Colour pipeline: linear lighting, ACES filmic tone mapping, sRGB output.
     // js/color-pipeline.js converts the authored sRGB hexes on the way in.
@@ -3789,7 +3866,7 @@ const Renderer = (() => {
     }
     // the clear color is written to the screen untouched, so it gets the same
     // tone mapping and encoding the fogged scene does and the two meet seamlessly
-    renderer.setClearColor(LIN ? displayColor(new THREE.Color(vt.backdrop), renderer.toneMapping !== THREE.NoToneMapping ? renderer.toneMappingExposure : 0) : vt.backdrop);
+    renderer.setClearColor(0x000000, 0);
     scene = new THREE.Scene();
     camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 1, 100);
 
@@ -3828,7 +3905,7 @@ const Renderer = (() => {
     buildParticles();
     buildRings();
     buildLife();
-    if (levelMood() < 0.72) buildClouds();
+    // no drifting clouds: a moon has no weather (they read as white blobs at the screen edges)
     buildHealthBars();
     buildSelection();
     flushBatch();

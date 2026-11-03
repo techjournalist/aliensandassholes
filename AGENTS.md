@@ -80,6 +80,21 @@ A mesa must stay clear of a road's rounded corners (the validator says
 where); Greenhope's first try at [4..6, 2..3] clipped the bends at [3, 1]
 and [7, 1].
 
+**The board floats in the title screen's sky** (the user liked the title's
+UFO, moon and ringed planet). `js/battle-sky.js` builds one SVG behind the
+game canvas (`#battle-sky`): a violet gradient with twinkling stars, the
+ringed gas giant (right), a cratered moon (left) and two UFOs drifting by
+on CSS animations. The WebGL canvas is transparent (`alpha: true`, clear
+alpha 0) and the old floor plane is gone. Note `BattleSky` is a top-level
+const, so test it with `typeof BattleSky`, not `window.BattleSky` (that
+check silently skipped the sky once). `buildMountains()` rings the board
+with jagged violet peaks with pale crystal tips, in 4-unit runs; a run on
+the camera's side of the board hides, so peaks never cover play.
+`buildUfo()` hangs a big saucer (dome, blinking lights, additive beam) just
+off the board above the first route's landing pods; scenery only. There
+are no drifting clouds or cloud shadows any more (a moon has no weather;
+the clouds showed as white blobs at the screen corners).
+
 **Music is space music** (the user said the Knights & Knaves score still
 sounded like an Earth game). Same engine (`scheduleStep`, layers, mixes,
 seeded tune per level) with new sounds: open sus2, add9, maj7 and min9

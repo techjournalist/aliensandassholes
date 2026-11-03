@@ -60,6 +60,14 @@
     -webkit-tap-highlight-color: transparent;
     overscroll-behavior: none;
   }
+  /* the night sky behind the battlefield (js/battle-sky.js); the canvas is transparent over it */
+  #battle-sky { position: fixed; inset: 0; pointer-events: none; }
+  #battle-sky svg { width: 100%; height: 100%; display: block; }
+  .bs-ufo-a { animation: bs-drift-a 70s linear infinite; }
+  .bs-ufo-b { animation: bs-drift-b 95s linear infinite; animation-delay: -40s; }
+  @keyframes bs-drift-a { 0% { transform: translate(-200px, 120px); } 50% { transform: translate(800px, 70px); } 100% { transform: translate(1800px, 130px); } }
+  @keyframes bs-drift-b { 0% { transform: translate(1800px, 120px); } 100% { transform: translate(-200px, 90px); } }
+  @media (prefers-reduced-motion: reduce) { .bs-ufo-a, .bs-ufo-b { animation: none; transform: translate(260px, 330px); } }
   #game {
     position: fixed; inset: 0; width: 100%; height: 100%;
     display: block; touch-action: none; outline: none;
@@ -797,6 +805,7 @@
 </style>
 </head>
 <body>
+<div id="battle-sky"></div>
 <canvas id="game" aria-label="Aliens and Assholes game view"></canvas>
 <div id="tiltshift" aria-hidden="true"></div>
 <div id="vignette" aria-hidden="true"></div>
@@ -1123,6 +1132,7 @@
 <script src="js/progress.js"></script>
 <script src="js/game-state.js"></script>
 <script src="js/renderer-fx.js"></script>
+<script src="js/battle-sky.js"></script>
 <script src="js/renderer.js"></script>
 <script src="js/input.js"></script>
 <script src="js/celebrate.js"></script>
