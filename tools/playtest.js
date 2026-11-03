@@ -894,8 +894,10 @@ async function enterLevel(page, levelId) {
       await page.locator('#pause-btn').click(); await page.waitForTimeout(200);
       check('after a win the pause button brings back the end screen', await page.locator('#end').isVisible());
       await page.evaluate(() => { document.getElementById('end').classList.remove('show'); });
-      await page.waitForTimeout(2300);
-      check('safety net: a finished level with no screen showing gets its end screen back', await page.locator('#end').isVisible());
+      // the guard counts 1.5 s of wall-clock time but only looks once a frame,
+      // and a software-rendered Level 10 frame can take most of a second: wait for it
+      const back = await page.locator('#end.show').waitFor({ timeout: 6000 }).then(() => true).catch(() => false);
+      check('safety net: a finished level with no screen showing gets its end screen back', back);
       await page.locator('#end-map-btn').click(); await page.waitForTimeout(300);
       const replayLabel = await page.locator('#wm-play-btn').innerText();
       check('the map offers to play the finished level again', replayLabel === `Play ${lv.name} again`, replayLabel);
