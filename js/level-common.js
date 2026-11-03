@@ -186,11 +186,21 @@ const LevelCommon = (() => {
     ], radius: 0.22 };
   }
   // An old crater: a low raised rim round a darker floor (lies flat, never hides a tower).
+  // A few pebbles and grit on the regolith.
+  function pebbleParts(kit, rng) {
+    const { P, M, GEO } = kit;
+    const parts = [];
+    for (let i = 0, n = 2 + Math.floor(rng() * 3); i < n; i++) {
+      const a = rng() * 6.28, d = rng() * 0.18, s = 0.03 + rng() * 0.05;
+      parts.push(P(GEO.rock, rng() < 0.5 ? PALETTE.stone : PALETTE.stoneDark, M(Math.cos(a) * d, s * 0.4, Math.sin(a) * d, { sx: s * 1.3, sy: s * 0.7, sz: s, ry: rng() * 3 }), false));
+    }
+    return { parts, radius: 0 };
+  }
   function craterParts(kit, rng) {
     const { P, M, GEO, shade } = kit;
     const r = 0.22 + rng() * 0.18;
     return { parts: [
-      P(GEO.circle, shade(PALETTE.meadowDark, 0.35), M(0, 0.007, 0, { s: r * 0.86 }), false),
+      P(GEO.circle, shade(PALETTE.stoneDark, 0.35), M(0, 0.007, 0, { s: r * 0.86 }), false),
       P(GEO.torus, PALETTE.stoneDark, M(0, 0.012, 0, { sx: r, sy: r, sz: 0.5, rx: Math.PI / 2 }), false),
       P(GEO.rock, PALETTE.stone, M(r * 0.8, 0.03, -r * 0.3, { s: 0.05 }), false),
     ], radius: 0 };
@@ -343,19 +353,22 @@ const LevelCommon = (() => {
   // stalks, crusted rocks, burst pods and wrecked rovers. `keepLow(c, r)`
   // marks cells near the endpoint where only low props may go, so its
   // skyline stays clear.
-  function countryside(kit, { seed, mix, edge, keepLow = () => false, sway = 8 }) {
+  function countryside(kit, { seed, mix, edge, keepLow = () => false, sway = 0 }) {
     const { M, batchPart, batchDecal, liveProp, decal, srand, worldX, worldZ, cols, rows, border, level, animated } = kit;
     const rng = srand(seed);
     const swayTrees = [];
     const mouths = GameState.routes.map((rt) => rt.cells[0]);
     const R = {
-      tree: () => kit.treeParts(rng), bush: () => bushParts(kit, rng), tuft: () => kit.tuftParts(rng),
-      flower: () => kit.flowerParts(rng), rock: () => kit.rockParts(rng, false), hay: () => kit.hayParts(rng),
+      // a bare moon: whatever a level names, nothing living gets placed.
+      // 'tree' is a rock landmark, bushes, tufts and flowers are pebbles and
+      // small rocks, mushrooms are boulders or a dull crystal outcrop
+      tree: () => kit.treeParts(rng), bush: () => kit.rockParts(rng, false), tuft: () => pebbleParts(kit, rng),
+      flower: () => pebbleParts(kit, rng), rock: () => kit.rockParts(rng, false), hay: () => crateParts(kit, rng),
       fence: () => fenceParts(kit, rng), barrel: () => crateParts(kit, rng), cart: () => roverParts(kit, rng),
-      cottage: () => habParts(kit, rng), mushroom: () => kit.mushroomParts(rng, false), well: () => pumpParts(kit),
+      cottage: () => habParts(kit, rng), mushroom: () => kit.rockParts(rng, false), well: () => pumpParts(kit),
       crystal: () => kit.crystalParts(rng, false), solar: () => solarParts(kit, rng), crater: () => craterParts(kit, rng),
       silo: () => siloParts(kit, rng), greenhouse: () => greenhouseParts(kit, rng), antenna: () => antennaParts(kit, rng),
-      bigshroom: () => kit.mushroomParts(rng, true),
+      bigshroom: () => kit.crystalParts(rng, true),
       ...(kit.extraRecipes ? kit.extraRecipes(rng) : {}),
     };
     const TALL = new Set(['tree', 'cottage', 'silo', 'greenhouse', 'antenna', 'bigshroom', 'crystal']);
@@ -607,11 +620,9 @@ const LevelCommon = (() => {
       }
       for (let i = 0; i < 6; i++) batchPart(P(GEO.box, PALETTE.steel, M(-0.45 + i * 0.18, 0.045, 0, { sx: 0.02, sy: 0.01, sz: 0.8 }), false), wm);
     } else if (style === 'log') {
-      // a fallen giant glowshroom stalk, its cap still glowing on the far bank
-      batchPart(P(GEO.cyl, PALETTE.cream, M(0, 0.02, 0, { sx: 0.44, sy: 1.3, sz: 0.4, rz: Math.PI / 2 })), wm);
-      batchPart(P(GEO.dome, PALETTE.crystal, M(0.72, 0.02, -0.5, { sx: 0.5, sy: 0.32, sz: 0.5, rz: -1.2 })), wm);
-      for (let i = 0; i < 4; i++) batchPart(P(GEO.bead, PALETTE.crystalTeal, M(-0.4 + i * 0.26, 0.42, 0.3 - (i % 2) * 0.6, { s: 0.04 }), false, { unlit: true }), wm);
-      rail(PALETTE.woodLight, 0.18, false);
+      // a slab of basalt fallen across the creek, rough rock either side
+      batchPart(P(GEO.box, PALETTE.slate, M(0, -0.02, 0, { sx: 1.3, sy: 0.16, sz: 0.86 })), wm);
+      for (const sd of [-1, 1]) for (let i = 0; i < 3; i++) batchPart(P(GEO.rock, PALETTE.stoneDark, M(-0.45 + i * 0.45, 0.09, sd * 0.45, { sx: 0.14, sy: 0.1, sz: 0.1, ry: i }), false), wm);
     } else if (style === 'span') {
       // a cable-stayed span: two masts, cables to the deck
       rail(PALETTE.plaster);
@@ -694,7 +705,7 @@ const LevelCommon = (() => {
       front(1.0, 0.55);
       glassDome(kit, cx - 0.4, 0.04, cz - 0.6, 0.5, { h: 0.5 });
       glassDome(kit, cx + 0.45, 0.04, cz - 0.75, 0.4, { h: 0.42 });
-      for (const p of kit.mushroomParts(srand(9), true).parts) batchPart(p, M(cx - 0.4, 0.04, cz - 0.6));
+      for (const p of kit.crystalParts(srand(9), false, false).parts) batchPart(p, M(cx - 0.4, 0.04, cz - 0.6));   // the sample under the big dome
       batchPart(P(GEO.cyl, PALETTE.steelDark, M(0.75, 0.1, 0.0, { sx: 0.16, sy: 0.2, sz: 0.16 })), wm);
       const tank = new THREE.Mesh(GEO.cyl, new THREE.MeshBasicMaterial({ color: PALETTE.goo, transparent: true, opacity: 0.6 }));
       tank.position.set(cx + 0.75, 0.6, cz); tank.scale.set(0.13, 0.8, 0.13); scene.add(tank);
@@ -750,7 +761,7 @@ const LevelCommon = (() => {
       batchPart(P(GEO.ring, PALETTE.hazard, M(gx, 0.38, gz + 0.03, { s: 0.3 }), false), wm);
       for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2; batchPart(P(GEO.bead, PALETTE.steelDark, M(gx + Math.cos(a) * 0.22, 0.38 + Math.sin(a) * 0.22, gz + 0.03, { s: 0.03 }), false), wm); }
       batchPart(P(GEO.box, PALETTE.hazard, M(gx, 0.03, gz + 0.16, { sx: 0.6, sy: 0.06, sz: 0.24 })), wm);
-      for (let i = 0; i < 3; i++) for (const p of kit.treeParts(srand(40 + i)).parts) batchPart(p, M(cx - 0.5 + i * 0.5, 0.5, cz - 0.7 - (i % 2) * 0.2, { s: 0.6 }));
+      for (let i = 0; i < 3; i++) for (const p of kit.crystalParts(srand(40 + i), false).parts) batchPart(p, M(cx - 0.5 + i * 0.5, 0.5, cz - 0.7 - (i % 2) * 0.2, { s: 0.6 }));
       smoke = [cx, 0.9, cz - 0.3]; fire = [cx + gx, 0.6, cz + gz - 0.2];
     } else if (style === 'shieldgen') {
       front(0.9, 0.55);

@@ -689,16 +689,26 @@ const Renderer = (() => {
   // -------- prop recipes (each returns a parts list in local space) --------
   const P = (geo, color, m, outline = true, extra = {}) => ({ geo, color, m, outline, ...extra });
 
-  // Moon flora, nothing like an Earth tree: a tentacled anemone with
-  // glowing tips, a hoodoo (a stacked rock pinnacle), a tube coral and a
-  // cluster of glowing pods. Flora uses the three meadow tones for its bulk,
-  // so each level's retint still works, plus one glowing accent.
+  // Nothing grows here. What the level files call a 'tree' is the tall
+  // landmark of a bare moon: a hoodoo (stacked rock pinnacle), a basalt
+  // spire or a dull crystal column, all in stone tones with no glow.
   function treeParts(rng) {
     const kind = rng();
-    if (kind < 0.3) return anemoneParts(rng);
-    if (kind < 0.52) return hoodooParts(rng);
-    if (kind < 0.76) return coralParts(rng);
-    return podParts(rng);
+    if (kind < 0.45) return hoodooParts(rng);
+    if (kind < 0.8) return spireParts(rng);
+    return crystalParts(rng, false, true);
+  }
+  // a basalt spire: a leaning column of stacked, faceted rock
+  function spireParts(rng) {
+    const parts = [], lean = (rng() - 0.5) * 0.25, n = 2 + Math.floor(rng() * 2);
+    let y = 0, w = 0.16 + rng() * 0.06;
+    for (let i = 0; i < n; i++) {
+      const h = 0.35 + rng() * 0.25;
+      parts.push(P(GEO.cylTaper, i % 2 ? PALETTE.stoneDark : PALETTE.slate, M(Math.sin(lean) * y, y + h / 2, 0, { sx: w, sy: h, sz: w * 0.85, ry: rng() * 3, rz: lean })));
+      y += h * 0.92; w *= 0.72;
+    }
+    parts.push(P(GEO.rock, PALETTE.stoneDark, M(0.12, 0.08, 0.05, { sx: 0.2, sy: 0.14, sz: 0.16, ry: rng() * 3 })));
+    return { parts, radius: 0.22 };
   }
   const GLOWS = () => [PALETTE.flowerPink, PALETTE.crystalTeal, PALETTE.flowerYellow, PALETTE.crystal];
   // a tentacle: two tapering segments bending outward from the base, a glowing bead at the tip
@@ -826,21 +836,22 @@ const Renderer = (() => {
     }
     if (hollow) {
       for (let i = 0; i < 2; i++) parts.push(P(GEO.bead, PALETTE.spore, M((rng() - 0.5) * s, s * 0.9, (rng() - 0.5) * s * 0.6, { s: 0.035 + rng() * 0.02 }), false, { unlit: true }));
-    } else if (rng() < 0.55) {
-      const col = rng() < 0.5 ? PALETTE.crystal : PALETTE.crystalTeal;
+    } else if (rng() < 0.3) {
+      const col = lerpColor(rng() < 0.5 ? PALETTE.crystal : PALETTE.crystalTeal, PALETTE.stone, 0.55).getHex();
       for (let i = 0; i < 2 + Math.floor(rng() * 2); i++) {
         const a = rng() * 6.28;
         parts.push(P(GEO.cone, col, M(Math.cos(a) * s * 0.35, s * 0.8, Math.sin(a) * s * 0.3, { sx: 0.05 + rng() * 0.03, sy: 0.18 + rng() * 0.14, sz: 0.05, rz: -Math.cos(a) * 0.5, rx: Math.sin(a) * 0.5 })));
       }
-    } else {
-      parts.push(P(GEO.sphereLo, PALETTE.moss, M(-s * 0.15, s * 1.1, 0, { sx: s * 0.85, sy: s * 0.2, sz: s * 0.7, ry }), false));
     }
     return { parts, radius: s * 1.2 };
   }
   // a crystal outcrop: a cluster of tall faceted shards, one glowing core
-  function crystalParts(rng, big) {
+  function crystalParts(rng, big, dull = true) {
     const s = big ? 1 + rng() * 0.5 : 0.5 + rng() * 0.35;
-    const col = rng() < 0.55 ? PALETTE.crystal : PALETTE.crystalTeal, tip = lerpColor(col, 0xffffff, 0.35).getHex();
+    // moon crystal is mostly grey quartz with a faint tint; only set pieces glow
+    let col = rng() < 0.55 ? PALETTE.crystal : PALETTE.crystalTeal;
+    if (dull) col = lerpColor(col, PALETTE.stone, 0.6).getHex();
+    const tip = lerpColor(col, 0xffffff, 0.35).getHex();
     const parts = [P(GEO.rock, PALETTE.stoneDark, M(0, 0.06 * s, 0, { sx: 0.3 * s, sy: 0.12 * s, sz: 0.26 * s }), false)];
     const n = 3 + Math.floor(rng() * 3);
     for (let i = 0; i < n; i++) {
@@ -849,8 +860,8 @@ const Renderer = (() => {
       parts.push(P(GEO.cylTaper, col, M(Math.cos(a) * d, h * 0.42, Math.sin(a) * d, { sx: w, sy: h * 0.84, sz: w, rz: -Math.cos(a) * tilt, rx: Math.sin(a) * tilt, ry: a })));
       parts.push(P(GEO.cone, tip, M(Math.cos(a) * (d + Math.sin(tilt) * h * 0.86), h * 0.84 + w * 0.8, Math.sin(a) * (d + Math.sin(tilt) * h * 0.86), { sx: w * 0.62, sy: w * 1.8, sz: w * 0.62, rz: -Math.cos(a) * tilt, rx: Math.sin(a) * tilt }), false));
     }
-    parts.push(P(GEO.bead, PALETTE.cream, M(0, 0.3 * s, 0.05 * s, { s: 0.05 * s }), false, { unlit: true }));
-    return { parts, radius: 0.28 * s, glow: col };
+    if (!dull) parts.push(P(GEO.bead, PALETTE.cream, M(0, 0.3 * s, 0.05 * s, { s: 0.05 * s }), false, { unlit: true }));
+    return { parts, radius: 0.28 * s, glow: dull ? null : col };
   }
   // an alien bloom: a curling stalk and a five-petal flower in neon colors
   function flowerParts(rng) {
@@ -1043,9 +1054,10 @@ const Renderer = (() => {
       const n = rng() < 0.55 ? 1 : 0;
       for (let i = 0; i < n; i++) {
         const roll = rng();
-        if (roll < 0.45) col.copy(lerpColor(vt.meadowDark, 0x000000, 0.12));          // deep moss
-        else if (roll < 0.75) col.copy(lerpColor(vt.meadow, PALETTE.path, 0.4));        // bare earth
-        else col.copy(lerpColor(vt.meadow, PALETTE.meadowLight, 0.6));                  // clover
+        // patches of darker basalt, pale dust and loose grit, all stone toned
+        if (roll < 0.45) col.copy(lerpColor(PALETTE.stoneDark, vt.meadowDark, 0.15));
+        else if (roll < 0.75) col.copy(lerpColor(PALETTE.stone, vt.meadow, 0.12));
+        else col.copy(lerpColor(PALETTE.stone, 0xffffff, 0.2));
         col.lerp(new THREE.Color(PALETTE.hollowGround), hz);
         const g = GEO.circle.clone().applyMatrix4(M(worldX(c) + (rng() - 0.5) * 0.6, 0.008 + rng() * 0.004, worldZ(r) + (rng() - 0.5) * 0.6,
           { sx: 0.16 + rng() * 0.2, sy: 1, sz: 0.1 + rng() * 0.14, ry: rng() * 3.14 }));

@@ -31,7 +31,7 @@ const LEVEL_6 = (() => {
     const LC = LevelCommon;
     LC.standardScene(kit, { channel: 'coolant', bridge: 'mono', outpost: 'spaceport', seed: 606, mix: [[10, 'tree'], [8, 'bush'], [10, 'tuft'], [8, 'flower'], [6, 'barrel'], [5, 'cart'], [5, 'cottage'], [4, 'solar'], [3, 'silo'], [3, 'antenna'], [2, 'crater'], [12, null]], edge: [[22, 'tree'], [8, 'cottage'], [6, 'silo'], [6, 'rock'], [4, 'antenna'], [18, null]] });
     // bazaar stalls: striped awnings over crates along the square
-    const cols = [PALETTE.flowerPink, PALETTE.tunic, PALETTE.hazard, PALETTE.crystal];
+    const cols = [PALETTE.hull, PALETTE.tunic, PALETTE.hazard, PALETTE.steel];
     [[10, 2], [14, 6], [11, 9], [16, 7]].forEach(([c, r], i) => {
       if (GameState.cellKind(c, r) !== 'ground' || GameState.isBuildable(c, r)) return;
       const x = worldX(c), z = worldZ(r);

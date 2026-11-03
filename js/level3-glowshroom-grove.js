@@ -1,9 +1,10 @@
 // ===================================================================
-// LEVEL 3 — Glowshroom Grove
-// The colony's research lab sits in a grove of giant glowing mushrooms.
+// LEVEL 3 — The Basalt Flats
+// The colony's research lab sits out on the basalt flats, a plain of cracked
+// black lava rock.
 // The pods came down in the north woods, so three roads wind south through
 // the caps: the lane, the ridge path and the fen track. They meet before a
-// fallen mushroom stalk over the goo creek that cuts the grove in two.
+// fallen basalt slab over the goo creek that cuts the flats in two.
 // The Hive Queen stalks in on the last wave.
 // ===================================================================
 const LEVEL_3 = (() => {
@@ -20,7 +21,7 @@ const LEVEL_3 = (() => {
     { name: "Glowfall", flavor: "Saucers in the caps, crawlers underneath.", groups: [g('bat', 4, 1.0, 0, 'lane', 0), g('trickster', 6, 0.65, 0, 'fen', 4), g('grunt', 5, 1.0, 0, 'ridge', 6)] },
     { name: "The Press", flavor: "One road after another.", groups: [g('troll', 2, 2.6, 0, 'ridge', 0), g('grunt', 8, 0.8, 0, 'lane', 1), g('trickster', 5, 0.65, 0, 'fen', 6), g('bat', 4, 1.0, 0, 'lane', 10)] },
     { name: "Pincer", flavor: "Brutes from the north and west, saucers from the south.", groups: [g('troll', 2, 2.4, 0, 'ridge', 0), g('troll', 1, 2.4, 0, 'lane', 2), g('bat', 6, 0.8, 0, 'fen', 4), g('grunt', 6, 0.8, 0, 'fen', 9)] },
-    { name: "Spore Storm", flavor: "The grove is crawling.", groups: [g('grunt', 9, 0.65, 0, 'lane', 0), g('trickster', 8, 0.5, 0, 'fen', 2), g('troll', 3, 2.2, 0, 'ridge', 3), g('bat', 5, 0.85, 0, 'lane', 8)] },
+    { name: "Spore Storm", flavor: "The flats are crawling.", groups: [g('grunt', 9, 0.65, 0, 'lane', 0), g('trickster', 8, 0.5, 0, 'fen', 2), g('troll', 3, 2.2, 0, 'ridge', 3), g('bat', 5, 0.85, 0, 'lane', 8)] },
     { name: "The Hive Queen", flavor: "The Hive Queen comes down the lane, her guards around her. Everything can hit her.", groups: [g('bat', 4, 1.0, 0, 'ridge', 0), g('grunt', 8, 0.75, 0, 'fen', 1), g('hivequeen', 1, 1, 0, 'lane', 7)] },
   ];
 
@@ -35,8 +36,8 @@ const LEVEL_3 = (() => {
   return {
     id: 'glowshroom-grove',
     index: 3,
-    name: 'Glowshroom Grove',
-    subtitle: 'Three roads through the mushrooms. Guard the lab.',
+    name: 'The Basalt Flats',
+    subtitle: 'Three roads across the lava rock. Guard the lab.',
     map: { x: 486, y: 214, reclaim: 98, icon: 'lab' },
     grid: { cols: 20, rows: 13 },
     spawn: [3, 0],
@@ -60,7 +61,7 @@ const LEVEL_3 = (() => {
     waves, prepSeconds: 14, startGold: 170, startLives: 20, starThresholds: [16, 8],
     tipTile: [4, 3],
     endScreenText: {
-      3: () => 'Not one sample jar broken. The lab names a new mushroom after you.',
+      3: () => 'Not one sample jar broken. The lab names a new rock after you.',
       2: (s) => `The lab holds with ${s.lives} lives to spare. Something escaped from a jar, but it was probably fine.`,
       1: (s) => `The lab holds with ${s.lives} lives left. The scientists are hiding under their desks.`,
       lose: (s) => `The lab fell on wave ${s.wave}. All three roads meet before the stalk bridge: build there, and keep a Cryo Beam by the creek for the saucers.`,
