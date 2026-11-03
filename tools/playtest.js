@@ -420,10 +420,14 @@ async function enterLevel(page, levelId) {
   const mid = await page.evaluate(() => GameState.state.enemies.map((e) => ({ id: e.id, dist: +e.dist.toFixed(2), x: +e.x.toFixed(2), z: +e.z.toFixed(2) })));
   check('invaders spawned and spread along the road', mid.length >= 2 && mid[0].dist > 5,   // 6 on a straight road; curved roads walk about 14% less path distance in the same time
      JSON.stringify(mid.slice(0, 3)));
+  // on the road means within the drawn road, lip included (half width 0.47), of the route's
+  // own rounded centerline; grid cell centers are the wrong yardstick on a
+  // curvy road, whose corners cut up to 0.75 of a cell inside them
   const onRoad = await page.evaluate(() => GameState.state.enemies.every((e) => {
+    const rt = GameState.routes[e.route], p = { x: 0, z: 0 };
     let best = Infinity;
-    for (const [c, r] of GameState.pathCells) best = Math.min(best, Math.hypot(GameState.worldX(c) - e.x, GameState.worldZ(r) - e.z));
-    return best < 0.55;
+    for (let d = 0; d <= rt.length; d += 0.05) { GameState.pathPosAt(d, p, rt); best = Math.min(best, Math.hypot(p.x - e.x, p.z - e.z)); }
+    return best < 0.48;   // lane 0.22 plus a crawler's 0.22 weave, at most 0.44
   }));
   check('every invader stays on the road', onRoad);
   await page.screenshot({ path: `${OUT}/wave.png` });
