@@ -360,6 +360,47 @@ function paceTests(G, LEVELS) {
 }
 
 // ---- 3d. progress: a win is never lost (P3-FIX3) ----
+// ---- 3e. endless mode: generated waves, no win, the alive cap ----
+function endlessTests(G, LEVELS) {
+  const out = [];
+  const add = (name, ok, detail = '') => out.push({ name: `endless: ${name}`, ok, detail });
+  G.setEndless(true);
+  let sameSeed = true, aaOk = true, aaWhere = '';
+  for (const def of LEVELS) {
+    G.loadLevel(def);
+    const N = def.waves.length, a = [], b = [];
+    for (let n = N + 1; n <= N + 25; n++) a.push(JSON.stringify(G.waveInfo(n)));
+    G.loadLevel(def);
+    for (let n = N + 1; n <= N + 25; n++) b.push(JSON.stringify(G.waveInfo(n)));
+    if (a.join() !== b.join()) sameSeed = false;
+    for (let n = N + 1; n <= N + 25; n++) for (const g of G.waveInfo(n).groups) {
+      if (!(G.ENEMY_TYPES[g.type].flying)) continue;
+      const rt = G.routes.find((r) => r.id === g.route);
+      if (!rt || !rt.antiAir) { aaOk = false; aaWhere = `${def.id} wave ${n} ${g.type} on ${g.route}`; }
+    }
+  }
+  add('a map gives the same generated waves every time', sameSeed);
+  add('flyers only come down roads an anti-air tower can reach', aaOk, aaWhere);
+  // a run past the level's own waves never wins and never has more alive than the cap
+  const def = LEVELS[1];
+  G.loadLevel(def); G.startGame();
+  const S = G.state; S.lives = 1e6; S.prep = 0;
+  let peak = 0, won = false;
+  for (let w = 0; w < def.waves.length + 8; w++) {
+    G.startWave();
+    let i = 0;
+    while (S.waveActive && i++ < 60 * 400) { G.update(1 / 20); peak = Math.max(peak, S.enemies.length); }
+    if (S.phase === 'won') won = true;
+  }
+  add(`a run goes past the level's own ${def.waves.length} waves without a win`, !won && S.wave === def.waves.length + 8 && S.phase === 'playing', `wave ${S.wave} phase ${S.phase}`);
+  add(`never more than ${G.ENDLESS.cap} enemies alive at once`, peak <= G.ENDLESS.cap, `peak ${peak}`);
+  add('a boss comes every 5th generated wave', [5, 10, 15, 20].map((k) => def.waves.length + k).filter((n) => n % G.ENDLESS.bossEvery === 0).every((n) => G.waveInfo(n).groups.some((g) => G.ENEMY_TYPES[g.type].boss)));
+  G.setEndless(false);
+  G.loadLevel(def);
+  add('the campaign has no endless waves', G.waveInfo(def.waves.length + 1) === null && G.totalWaves() === def.waves.length);
+  return out;
+}
+
 function progressTests() {
   const out = [];
   const add = (name, ok, detail = '') => out.push({ name: `progress: ${name}`, ok, detail });
@@ -379,6 +420,17 @@ function progressTests() {
     return ctx.__p;
   };
   const NEXT = 'comms-ridge', WON = 'glowshroom-grove';
+
+  {
+    // endless bests: only ever go up, survive a reload, merge across copies
+    const l = store(), sss = store(), E = make(l, sss);
+    const firstNew = E.recordEndless('crater-rim', 12), lower = E.recordEndless('crater-rim', 7), higher = E.recordEndless('crater-rim', 15);
+    const again = make(l, store());
+    add('endless bests only go up and are saved', firstNew && !lower && higher && E.endlessBest('crater-rim') === 15 && again.endlessBest('crater-rim') === 15);
+    add('endless stays closed until the last level is won', !E.endlessUnlocked() && E.mode() === 'campaign');
+    E.setMode('endless');
+    add('picking endless before it opens still plays the campaign', E.mode() === 'campaign');
+  }
 
   let local = store(), session = store(), P = make(local, session);
   P.recordWin(WON, 2, 8);
@@ -643,6 +695,7 @@ function validate() {
   results.push(...elevationTests(GameState, LEVELS));
   results.push(...curveTests(GameState, LEVELS));
   results.push(...paceTests(GameState, LEVELS));
+  results.push(...endlessTests(GameState, LEVELS));
   results.push(...progressTests());
   results.push(...difficultyTests(GameState, LEVELS));
   results.push(...meadowGoldenTests());

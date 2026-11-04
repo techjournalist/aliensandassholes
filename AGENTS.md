@@ -80,6 +80,27 @@ A mesa must stay clear of a road's rounded corners (the validator says
 where); Greenhope's first try at [4..6, 2..3] clipped the bends at [3, 1]
 and [7, 1].
 
+**Endless mode is playable** (built on the existing generator; see
+`ENDLESS-MODE.md` section 2). It opens when the last level is won on either
+tier (`Progress.endlessUnlocked()`). The world map has a Campaign / Endless
+switch beside the tier picker (`#wm-mode`, remembered in `aa-mode` via
+`Progress.mode()/setMode()`; boot calls `GameState.setEndless`). In endless
+every map is playable and its node shows the best wave (`.wm-best`) instead
+of stars. A run plays the level's own waves, then generated ones forever
+(a boss every 5th, hp climbing, at most 45 alive); the HUD says "Wave N"
+with no "of N"; there is no win. When the outpost falls `showEndlessEnd()`
+scores the run: waves held (the wave reached minus one), aliens popped,
+credits earned, a "New best!" ribbon when it beats the map's best.
+`Progress.recordEndless(id, waves)` keeps the best per map in
+`progress.endless`, merged like everything else (highest wins); it is not in
+the save code. Tests: the validator checks the generator is deterministic,
+flyers only take anti-air roads, a run passes the level's own waves without
+winning, the alive cap holds, a boss every 5th wave, and that bests only go
+up and endless stays shut until the last win; the playtest runs the whole
+flow in a browser. Harness note: `GameState`, `Renderer`, `BattleSky` and
+friends are top-level consts, never `window` properties; wait on them with
+`typeof GameState !== 'undefined'`.
+
 **The board floats in the title screen's sky** (the user liked the title's
 UFO, moon and ringed planet). `js/battle-sky.js` builds one SVG behind the
 game canvas (`#battle-sky`): a violet gradient with twinkling stars, the

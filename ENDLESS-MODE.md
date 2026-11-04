@@ -35,7 +35,7 @@ bounty x0.95. Save format as planned (`bramble: { stars, bestLives }`, still
   tune the multipliers until Bramble is hard but beatable. Bots are weaker than
   people, so aim for roughly 50 to 70 percent bot wins, not 100.
 
-## 2. Endless mode (build second)
+## 2. Endless mode (built: see AGENTS.md, "Endless mode is playable")
 Unlocks after Level 10 is won. The player picks any of the 10 maps.
 
 - **Waves 1 to 13** use the level's own handmade waves (boss on 13).

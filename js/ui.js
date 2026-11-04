@@ -19,7 +19,8 @@ const UI = (() => {
       pill.setAttribute('aria-label', s.difficulty === 'bramble' ? `${s.lives} lives, ${GameState.DIFFICULTY.bramble.name}` : `${s.lives} lives`);
       shown.tier = s.difficulty;
     }
-    const wave = s.wave > 0 ? `Wave ${s.wave}/${total}` : 'Prep';
+    // endless has no last wave: just the count
+    const wave = s.wave > 0 ? (s.endless ? `Wave ${s.wave}` : `Wave ${s.wave}/${total}`) : 'Prep';
     if (shown.wave !== wave) { $('hud-wave').textContent = wave; shown.wave = wave; }
     const btn = $('wave-btn');
     let main, sub = '';
@@ -258,8 +259,46 @@ const UI = (() => {
       if (p && p.then) p.then(() => { try { screen.orientation.lock('landscape').catch(() => {}); } catch (e) { /* not supported */ } }).catch(() => {});
     } catch (e) { /* full screen is a nicety */ }
   }
+  // labels under the three end-screen numbers, campaign and endless
+  const STAT_LABELS = { campaign: ['Lives left', 'Aliens popped', 'Waves held'], endless: ['Credits earned', 'Aliens popped', 'Waves held'] };
+  function setStatLabels(mode) {
+    ['stat-lives', 'stat-kills', 'stat-waves'].forEach((id, i) => { const lab = $(id).nextElementSibling; if (lab) lab.textContent = STAT_LABELS[mode][i]; });
+  }
+  // An endless run never wins: when the outpost falls, the run is scored by
+  // the waves it held, against this map's best.
+  function showEndlessEnd() {
+    const s = GameState.state, level = GameState.currentLevel(), end = $('end');
+    const held = Math.max(0, s.wave - 1);
+    let fresh = false;
+    try { fresh = Progress.recordEndless(level.id, held); } catch (e) { /* never block the end screen */ }
+    const best = (() => { try { return Progress.endlessBest(level.id); } catch (e) { return held; } })();
+    $('end-title').textContent = 'The run is over';
+    $('end-ribbon-text').textContent = fresh ? 'New best!' : 'Endless';
+    $('end-text').textContent = fresh
+      ? `${level.endpoint.properName} held for ${held} wave${held === 1 ? '' : 's'}, your best on ${level.name}.`
+      : `${level.endpoint.properName} held for ${held} wave${held === 1 ? '' : 's'}. Your best on ${level.name} is ${best}.`;
+    $('stars').classList.remove('show');
+    setStatLabels('endless');
+    const mapBtn = $('end-map-btn');
+    mapBtn.textContent = 'Choose another battle';
+    delete mapBtn.dataset.nextLevel;
+    $('restart-btn').textContent = 'Run it again';
+    end.classList.remove('win', 'finale', 'show');
+    end.classList.toggle('endless-best', fresh);
+    end.classList.add('endless');
+    void end.offsetWidth;
+    end.classList.add('show');
+    countUp($('stat-lives'), s.earned || 0, 900, 700);
+    countUp($('stat-kills'), s.kills || 0, 1100, 800);
+    countUp($('stat-waves'), held, 700, 900);
+    Celebrate.stop();
+  }
   function showEnd(won) {
     const s = GameState.state, level = GameState.currentLevel();
+    if (s.endless) { showEndlessEnd(); return; }
+    setStatLabels('campaign');
+    $('restart-btn').textContent = 'Play again';
+    $('end').classList.remove('endless', 'endless-best');
     // Right after a win, the next level is already unlocked: offer to
     // continue straight to it instead of a generic "pick something" label.
     const next = LEVELS.find((l) => l.index === level.index + 1);
@@ -422,6 +461,16 @@ const UI = (() => {
     const sel0 = LEVELS.find((l) => l.id === mapSelected);
     const inBattle = !!sel0 && sel0.id === GameState.currentLevel().id && GameState.state.phase === 'playing';
     const tier = inBattle ? GameState.state.difficulty : Progress.tier();
+    // endless: open once the last battle is won; every map can be played, scored by its best wave
+    const endlessOpen = Progress.endlessUnlocked();
+    const mode = inBattle ? (GameState.state.endless ? 'endless' : 'campaign') : Progress.mode();
+    const endless = mode === 'endless';
+    document.querySelectorAll('#wm-mode .tier-btn').forEach((b) => {
+      b.setAttribute('aria-checked', String(b.dataset.mode === mode));
+      b.tabIndex = b.dataset.mode === mode ? 0 : -1;
+      b.disabled = inBattle || (b.dataset.mode === 'endless' && !endlessOpen);
+    });
+    $('wm-mode').querySelector('.endless .tier-sub').textContent = endlessOpen ? 'How long can you last?' : `Win ${LEVELS[LEVELS.length - 1].name} first`;
     $('wm-tier').querySelector('.bramble .tier-sub').textContent = `Tougher, ${GameState.DIFFICULTY.bramble.lives} lives`;
     document.querySelectorAll('#wm-tier .tier-btn').forEach((b) => {
       b.setAttribute('aria-checked', String(b.dataset.tier === tier));
@@ -453,14 +502,17 @@ const UI = (() => {
     }
     drawBridges(roads, curves, ordered);
     ordered.forEach((lv, i) => {
-      const unlocked = Progress.isUnlocked(lv.id);
+      const unlocked = endless || Progress.isUnlocked(lv.id);
+      const best = endless ? Progress.endlessBest(lv.id) : 0;
       const stars = Progress.starsFor(lv.id, tier), meadowStars = Progress.starsFor(lv.id), brambleStars = Progress.starsFor(lv.id, 'bramble');
       const { x, y } = mapPos(lv, i);
       const cls = 'wm-node' + (unlocked ? '' : ' locked') + (lv.id === mapSelected ? ' selected' : '') + (next && lv.id === next.id ? ' next' : '');
       const g = svgEl('g', { 'data-level': lv.id, transform: `translate(${x}, ${y})`, tabindex: unlocked ? '0' : '-1', role: 'button' }, cls);
-      g.setAttribute('aria-label', !unlocked ? `${lv.name}, locked`
+      g.setAttribute('aria-label', endless ? `${lv.name}, endless, ${best ? `best ${best} waves` : 'no run yet'}` : !unlocked ? `${lv.name}, locked`
         : `${lv.name}, ${meadowStars} stars on ${GameState.DIFFICULTY.meadow.name}` + (brambleStars ? `, beaten on ${GameState.DIFFICULTY.bramble.name} with ${brambleStars} stars` : ''));
-      const starDots = unlocked
+      const starDots = endless
+        ? `<text class="wm-best" text-anchor="middle" y="38">${best ? `&#8734; ${best}` : '&#8734;'}</text>`
+        : unlocked
         ? [0, 1, 2].map((k) => `<circle class="wm-star ${k < stars ? 'lit' : ''}" cx="${(k - 1) * 11}" cy="34" r="4"></circle>`).join('')
         : '';
       const glyph = lv.map && GLYPHS[lv.map.icon] ? `<g class="wm-glyph" transform="translate(-36 -16)">${GLYPHS[lv.map.icon]}</g>` : '';
@@ -483,15 +535,18 @@ const UI = (() => {
       const name = document.createElement('span');
       name.className = 'wm-name';
       name.textContent = sel.name;
-      blurb.append(name, sel.subtitle);
+      const best = endless ? Progress.endlessBest(sel.id) : 0;
+      blurb.append(name, endless ? `Endless: the waves never stop. ${best ? `Your best here is ${best} waves.` : 'No run here yet.'}` : sel.subtitle);
     } else blurb.textContent = 'Pick a battle on the map.';
     $('wm-play-btn').disabled = !sel;
     const here = sel && sel.id === GameState.currentLevel().id, phase = GameState.state.phase;
+    // a battle loaded in the other mode needs a fresh start too
+    const sameMode = !!GameState.state.endless === endless;
     $('wm-play-btn').textContent = !sel ? 'Choose a battle'
-      : !here ? `Fly to ${sel.name}`
-      : phase === 'title' ? `Defend ${sel.name}`
+      : !here || (!sameMode && phase !== 'playing') ? (endless ? `Endless on ${sel.name}` : `Fly to ${sel.name}`)
+      : phase === 'title' ? (endless ? `Start endless on ${sel.name}` : `Defend ${sel.name}`)
       : phase === 'playing' ? `Return to ${sel.name}`
-      : `Play ${sel.name} again`;
+      : endless ? `Endless on ${sel.name} again` : `Play ${sel.name} again`;
   }
   // The payoff for a first win: the goo visibly pulls back
   // from the battlefield, with a burst of gold and a chime.
@@ -660,6 +715,24 @@ const UI = (() => {
       e.preventDefault(); e.stopPropagation();
       if (!e.target.closest('.tier-btn') || e.target.disabled) return;
       pickTier(Progress.tier() === 'meadow' ? 'bramble' : 'meadow');
+    });
+    // campaign or endless: remembered, and applied at once to a level that has not started yet
+    const pickMode = (m) => {
+      Audio.unlock();
+      if (m === 'endless' && !Progress.endlessUnlocked()) return;
+      const v = Progress.setMode(m);
+      try { Audio.sfx.select(); } catch (e) { /* audio is optional */ }
+      GameState.setEndless(v === 'endless');
+      renderWorldMap();
+      const b = document.querySelector(`#wm-mode .tier-btn[data-mode="${v}"]`);
+      if (b && !b.disabled) b.focus();
+    };
+    $('wm-mode').addEventListener('click', (e) => { const b = e.target.closest('.tier-btn'); if (b && !b.disabled) pickMode(b.dataset.mode); });
+    $('wm-mode').addEventListener('keydown', (e) => {
+      if (!/^Arrow(Left|Right|Up|Down)$/.test(e.key)) return;
+      e.preventDefault(); e.stopPropagation();
+      if (!e.target.closest('.tier-btn') || e.target.disabled) return;
+      pickMode(Progress.mode() === 'endless' ? 'campaign' : 'endless');
     });
     $('restart-btn').addEventListener('click', () => location.reload());
     $('end-map-btn').addEventListener('click', () => {

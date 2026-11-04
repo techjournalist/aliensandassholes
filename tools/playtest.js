@@ -53,7 +53,7 @@ async function enterLevel(page, levelId) {
   await page.locator('#wm-play-btn').click(); await page.waitForTimeout(200);
   // playing a different level reloads the page: wait until the game is back
   // and on that level (a slow software-rendered load used to race this)
-  await page.waitForFunction((id) => window.GameState && GameState.currentLevel && GameState.currentLevel().id === id && window.Renderer && Renderer.debugScene, levelId, { timeout: 30000 }).catch(() => {});
+  await page.waitForFunction((id) => typeof GameState !== 'undefined' && typeof Renderer !== 'undefined' && GameState.currentLevel().id === id, levelId, { timeout: 30000 }).catch(() => {});
 }
 
 (async () => {
@@ -1016,6 +1016,43 @@ async function enterLevel(page, levelId) {
   await page.screenshot({ path: `${OUT}/mobile-landscape.png` });
   console.log('MOBILE DEBUG: ' + (await page.locator('#debug').innerText()).replace(/\n/g, ' | '));
   await ctx.close();
+
+  // ---------------- Endless mode ----------------
+  {
+    const ectx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    if (THREE_LOCAL) await ectx.route('**/three.min.js', (r) => r.fulfill({ path: THREE_LOCAL, contentType: 'application/javascript' }));
+    const ep = await ectx.newPage();
+    ep.on('console', (m) => { if (['error', 'warning'].includes(m.type())) log.push(`[endless ${m.type()}] ${m.text()}`); });
+    ep.on('pageerror', (e) => log.push(`[endless pageerror] ${e.message}`));
+    // before the last level is won endless is shut
+    await ep.goto(PAGE); await ep.waitForTimeout(1500);
+    await ep.locator('#start-btn').click(); await ep.waitForTimeout(300);
+    check('endless: the switch is shut until the last battle is won', await ep.locator('#wm-mode .tier-btn[data-mode="endless"]').isDisabled());
+    // every level won: endless opens
+    await ep.evaluate(() => { localStorage.setItem('aa-progress', JSON.stringify({ v: 1, levels: Object.fromEntries(LEVELS.map((l) => [l.id, { unlocked: true, stars: 2, bestLives: 12 }])) })); });
+    await ep.reload(); await ep.waitForTimeout(1500);
+    await ep.locator('#start-btn').click(); await ep.waitForTimeout(300);
+    await ep.locator('#wm-mode .tier-btn[data-mode="endless"]').click(); await ep.waitForTimeout(300);
+    check('endless: the switch opens once the last battle is won, and is remembered', await ep.evaluate(() => Progress.mode() === 'endless' && document.querySelector('#wm-mode [data-mode="endless"]').getAttribute('aria-checked') === 'true'));
+    check('endless: map nodes show the best wave instead of stars', await ep.evaluate(() => document.querySelectorAll('.wm-node .wm-best').length === LEVELS.length && !document.querySelector('.wm-node .wm-star')));
+    const target = LEVELS_LIST[1].id;
+    await ep.locator(`.wm-node[data-level="${target}"]`).click(); await ep.waitForTimeout(200);
+    check('endless: the play button says endless', /endless/i.test(await ep.locator('#wm-play-btn').innerText()), await ep.locator('#wm-play-btn').innerText());
+    await ep.locator('#wm-play-btn').click();
+    await ep.waitForFunction((id) => typeof GameState !== 'undefined' && GameState.currentLevel().id === id && GameState.state.phase === 'playing', target, { timeout: 30000 }).catch(() => {});
+    check('endless: the run starts in endless mode', await ep.evaluate(() => GameState.state.endless === true && GameState.totalWaves() === Infinity));
+    // play it out with no towers until the outpost falls
+    const run = await ep.evaluate(() => { const S = GameState.state; S.lives = 40; for (let w = 0; w < 60 && S.phase === 'playing'; w++) { GameState.startWave(); let i = 0; while (S.waveActive && i++ < 60 * 300) GameState.update(1 / 20); } return { wave: S.wave, phase: S.phase, n: GameState.currentLevel().waves.length }; });
+    check('endless: the run lasts past the level\'s own waves and ends in a loss, never a win', run.phase === 'lost' && run.wave > run.n, JSON.stringify(run));
+    check('endless: the wave counter has no "of N"', await ep.evaluate(() => /^Wave \d+$/.test(document.querySelector('.pill.wave').innerText.replace(/[^\w ]/g, '').trim())));
+    const shown = await ep.locator('#end.endless.show').waitFor({ timeout: 8000 }).then(() => true).catch(() => false);
+    check('endless: the end screen is the run\'s, with waves held and a new best', shown && await ep.locator('#end-title').innerText() === 'The run is over' && /new best/i.test(await ep.locator('#end-ribbon-text').innerText()));
+    check('endless: the best is saved for that map', await ep.evaluate((r) => Progress.endlessBest(GameState.currentLevel().id) === r.wave - 1, run));
+    await ep.locator('#end-map-btn').click(); await ep.waitForTimeout(300);
+    check('endless: back on the map the node shows the new best', await ep.evaluate((r) => (document.querySelector(`.wm-node[data-level="${GameState.currentLevel().id}"] .wm-best`) || {}).textContent.includes(String(r.wave - 1)), run));
+    await ep.screenshot({ path: `${OUT}/endless-map.png` });
+    await ectx.close();
+  }
 
   await browser.close();
   check('no console errors or warnings', log.length === 0);

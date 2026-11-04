@@ -14,6 +14,8 @@
   const level = LEVELS.find((l) => l.id === activeId) || LEVELS[0];
   // the difficulty tier the player last picked on the world map (Meadow by default)
   try { GameState.setDifficulty(Progress.tier()); } catch (e) { /* stay on Meadow */ }
+  // endless mode, if the player picked it on the world map (and it is open)
+  try { GameState.setEndless(Progress.mode() === 'endless'); } catch (e) { /* stay on the campaign */ }
   GameState.loadLevel(level);
 
   const canvas = document.getElementById('game');

@@ -443,6 +443,19 @@
   .screen #wm-tier .tier-btn.bramble[aria-checked="true"] { background: var(--thorn); color: var(--cream); }
   .screen #wm-tier .tier-btn:disabled { opacity: 0.5; cursor: default; transform: none; }
   .tier-btn.bramble .tier-name::before { content: "\2766\00a0"; }
+  /* endless mode: the same pill switch as the tiers, beside them */
+  #wm-mode { display: inline-flex; gap: 6px; padding: 4px; border-radius: 30px; background: rgba(0, 0, 0, 0.3); }
+  .screen #wm-mode .tier-btn {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+    min-height: 52px; min-width: 104px; padding: 2px 14px; border-radius: 24px; border: 2px solid rgba(246, 236, 212, 0.35);
+    background: linear-gradient(180deg, var(--wood-hi), var(--wood-lo)); color: var(--cream);
+    font-size: 16px; line-height: 1.1; box-shadow: none;
+  }
+  .screen #wm-mode .tier-btn[aria-checked="true"] { background: var(--gold); color: var(--ink); border-color: var(--ink); box-shadow: 0 3px 0 var(--ink); }
+  .screen #wm-mode .tier-btn.endless[aria-checked="true"] { background: linear-gradient(180deg, #7ad8ff, #4a6ad8); color: #0b0820; }
+  .screen #wm-mode .tier-btn:disabled { opacity: 0.5; cursor: default; transform: none; }
+  .tier-btn.endless .tier-name::before { content: "\221E\00a0"; }
+  .wm-best { fill: #7ad8ff; font-size: 13px; font-weight: 800; font-family: inherit; pointer-events: none; }
   /* a level beaten on Bramble: a thorn mark on its node */
   .wm-thorn circle { fill: none; stroke: var(--thorn); stroke-width: 4; }
   .wm-thorn path { fill: var(--thorn); stroke: var(--ink); stroke-width: 1.2; stroke-linejoin: round; }
@@ -731,6 +744,10 @@
   #end.win #stars span.lit:nth-child(3) { animation-delay: 1.65s; }
   #end-stats { display: none; justify-content: center; gap: 10px; margin: 0 0 14px; flex-wrap: wrap; }
   #end.win #end-stats { display: flex; animation: statsin 0.5s 0.5s ease-out both; }
+  /* an endless run's end: the numbers and a ribbon, no stars; a new best gets the gold ribbon */
+  #end.endless #end-stats { display: flex; animation: statsin 0.5s 0.3s ease-out both; }
+  #end.endless #end-ribbon { display: inline-flex; filter: saturate(0.4) brightness(0.9); }
+  #end.endless.endless-best #end-ribbon { filter: none; animation: ribbonin 0.7s 0.2s cubic-bezier(0.3, 1.6, 0.5, 1) both; }
   @keyframes statsin { 0% { transform: translateY(10px); opacity: 0; } 100% { transform: none; opacity: 1; } }
   .stat { min-width: 96px; padding: 8px 12px 7px; border: 2px solid rgba(242, 193, 78, 0.55); border-radius: 12px; background: rgba(0, 0, 0, 0.3); }
   .stat b { display: block; font-size: 28px; line-height: 1.1; color: var(--gold); font-variant-numeric: tabular-nums; text-shadow: 0 2px 0 var(--ink); }
@@ -945,6 +962,10 @@
     </svg>
     <p id="wm-blurb" class="stakes">Pick a battle on the map.</p>
     <div id="wm-actions">
+      <div id="wm-mode" role="radiogroup" aria-label="Mode">
+        <button type="button" class="tier-btn" role="radio" data-mode="campaign" aria-checked="true"><span class="tier-name">Campaign</span><span class="tier-sub">Ten battles</span></button>
+        <button type="button" class="tier-btn endless" role="radio" data-mode="endless" aria-checked="false"><span class="tier-name">Endless</span><span class="tier-sub">How long can you last?</span></button>
+      </div>
       <div id="wm-tier" role="radiogroup" aria-label="Difficulty">
         <button type="button" class="tier-btn" role="radio" data-tier="meadow" aria-checked="true"><span class="tier-name">Cadet</span><span class="tier-sub">The usual fight</span></button>
         <button type="button" class="tier-btn bramble" role="radio" data-tier="bramble" aria-checked="false"><span class="tier-name">Veteran</span><span class="tier-sub">Tougher, 16 lives</span></button>

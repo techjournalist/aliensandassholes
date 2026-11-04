@@ -12,16 +12,19 @@
 // failed or stale storage read). Merging only ever adds: a level stays unlocked
 // if any copy says so, stars and best lives take the highest. A level with
 // stars always opens the next one, so a half-saved win heals itself.
+//
+// Endless mode adds `endless: { id: best wave survived }`, merged the same
+// way (the highest wins). It is not part of the save code.
 // ===================================================================
 const Progress = (() => {
-  const KEY = 'aa-progress', BACKUP = 'aa-progress-session', TIER_KEY = 'aa-difficulty';
+  const KEY = 'aa-progress', BACKUP = 'aa-progress-session', TIER_KEY = 'aa-difficulty', MODE_KEY = 'aa-mode';
   const TIERS = ['meadow', 'bramble'];
   let mem = null;
 
   function defaults() {
     const levels = {};
     LEVELS.forEach((lv, i) => { levels[lv.id] = { unlocked: i === 0, stars: 0, bestLives: null, bramble: { stars: 0, bestLives: null } }; });
-    return { v: 1, levels };
+    return { v: 1, levels, endless: {} };
   }
 
   function parse(raw) {
@@ -47,6 +50,9 @@ const Progress = (() => {
         a.bramble.stars = Math.max(a.bramble.stars || 0, b.bramble.stars || 0);
         a.bramble.bestLives = bestOf(a.bramble.bestLives, b.bramble.bestLives);
       }
+    }
+    if (src.endless && typeof src.endless === 'object') {
+      for (const id in src.endless) if (into.levels[id] && Number.isFinite(src.endless[id])) into.endless[id] = Math.max(into.endless[id] || 0, src.endless[id]);
     }
     return into;
   }
@@ -156,6 +162,29 @@ const Progress = (() => {
     return { ok: true, changed };
   }
 
+  // ---- endless mode ----
+  // it opens once the last level is won, on either tier
+  function endlessUnlocked() { return isWon(LEVELS[LEVELS.length - 1].id); }
+  // the most waves survived on a map in endless (0 if never played)
+  function endlessBest(id) { return load().endless[id] || 0; }
+  // record a finished endless run; true if it is a new best for that map
+  function recordEndless(id, waves) {
+    const data = load(), was = data.endless[id] || 0;
+    if (waves > was) { data.endless[id] = waves; save(data); return true; }
+    return false;
+  }
+  // 'campaign' or 'endless', as last picked on the world map (endless only once it is open)
+  function mode() {
+    let m = null;
+    try { m = localStorage.getItem(MODE_KEY); } catch (e) { /* storage may be blocked */ }
+    return m === 'endless' && endlessUnlocked() ? 'endless' : 'campaign';
+  }
+  function setMode(m) {
+    const v = m === 'endless' ? 'endless' : 'campaign';
+    try { localStorage.setItem(MODE_KEY, v); } catch (e) { /* storage may be blocked */ }
+    return v;
+  }
+
   // the difficulty tier the player last picked on the world map
   function tier() {
     let t = null;
@@ -168,5 +197,5 @@ const Progress = (() => {
     return v;
   }
 
-  return { load, isUnlocked, isWon, starsFor, recordWin, exportCode, importCode, tier, setTier };
+  return { load, isUnlocked, isWon, starsFor, recordWin, exportCode, importCode, tier, setTier, endlessUnlocked, endlessBest, recordEndless, mode, setMode };
 })();
