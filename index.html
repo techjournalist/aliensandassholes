@@ -464,6 +464,12 @@
   @media (max-height: 460px) {
     .screen #wm-tier .tier-btn { min-height: 44px; min-width: 92px; padding: 0 10px; font-size: 15px; }
     .tier-btn .tier-sub { font-size: 10px; }
+    /* phones in landscape: both switches and Play share one row, so the
+       switches drop their sub-labels and shrink to fit */
+    #wm-actions { gap: 6px 8px; flex-wrap: nowrap; }
+    .screen #wm-mode .tier-btn, .screen #wm-tier .tier-btn { min-height: 44px; min-width: 70px; padding: 0 8px; font-size: 14px; }
+    #wm-mode .tier-sub, #wm-tier .tier-sub { display: none; }
+    .screen #wm-play-btn { padding-left: 14px; padding-right: 14px; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; max-width: 46vw; }
   }
 
   /* ---- painted UI pass: carved wood panels, gold trim, glossy buttons ----

@@ -268,10 +268,17 @@ const UI = (() => {
   // the waves it held, against this map's best.
   function showEndlessEnd() {
     const s = GameState.state, level = GameState.currentLevel(), end = $('end');
-    const held = Math.max(0, s.wave - 1);
-    let fresh = false;
-    try { fresh = Progress.recordEndless(level.id, held); } catch (e) { /* never block the end screen */ }
-    const best = (() => { try { return Progress.endlessBest(level.id); } catch (e) { return held; } })();
+    // scored once per run: the screen can come back (the safety net, the
+    // pause button) and must still say "New best!" the second time
+    if (!s.endlessResult) {
+      const held = Math.max(0, s.wave - 1);
+      let fresh = false;
+      try { fresh = Progress.recordEndless(level.id, held); } catch (e) { /* never block the end screen */ }
+      let best = held;
+      try { best = Progress.endlessBest(level.id); } catch (e) { /* keep this run's */ }
+      s.endlessResult = { held, fresh, best };
+    }
+    const { held, fresh, best } = s.endlessResult;
     $('end-title').textContent = 'The run is over';
     $('end-ribbon-text').textContent = fresh ? 'New best!' : 'Endless';
     $('end-text').textContent = fresh

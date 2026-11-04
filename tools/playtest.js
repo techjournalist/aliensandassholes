@@ -962,7 +962,7 @@ async function enterLevel(page, levelId) {
   check('tiers: the HUD lives pill marks a Bramble battle', await page.evaluate(() => GameState.state.phase === 'playing' && document.getElementById('hud-lives').parentElement.classList.contains('bramble')));
   await page.evaluate(() => GameState.pause()); await page.waitForTimeout(150);
   await page.locator('#pause-map-btn').tap(); await page.waitForTimeout(250);
-  check('tiers: the picker is locked while returning to a battle in progress', await page.evaluate(() => document.getElementById('worldmap').classList.contains('show') && [...document.querySelectorAll('.tier-btn')].every((b) => b.disabled) && document.querySelector('.tier-btn[aria-checked="true"]').dataset.tier === 'bramble'));
+  check('tiers: the picker is locked while returning to a battle in progress', await page.evaluate(() => document.getElementById('worldmap').classList.contains('show') && [...document.querySelectorAll('#wm-tier .tier-btn, #wm-mode .tier-btn')].every((b) => b.disabled) && document.querySelector('#wm-tier .tier-btn[aria-checked="true"]').dataset.tier === 'bramble'));
   await page.locator('#wm-play-btn').tap(); await page.waitForTimeout(200);
   await page.evaluate(() => { document.getElementById('pause').classList.remove('show'); GameState.resume(); });
   // a Bramble win goes to the Bramble record only
@@ -1042,7 +1042,8 @@ async function enterLevel(page, levelId) {
     await ep.waitForFunction((id) => typeof GameState !== 'undefined' && GameState.currentLevel().id === id && GameState.state.phase === 'playing', target, { timeout: 30000 }).catch(() => {});
     check('endless: the run starts in endless mode', await ep.evaluate(() => GameState.state.endless === true && GameState.totalWaves() === Infinity));
     // play it out with no towers until the outpost falls
-    const run = await ep.evaluate(() => { const S = GameState.state; S.lives = 40; for (let w = 0; w < 60 && S.phase === 'playing'; w++) { GameState.startWave(); let i = 0; while (S.waveActive && i++ < 60 * 300) GameState.update(1 / 20); } return { wave: S.wave, phase: S.phase, n: GameState.currentLevel().waves.length }; });
+    // no towers: plenty of lives until past the level's own waves, then the last few
+    const run = await ep.evaluate(() => { const S = GameState.state, N = GameState.currentLevel().waves.length; for (let w = 0; w < 80 && S.phase === 'playing'; w++) { S.lives = S.wave < N + 2 ? 1e6 : Math.min(S.lives, 3); GameState.startWave(); let i = 0; while (S.waveActive && i++ < 60 * 300) GameState.update(1 / 20); } return { wave: S.wave, phase: S.phase, n: N }; });
     check('endless: the run lasts past the level\'s own waves and ends in a loss, never a win', run.phase === 'lost' && run.wave > run.n, JSON.stringify(run));
     check('endless: the wave counter has no "of N"', await ep.evaluate(() => /^Wave \d+$/.test(document.querySelector('.pill.wave').innerText.replace(/[^\w ]/g, '').trim())));
     const shown = await ep.locator('#end.endless.show').waitFor({ timeout: 8000 }).then(() => true).catch(() => false);
