@@ -1,0 +1,12 @@
+remotion/node_modules
+remotion/public/shots
+remotion/out
+capture/stills
+capture/logs
+capture/*.jpg
+capture/*.png
+capture/probe*.js
+remotion/public/audio/*.wav
+!remotion/public/audio/.keep
+vo/music.wav
+*.mp4
